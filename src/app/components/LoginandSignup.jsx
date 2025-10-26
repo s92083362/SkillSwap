@@ -1,7 +1,9 @@
 "use client"
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function AuthForm() {
+export default function LoginAndSignup() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('signup');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -28,7 +30,6 @@ export default function AuthForm() {
       return;
     }
     setError('');
-    // Proceed with signup logic
     console.log('SignUp data:', signupData);
   };
 
@@ -39,8 +40,12 @@ export default function AuthForm() {
       return;
     }
     setError('');
-    // Proceed with login logic
     console.log('Login data:', loginData);
+  };
+
+  // Navigate to Forgot Password page
+  const handleForgotPassword = () => {
+    router.push('/forgotpassword');
   };
 
   return (
@@ -113,11 +118,7 @@ export default function AuthForm() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-5 top-1/2 transform -translate-y-1/2"
                 >
-                  <svg
-                    className="w-5 h-5 text-blue-900"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-5 h-5 text-blue-900" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                   </svg>
                 </button>
@@ -134,11 +135,7 @@ export default function AuthForm() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-5 top-1/2 transform -translate-y-1/2"
                 >
-                  <svg
-                    className="w-5 h-5 text-blue-900"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-5 h-5 text-blue-900" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                   </svg>
                 </button>
@@ -174,7 +171,6 @@ export default function AuthForm() {
                 </button>
               </p>
 
-              {/* OR separator */}
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t-2 border-gray-300"></div>
                 <span className="px-3 lg:px-4 text-gray-700 text-base lg:text-lg font-semibold">OR</span>
@@ -183,35 +179,19 @@ export default function AuthForm() {
 
               <p className="text-center text-gray-700 text-sm lg:text-base mb-3">Sign in with</p>
 
-              {/* Social buttons */}
               <div className="flex justify-center space-x-4">
                 <button className="hover:scale-110 transition-transform">
                   <svg className="w-10 h-10 lg:w-12 lg:h-12" viewBox="0 0 48 48">
-                    <path
-                      fill="#FFC107"
-                      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-                    />
-                    <path
-                      fill="#FF3D00"
-                      d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-                    />
-                    <path
-                      fill="#4CAF50"
-                      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-                    />
-                    <path
-                      fill="#1976D2"
-                      d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-                    />
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
+                    <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
                   </svg>
                 </button>
                 <button className="hover:scale-110 transition-transform">
                   <svg className="w-10 h-10 lg:w-12 lg:h-12" viewBox="0 0 48 48">
                     <circle cx="24" cy="24" r="20" fill="#3B5998" />
-                    <path
-                      fill="#FFF"
-                      d="M29.5 16.5h-3c-1.4 0-2.5 1.1-2.5 2.5v3h5.5l-1 5H24v12h-5V27h-3v-5h3v-3c0-4.1 3.4-7.5 7.5-7.5h3v5z"
-                    />
+                    <path fill="#FFF" d="M29.5 16.5h-3c-1.4 0-2.5 1.1-2.5 2.5v3h5.5l-1 5H24v12h-5V27h-3v-5h3v-3c0-4.1 3.4-7.5 7.5-7.5h3v5z" />
                   </svg>
                 </button>
               </div>
@@ -240,18 +220,17 @@ export default function AuthForm() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-5 top-1/2 transform -translate-y-1/2"
                 >
-                  <svg
-                    className="w-5 h-5 text-blue-900"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
+                  <svg className="w-5 h-5 text-blue-900" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
                   </svg>
                 </button>
               </div>
 
               <div className="text-right">
-                <button className="text-blue-900 text-xs lg:text-sm hover:underline">
+                <button 
+                  onClick={handleForgotPassword}
+                  className="text-blue-900 text-xs lg:text-sm hover:underline"
+                >
                   Forgot password?
                 </button>
               </div>
@@ -263,42 +242,25 @@ export default function AuthForm() {
                 Login
               </button>
 
-              {/* OR separator */}
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t-2 border-gray-300"></div>
                 <span className="px-3 lg:px-4 text-gray-700 text-base lg:text-lg font-semibold">OR</span>
                 <div className="flex-1 border-t-2 border-gray-300"></div>
               </div>
 
-              {/* Social buttons */}
               <div className="flex justify-center space-x-4 mb-4">
                 <button className="hover:scale-110 transition-transform">
                   <svg className="w-10 h-10 lg:w-12 lg:h-12" viewBox="0 0 48 48">
-                    <path
-                      fill="#FFC107"
-                      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-                    />
-                    <path
-                      fill="#FF3D00"
-                      d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-                    />
-                    <path
-                      fill="#4CAF50"
-                      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-                    />
-                    <path
-                      fill="#1976D2"
-                      d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-                    />
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
+                    <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
+                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
                   </svg>
                 </button>
                 <button className="hover:scale-110 transition-transform">
                   <svg className="w-10 h-10 lg:w-12 lg:h-12" viewBox="0 0 48 48">
                     <circle cx="24" cy="24" r="20" fill="#3B5998" />
-                    <path
-                      fill="#FFF"
-                      d="M29.5 16.5h-3c-1.4 0-2.5 1.1-2.5 2.5v3h5.5l-1 5H24v12h-5V27h-3v-5h3v-3c0-4.1 3.4-7.5 7.5-7.5h3v5z"
-                    />
+                    <path fill="#FFF" d="M29.5 16.5h-3c-1.4 0-2.5 1.1-2.5 2.5v3h5.5l-1 5H24v12h-5V27h-3v-5h3v-3c0-4.1 3.4-7.5 7.5-7.5h3v5z" />
                   </svg>
                 </button>
               </div>
