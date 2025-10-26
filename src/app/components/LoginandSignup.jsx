@@ -7,6 +7,42 @@ export default function AuthForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
+  // Controlled inputs
+  const [signupData, setSignupData] = useState({ username: '', email: '', password: '', confirmPassword: '' });
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+
+  const [error, setError] = useState('');
+
+  // Handle SignUp
+  const handleSignUp = () => {
+    if (!signupData.username || !signupData.email || !signupData.password || !signupData.confirmPassword) {
+      setError('Please fill all the fields');
+      return;
+    }
+    if (!agreed) {
+      setError('Please agree to the terms and conditions');
+      return;
+    }
+    if (signupData.password !== signupData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    setError('');
+    // Proceed with signup logic
+    console.log('SignUp data:', signupData);
+  };
+
+  // Handle Login
+  const handleLogin = () => {
+    if (!loginData.email || !loginData.password) {
+      setError('Please fill all the fields');
+      return;
+    }
+    setError('');
+    // Proceed with login logic
+    console.log('Login data:', loginData);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl flex flex-col lg:flex-row overflow-hidden">
@@ -24,7 +60,7 @@ export default function AuthForm() {
           {/* Tabs */}
           <div className="flex mb-6">
             <button
-              onClick={() => setActiveTab('login')}
+              onClick={() => { setActiveTab('login'); setError(''); }}
               className={`flex-1 text-xl lg:text-2xl font-bold pb-3 transition-colors ${
                 activeTab === 'login'
                   ? 'text-blue-900 border-b-4 border-blue-900'
@@ -34,7 +70,7 @@ export default function AuthForm() {
               Login
             </button>
             <button
-              onClick={() => setActiveTab('signup')}
+              onClick={() => { setActiveTab('signup'); setError(''); }}
               className={`flex-1 text-xl lg:text-2xl font-bold pb-3 transition-colors ${
                 activeTab === 'signup'
                   ? 'text-blue-900 border-b-4 border-blue-900'
@@ -45,24 +81,33 @@ export default function AuthForm() {
             </button>
           </div>
 
+          {/* Display error */}
+          {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
+
           {/* SignUp Form */}
           {activeTab === 'signup' && (
             <div className="space-y-4">
               <input
                 type="text"
                 placeholder="User Name"
+                value={signupData.username}
+                onChange={(e) => setSignupData({ ...signupData, username: e.target.value })}
                 className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900"
               />
               <input
                 type="email"
                 placeholder="Email"
+                value={signupData.email}
+                onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
                 className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900"
               />
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Password"
-                  className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none  text-black focus:ring-2 focus:ring-blue-900"
+                  value={signupData.password}
+                  onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                  className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900"
                 />
                 <button
                   onClick={() => setShowPassword(!showPassword)}
@@ -81,7 +126,9 @@ export default function AuthForm() {
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="Confirm Password"
-                  className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none focus:ring-2  text-black focus:ring-blue-900"
+                  value={signupData.confirmPassword}
+                  onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
+                  className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none focus:ring-2 text-black focus:ring-blue-900"
                 />
                 <button
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -110,20 +157,24 @@ export default function AuthForm() {
                 </label>
               </div>
 
-              <button className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors">
+              <button
+                onClick={handleSignUp}
+                className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors"
+              >
                 SignUp
               </button>
 
               <p className="text-center text-gray-700 text-sm lg:text-base">
                 Already got an account?{' '}
                 <button
-                  onClick={() => setActiveTab('login')}
+                  onClick={() => { setActiveTab('login'); setError(''); }}
                   className="text-blue-900 font-semibold hover:underline"
                 >
                   Login
                 </button>
               </p>
 
+              {/* OR separator */}
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t-2 border-gray-300"></div>
                 <span className="px-3 lg:px-4 text-gray-700 text-base lg:text-lg font-semibold">OR</span>
@@ -132,6 +183,7 @@ export default function AuthForm() {
 
               <p className="text-center text-gray-700 text-sm lg:text-base mb-3">Sign in with</p>
 
+              {/* Social buttons */}
               <div className="flex justify-center space-x-4">
                 <button className="hover:scale-110 transition-transform">
                   <svg className="w-10 h-10 lg:w-12 lg:h-12" viewBox="0 0 48 48">
@@ -172,12 +224,16 @@ export default function AuthForm() {
               <input
                 type="email"
                 placeholder="Email"
+                value={loginData.email}
+                onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                 className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900"
               />
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   placeholder="Password"
+                  value={loginData.password}
+                  onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                   className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900"
                 />
                 <button
@@ -200,16 +256,21 @@ export default function AuthForm() {
                 </button>
               </div>
 
-              <button className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px]  text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors">
+              <button
+                onClick={handleLogin}
+                className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors"
+              >
                 Login
               </button>
 
+              {/* OR separator */}
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t-2 border-gray-300"></div>
                 <span className="px-3 lg:px-4 text-gray-700 text-base lg:text-lg font-semibold">OR</span>
                 <div className="flex-1 border-t-2 border-gray-300"></div>
               </div>
 
+              {/* Social buttons */}
               <div className="flex justify-center space-x-4 mb-4">
                 <button className="hover:scale-110 transition-transform">
                   <svg className="w-10 h-10 lg:w-12 lg:h-12" viewBox="0 0 48 48">
@@ -245,7 +306,7 @@ export default function AuthForm() {
               <p className="text-center text-gray-700 text-sm lg:text-base">
                 Don't have an account?{' '}
                 <button
-                  onClick={() => setActiveTab('signup')}
+                  onClick={() => { setActiveTab('signup'); setError(''); }}
                   className="text-blue-900 font-semibold hover:underline"
                 >
                   SignUp
