@@ -45,7 +45,7 @@ export default function LoginAndSignup() {
 
   // Navigate to Forgot Password page
   const handleForgotPassword = () => {
-    router.push('/forgotpassword');
+    router.push('/auth/forgot-password');
   };
 
   return (

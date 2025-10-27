@@ -1,9 +1,7 @@
-import LoginAndSignup from './components/LoginandSignup';
+import SkillSwapLanding from './components/SkillSwapLanding';
 
 export default function Home() {
-  return (
-    <main>
-      <LoginAndSignup />
-    </main>
-  );
+  
+    return <SkillSwapLanding />;
+ 
 }
