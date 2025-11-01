@@ -71,7 +71,7 @@ export default function SkillSwapLanding() {
             new technologies, and grow together.
           </p>
           <button 
-            onClick={() => router.push('/auth/loginandsignup')}
+            onClick={() => router.push('/auth/login-and-signup')}
             className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
           >
             Start Swapping Skills
@@ -158,7 +158,7 @@ export default function SkillSwapLanding() {
             Join a vibrant community of developers and IT professionals dedicated to mutual growth.
           </p>
           <button 
-            onClick={() => router.push('/auth/loginandsignup')}
+            onClick={() => router.push('/auth/login-and-signup')}
             className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
           >
             Sign Up Now & Start Learning
