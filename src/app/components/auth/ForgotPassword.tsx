@@ -17,7 +17,7 @@ export default function ForgotPassword() {
   };
 
   const handleBackToLogin = () => {
-    router.push('/auth/loginandsignup');
+    router.push('/auth/login-and-signup');
   };
 
   return (

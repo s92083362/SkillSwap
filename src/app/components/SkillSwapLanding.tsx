@@ -11,12 +11,12 @@ export default function SkillSwapLanding() {
   // Handler functions
   const handleSignUp = () => {
     setSelectedTab('signup');
-    router.push('/auth/loginandsignup');
+    router.push('/auth/login-and-signup');
   };
 
   const handleLogin = () => {
     setSelectedTab('login');
-    router.push('/auth/loginandsignup');
+    router.push('/auth/login-and-signup');
   };
 
   return (
