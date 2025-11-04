@@ -25,6 +25,7 @@ export default function ForgotPassword() {
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl flex flex-col lg:flex-row overflow-hidden">
         {/* Left Side - Image Section */}
         <div className="w-full lg:w-1/2 bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center p-6">
+         {/* Image hosted on ImgBB: https://imgbb.com */}
           <img 
             src="https://i.ibb.co/prv9CVH7/Welcome-to-Skill-Swap-1-1.png" 
             alt="Welcome to SkillSwap" 

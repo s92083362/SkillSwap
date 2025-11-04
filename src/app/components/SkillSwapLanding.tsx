@@ -25,6 +25,7 @@ export default function SkillSwapLanding() {
       <header className="flex flex-wrap items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white">
         <div className="flex items-center gap-2 min-w-0">
           {/* Logo as image */}
+          {/* Image hosted on ImgBB: https://imgbb.com */}
           <img 
             src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png" 
             alt="SkillSwap Logo" 
@@ -60,24 +61,38 @@ export default function SkillSwapLanding() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative bg-black text-white py-16 sm:py-32 px-4 sm:px-8">
-        <div className="absolute inset-0 opacity-50">
-          <img src="https://i.ibb.co/kVsPLPWS/20251027-2110-image.png" alt="" className="w-full h-full object-cover" />
-        </div>
-        <div className="relative max-w-2xl sm:max-w-4xl mx-auto text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">Trade Skills, Master Code</h1>
-          <p className="text-base sm:text-lg text-gray-300 mb-6 sm:mb-8 max-w-2xl mx-auto">
-            A peer-to-peer learning platform for developers. Exchange your expertise, learn<br className="hidden sm:block" />
-            new technologies, and grow together.
-          </p>
-          <button 
-            onClick={() => router.push('/auth/login-and-signup')}
-            className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
-          >
-            Start Swapping Skills
-          </button>
-        </div>
-      </section>
+      <section className="relative w-full h-[70vh] overflow-hidden flex items-center justify-center bg-black">
+  {/* Responsive video background */}
+  <video
+    src="https://res.cloudinary.com/drw4jufk2/video/upload/Lpage_remtex.mp4"
+    autoPlay
+    loop
+    muted
+    playsInline
+    className="absolute inset-0 w-full h-full object-cover z-10"
+  />
+
+  {/* Overlay for readability */}
+  <div className="absolute inset-0 w-full h-full bg-black/50 z-20"></div>
+  
+  {/* Hero content */}
+  <div className="relative z-30 max-w-2xl sm:max-w-4xl mx-auto text-center text-white">
+    <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 sm:mb-6">
+      Trade Skills, Master Code
+    </h1>
+    <p className="text-base sm:text-lg text-gray-300 mb-6 sm:mb-8 max-w-2xl mx-auto">
+      A peer-to-peer learning platform for developers.<br className="hidden sm:block" />
+      Exchange your expertise, learn new technologies, and grow together.
+    </p>
+    <button 
+      onClick={() => router.push('/auth/login-and-signup')}
+      className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
+    >
+      Start Swapping Skills
+    </button>
+  </div>
+</section>
+
 
       {/* How It Works Section */}
       <section className="py-12 sm:py-20 px-4 sm:px-8 bg-gray-50">
@@ -126,9 +141,17 @@ export default function SkillSwapLanding() {
       <section className="py-12 sm:py-20 px-4 sm:px-8 bg-blue-200">
         <div className="max-w-3xl sm:max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
           <div className="relative order-2 lg:order-1">
-            <div className="bg-green-900 rounded-lg p-6 sm:p-8 aspect-video">
-              <img src="https://i.ibb.co/jZWrSynf/Container-Picsart-Ai-Image-Enhancer.png" alt="" className="w-full h-full object-cover rounded" />
-            </div>
+          <div className="bg-green-900 rounded-lg overflow-hidden aspect-video">
+  <iframe
+    src="https://player.cloudinary.com/embed/?cloud_name=drw4jufk2&public_id=video_1_ixg9cy&profile=cld-default&controls=playpause,fullscreen&showLogo=false&hideContextMenu=true"
+    title="Cloudinary Video"
+    allow="autoplay; fullscreen"
+    allowFullScreen
+    className="w-full h-full border-0"
+  ></iframe>
+</div>
+
+
             <div className="absolute -bottom-4 sm:-bottom-6 right-4 sm:right-6 bg-white rounded-lg shadow-lg p-3 sm:p-4 flex items-center gap-3">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-300 rounded-full"></div>
               <div>
