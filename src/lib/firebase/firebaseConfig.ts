@@ -4,7 +4,7 @@ import { getAnalytics } from "firebase/analytics";
 import { getStorage } from "firebase/storage"; // <-- ADD THIS
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD9r8BPlPmpBO9wcPpNy2-XubeOCRe6cOo",
+  apiKey: "process.env.NEXT_PUBLIC_FIREBASE_API_KEY,",
   authDomain: "my-activty.firebaseapp.com",
   databaseURL: "https://my-activty-default-rtdb.firebaseio.com",
   projectId: "my-activty",
