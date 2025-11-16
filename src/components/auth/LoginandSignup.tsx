@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login, register, googleLogin } from "../../lib/firebase/auth";
+import { login, register, googleLogin, facebookLogin } from "../../lib/firebase/auth";
 
 export default function LoginAndSignup() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function LoginAndSignup() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Handle Google login (real Firebase auth)
+  // Google
   const handleGoogleLogin = async () => {
     setError("");
     try {
@@ -29,12 +29,22 @@ export default function LoginAndSignup() {
     }
   };
 
-  // Handle Facebook login (still stub)
-  const handleFacebookLogin = () => {
-    setError("Facebook login not implemented yet.");
+  // Facebook (real!)
+  const handleFacebookLogin = async () => {
+    setError("");
+    try {
+      await facebookLogin();
+      setSuccess("You are logged in successfully");
+      setTimeout(() => {
+        setSuccess("");
+        router.push("/dash-board");
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
-  // Handle Sign Up
+  // Sign Up
   const handleSignUp = async () => {
     if (!signupData.username || !signupData.email || !signupData.password || !signupData.confirmPassword) {
       setError("Please fill all the fields");
@@ -61,7 +71,7 @@ export default function LoginAndSignup() {
     }
   };
 
-  // Handle Login
+  // Login
   const handleLogin = async () => {
     if (!loginData.email || !loginData.password) {
       setError("Please fill all the fields");
@@ -117,13 +127,11 @@ export default function LoginAndSignup() {
             </button>
           </div>
 
-          {/* Success popup */}
           {success && (
             <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-2 text-center font-semibold">
               {success}
             </div>
           )}
-          {/* Display error */}
           {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
 
           {/* SignUp Form */}
