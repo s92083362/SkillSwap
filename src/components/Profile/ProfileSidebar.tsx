@@ -3,6 +3,8 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { logout } from "../../lib/firebase/auth";
 import { LogOut, Home, Layers, MessageSquare, Compass, User, X } from "lucide-react";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "../../lib/firebase/firebaseConfig";
 
 interface ProfileSidebarProps {
   mobileMenuOpen: boolean;
@@ -19,6 +21,9 @@ export default function ProfileSidebar({
 }: ProfileSidebarProps) {
   const router = useRouter();
   const [success, setSuccess] = useState("");
+
+  // Get auth user info
+  const [user, loading, error] = useAuthState(auth);
 
   const navItems: { key: typeof activeSection; icon: React.ReactNode; label: string }[] = [
     { key: "dashboard", icon: <Home className="w-5 h-5" />, label: "Dashboard" },
@@ -50,6 +55,13 @@ export default function ProfileSidebar({
         : "text-gray-600 hover:bg-blue-50"
     }`;
 
+  // Use user's photoURL or fallback to avatar with initials
+  const avatarUrl = user?.photoURL
+    ? user.photoURL
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.displayName || "User")}&background=F8D5CB&color=555`;
+
+  const displayName = loading ? "Loading..." : user?.displayName || "User";
+
   // Sidebar for desktop
   const sidebarContent = (
     <>
@@ -58,9 +70,15 @@ export default function ProfileSidebar({
           {success}
         </div>
       )}
-      <img src="https://ui-avatars.com/api/?name=Sophia+Bennett&background=F8D5CB&color=555" alt="Profile" className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover mb-3 lg:mb-4" />
-      <p className="font-bold text-base lg:text-lg mb-1 text-gray-900">Sophia Bennett</p>
-      <p className="text-purple-600 text-xs lg:text-sm font-medium mb-5 lg:mb-7 bg-purple-100 px-2 py-1 rounded">Standard Member</p>
+      <img
+        src={avatarUrl}
+        alt="Profile"
+        className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover mb-3 lg:mb-4"
+      />
+      <p className="font-bold text-base lg:text-lg mb-1 text-gray-900">{displayName}</p>
+      <p className="text-purple-600 text-xs lg:text-sm font-medium mb-5 lg:mb-7 bg-purple-100 px-2 py-1 rounded">
+        Standard Member
+      </p>
       <ul className="w-full flex-1 space-y-1 mb-0">
         {navItems.map((item) => (
           <li key={item.key}>

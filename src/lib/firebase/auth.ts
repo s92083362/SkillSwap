@@ -6,7 +6,8 @@ import {
   GoogleAuthProvider,
   FacebookAuthProvider,
   signInWithPopup,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updateProfile
 } from 'firebase/auth';
 import { auth } from './firebaseConfig';
 
@@ -20,10 +21,12 @@ export async function login(email: string, password: string) {
   }
 }
 
-// Email/Password Register function
-export async function register(email: string, password: string) {
+// Email/Password Register function (now sets name)
+export async function register(email: string, password: string, name: string) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // Set the user's displayName
+    await updateProfile(userCredential.user, { displayName: name });
     return userCredential.user;
   } catch (error) {
     throw error;
@@ -54,7 +57,7 @@ export async function googleLogin() {
 export async function facebookLogin() {
   try {
     const provider = new FacebookAuthProvider();
-    // Optionally request additional permissions with provider.addScope('email')
+    // Optionally request additional permissions
     const result = await signInWithPopup(auth, provider);
     return result.user;
   } catch (error) {
