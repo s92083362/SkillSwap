@@ -1,9 +1,12 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "../../../components/shared/header/Header";
 import AccordionSection from "../../../components/dashboard/AccordionSection";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth, db } from "../../../lib/firebase/firebaseConfig";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 
 const skills = [
   {
@@ -89,19 +92,40 @@ const skills = [
   },
 ];
 
-interface SkillDetailPageProps {
-  params: Promise<{ skillId: string }>;
-}
-
-export default function SkillDetailPage({ params }: SkillDetailPageProps) {
-  // ✅ Properly unwrap the params Promise
+export default function SkillDetailPage({ params }) {
+  // ✅ Proper params unwrapping for Next.js 15+
   const { skillId } = React.use(params);
 
   // ✅ Add header state to fix setMobileMenuOpen error
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user] = useAuthState(auth);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [loadingEnroll, setLoadingEnroll] = useState(false);
 
   const skill = skills.find((s) => s.id === skillId);
   if (!skill) return notFound();
+
+  // Check enrollment status when component mounts or skill/user changes
+  useEffect(() => {
+    if (!user || !skillId) {
+      setIsEnrolled(false);
+      return;
+    }
+    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
+    getDoc(ref).then((docSnap) => {
+      setIsEnrolled(docSnap.exists());
+    });
+  }, [user, skillId]);
+
+  // Enroll handler
+  async function handleEnroll() {
+    if (!user) return;
+    setLoadingEnroll(true);
+    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
+    await setDoc(ref, { enrolledAt: new Date() });
+    setIsEnrolled(true);
+    setLoadingEnroll(false);
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -114,6 +138,27 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
             Instructor: {skill.instructor}
           </p>
           <p className="text-base text-blue-800">{skill.description}</p>
+          {/* ENROLL BUTTON LOGIC */}
+          {user && (
+            <div className="mt-8 flex justify-center">
+              {isEnrolled ? (
+                <button
+                  disabled
+                  className="bg-green-200 text-green-700 px-5 py-2 rounded font-semibold opacity-70 cursor-not-allowed"
+                >
+                  Enrolled
+                </button>
+              ) : (
+                <button
+                  className="bg-blue-600 text-white rounded px-5 py-2 font-semibold hover:bg-blue-700 disabled:opacity-70"
+                  onClick={handleEnroll}
+                  disabled={loadingEnroll}
+                >
+                  {loadingEnroll ? "Enrolling..." : "Enroll"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {skill.sections.map((section, idx) => (
