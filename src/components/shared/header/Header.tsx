@@ -2,28 +2,60 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Menu, X } from "lucide-react";
+// import { useNotifications, Notification } from "../../../hooks/useNotifications";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "../../../lib/firebase/firebaseConfig";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "../../../lib/firebase/firebaseConfig";
+// import NotificationList from "./NotificationList";
 
 interface HeaderProps {
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
 }
 
-const sampleNotifications = [
-  {
-    id: 1,
-    message: "You have a skill swap request from Alice.",
-    actions: ["Approve", "Reject"]
-  },
-  {
-    id: 2,
-    message: "Bob approved your teach request.",
-    actions: []
-  }
-];
-
 const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) => {
   const router = useRouter();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [user] = useAuthState(auth);
+  const userId = user?.uid;
+  const [notifications, setNotifications] = useNotifications(userId);
+
+  const handleNotificationAction = async (notifId: string | number, action: string, notif: Notification) => {
+    if (action === "View") {
+      // Mark message as read in Firestore
+      try {
+        const messageRef = doc(db, "messages", notifId as string);
+        await updateDoc(messageRef, {
+          read: true,
+          readAt: new Date()
+        });
+      } catch (error) {
+        console.error("Error marking message as read:", error);
+      }
+
+      // Navigate to chat
+      if (notif.chatId) {
+        router.push(`/chat/${notif.chatId}`);
+      }
+      // Remove from local notifications
+      setNotifications(prev => prev.filter(n => n.id !== notifId));
+      setNotificationsOpen(false);
+    }
+  };
+
+  const dismissNotification = async (notifId: string | number) => {
+    try {
+      const messageRef = doc(db, "messages", notifId as string);
+      await updateDoc(messageRef, {
+        read: true,
+        readAt: new Date()
+      });
+      setNotifications(prev => prev.filter(n => n.id !== notifId));
+    } catch (error) {
+      console.error("Error dismissing notification:", error);
+    }
+  };
 
   return (
     <header className="bg-white border-b border-gray-200 relative">
@@ -48,49 +80,51 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
             {/* Notifications Dropdown */}
             <div className="relative">
               <button
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                className="p-2 hover:bg-gray-100 rounded-lg relative"
                 onClick={() => setNotificationsOpen((v) => !v)}
                 aria-label="Show notifications"
               >
                 <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full px-2 text-xs">
+                    {notifications.length}
+                  </span>
+                )}
               </button>
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white shadow-lg rounded-xl p-4 border z-50">
-                  <h3 className="font-bold mb-2">Notifications</h3>
-                  <ul className="space-y-3">
-                    {sampleNotifications.length === 0 && (
-                      <li className="text-gray-500">No notifications</li>
-                    )}
-                    {sampleNotifications.map((notif) => (
-                      <li key={notif.id} className="bg-gray-50 rounded p-3 text-gray-700">
-                        <div>{notif.message}</div>
-                        <div className="mt-2 flex gap-2">
-                          {notif.actions.map(action => (
-                            <button
-                              key={action}
-                              className={`px-2 py-1 rounded text-xs font-semibold border ${action === 'Approve' ? 'text-green-800 border-green-200 bg-green-50' : 'text-red-700 border-red-200 bg-red-50'}`}
-                              onClick={() => alert(action + " clicked!")}
-                            >{action}</button>
-                          ))}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    className="w-full mt-4 text-blue-600 underline"
-                    onClick={() => setNotificationsOpen(false)}
-                  >Close</button>
-                </div>
+                <NotificationList
+                  notifications={notifications}
+                  onClose={() => setNotificationsOpen(false)}
+                  onActionClick={handleNotificationAction}
+                  onDismiss={dismissNotification}
+                  onClearAll={() => {
+                    notifications.forEach(n => dismissNotification(n.id));
+                  }}
+                />
               )}
             </div>
-            {/* Profile Button: routes to /profile */}
+            {/* Profile Image Button */}
             <button
               onClick={() => router.push("/profile")}
-              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-orange-400 to-pink-400 cursor-pointer hover:ring-2 hover:ring-orange-400 transition flex items-center justify-center"
+              className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-orange-400 hover:ring-2 hover:ring-orange-400 transition flex items-center justify-center"
               aria-label="Go to Profile"
               title="Profile"
               type="button"
-            />
+            >
+              {user && user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || "Profile"}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center text-lg font-bold text-gray-700">
+                  {user?.displayName ? user.displayName[0].toUpperCase() : (
+                    <svg width="20" height="20"><circle cx="10" cy="10" r="10" fill="#F472B6" /></svg>
+                  )}
+                </span>
+              )}
+            </button>
             {/* Mobile Menu Button */}
             <button
               className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"

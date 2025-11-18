@@ -1,38 +1,99 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Upload } from "lucide-react";
-import { storage } from '../../lib/firebase/firebaseConfig'; // Adjust path as needed
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { updateProfile } from "firebase/auth";
+import { setDoc, doc } from "firebase/firestore";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth, db } from "../../lib/firebase/firebaseConfig";
 
 export default function EditProfile() {
-  const [name, setName] = useState('Alex Doe');
-  const [username, setUsername] = useState('@lexdoe');
-  const [bio, setBio] = useState('Frontend developer passionate about creating beautiful and intuitive user experiences.');
-  const [skills, setSkills] = useState('React, Tailwind CSS, JavaScript, Next.js');
-  const [availability, setAvailability] = useState('Available for new swaps');
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [user] = useAuthState(auth);
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [skills, setSkills] = useState("");
+  const [availability, setAvailability] = useState("Available for new swaps");
+  const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // Handle file upload to Firebase Storage
-  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // imgbb API - Get free API key from https://api.imgbb.com/
+  
+  const IMGBB_API_KEY = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+
+  // Sync local photoUrl with user's current Auth photoURL (on login, refresh, or logout)
+  useEffect(() => {
+    if (user?.photoURL) {
+      setPhotoUrl(user.photoURL);
+    } else {
+      setPhotoUrl(null);
+    }
+    if (user?.displayName) {
+      setName(user.displayName);
+    }
+  }, [user]);
+
+  // Photo upload handler
+  const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     try {
-      const storageRef = ref(storage, `profile_photos/${file.name}-${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(storageRef);
-      setPhotoUrl(downloadUrl);
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch(
+        `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+        {
+          method: "POST",
+          body: formData
+        }
+      );
+      const data = await response.json();
+      if (data.success) {
+        setPhotoUrl(data.data.url);
+        // Update Auth so reloads/logouts always show latest photo
+        if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: data.data.url });
+        // (Optional) update Firestore for user lists, etc
+        if (user) await setDoc(doc(db, "users", user.uid), { photoUrl: data.data.url }, { merge: true });
+      } else {
+        alert("Failed to upload photo.");
+      }
     } catch {
       alert("Failed to upload photo.");
     }
     setUploading(false);
   };
 
-  const handleRemovePhoto = () => {
+  // Remove photo: update both Auth and Firestore
+  const handleRemovePhoto = async () => {
     setPhotoUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: "" });
+    if (user) await setDoc(doc(db, "users", user.uid), { photoUrl: "" }, { merge: true });
+  };
+
+  // Save profile: update displayName in Auth, save username/bio/etc in Firestore
+  const handleSaveProfile = async () => {
+    if (!auth.currentUser) return;
+    setSaving(true);
+    try {
+      await updateProfile(auth.currentUser, {
+        displayName: name,
+        photoURL: photoUrl || undefined
+      });
+      await setDoc(doc(db, "users", auth.currentUser.uid), {
+        username,
+        bio,
+        skills,
+        availability,
+        photoUrl: photoUrl || undefined
+      }, { merge: true });
+      alert("Profile updated!");
+    } catch (e) {
+      alert("Failed to update profile.");
+    }
+    setSaving(false);
   };
 
   return (
@@ -42,7 +103,6 @@ export default function EditProfile() {
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Edit Profile</h1>
           <p className="text-gray-600 text-sm sm:text-base">Update your profile information and preferences.</p>
         </div>
-
         <div className="bg-white rounded-md md:rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 md:p-8">
           {/* Profile Photo */}
           <div className="mb-8">
@@ -76,7 +136,7 @@ export default function EditProfile() {
                 />
                 <button
                   type="button"
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
@@ -145,7 +205,7 @@ export default function EditProfile() {
             <p className="text-sm text-gray-500 mt-2">Separate skills with commas.</p>
           </div>
 
-          {/* Intro Video */}
+          {/* Intro Video - Not Implemented */}
           <div className="mb-6">
             <label className="block text-sm font-semibold text-gray-900 mb-2">Intro Video</label>
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-12 text-center">
@@ -183,8 +243,12 @@ export default function EditProfile() {
             <button className="px-6 py-2.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancel
             </button>
-            <button className="px-6 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">
-              Save Changes
+            <button
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+              onClick={handleSaveProfile}
+              disabled={saving}
+            >
+              {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </div>
