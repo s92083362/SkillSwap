@@ -2,12 +2,12 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Menu, X } from "lucide-react";
-// import { useNotifications, Notification } from "../../../hooks/useNotifications";
+import { useNotifications, Notification } from "../../../hooks/useNotifications";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../lib/firebase/firebaseConfig";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase/firebaseConfig";
-// import NotificationList from "./NotificationList";
+import NotificationList from "./NotificationList";
 
 interface HeaderProps {
   mobileMenuOpen: boolean;
