@@ -1,31 +1,45 @@
 "use client";
-
 import React, { useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface AccordionSectionProps {
-  title: string;
+  title: string | React.ReactNode;
   children: React.ReactNode;
   defaultOpen?: boolean;
 }
 
-const AccordionSection: React.FC<AccordionSectionProps> = ({ title, children, defaultOpen = false }) => {
-  const [open, setOpen] = useState(defaultOpen);
+const AccordionSection: React.FC<AccordionSectionProps> = ({
+  title,
+  children,
+  defaultOpen = false,
+}) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
   return (
-    <div className="mb-6">
+    <div className="bg-white rounded-lg shadow-sm mb-4 overflow-hidden border border-gray-200">
       <button
-        className="flex items-center gap-2 text-2xl font-bold w-full text-left py-4 px-2 bg-transparent focus:outline-none text-black"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 sm:p-6 hover:bg-gray-50 transition-colors"
       >
-        <span>{open ? "▾" : "▸"}</span>
-        {title}
+        <h3 className="text-lg sm:text-xl font-semibold text-gray-900 text-left">
+          {title}
+        </h3>
+        <div className="flex-shrink-0 ml-4">
+          {isOpen ? (
+            <ChevronUp className="w-5 h-5 text-gray-500" />
+          ) : (
+            <ChevronDown className="w-5 h-5 text-gray-500" />
+          )}
+        </div>
       </button>
-      {open && (
-        <div className="bg-blue-100 px-4 py-4 rounded-md border-t border-blue-200 text-base">
+      
+      {isOpen && (
+        <div className="px-4 sm:px-6 pb-6 pt-2 border-t border-gray-100">
           {children}
         </div>
       )}
     </div>
   );
 };
+
 export default AccordionSection;

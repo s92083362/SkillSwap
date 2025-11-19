@@ -1,166 +1,277 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Header from "../../../../components/shared/header/Header";
+import AccordionSection from "../../../../components/dashboard/AccordionSection";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth, db } from "../../../../lib/firebase/firebaseConfig";
+import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
 
-// Example skill data with sections including their own unique ids
-const skills = [
+const hardcodedSkills = [
   {
     id: "python-for-beginners",
     title: "Python for Beginners",
+    description: "Learn Python basics with clear lessons and sample code.",
+    instructor: "Alex Doe",
     sections: [
+      {
+        id: "skill-overview",
+        name: "Skill overview",
+        content: (
+          <>
+            <p className="text-gray-900 leading-relaxed">
+              This is an easy-to-follow guide to the fundamentals of how software applications are created and maintained. You'll learn core concepts, modern techniques, and practical skills that apply to any programming language.
+            </p>
+            <p className="text-gray-900 leading-relaxed">
+              We've condensed months of study into concise and informative lessons, designed for beginners but valuable for developing real world projects.
+            </p>
+          </>
+        ),
+      },
       {
         id: "computational-thinking-basics",
         name: "Computational thinking basics",
-        videoUrl:
-          "https://res.cloudinary.com/drw4jufk2/video/upload/Lpage_remtex.mp4",
-        resources: [
-          "https://realresource.com/1",
-          "https://realresource.com/2"
-        ],
+        content: (
+          <div className="bg-blue-200 rounded-lg py-2 px-6 mb-2 flex items-center">
+            <span className="font-bold mr-4 text-gray-900">1.1</span>
+            <span className="text-gray-900">Computational thinking basics</span>
+          </div>
+        ),
+      },
+      {
+        id: "what-is-python",
+        name: "What is Python?",
+        content: (
+          <div className="bg-blue-100 rounded-lg py-2 px-6 mb-2 flex items-center">
+            <span className="font-bold mr-4 text-gray-900">1.2</span>
+            <span className="text-gray-900">What is Python?</span>
+          </div>
+        ),
+      },
+    ],
+  },
+  {
+    id: "js-essentials",
+    title: "JavaScript Essentials",
+    description:
+      "Master JavaScript for modern web development, including all the fundamental building blocks.",
+    instructor: "Sam Smith",
+    sections: [
+      {
+        id: "js-skill-overview",
+        name: "Skill overview",
         content: (
           <>
-            <p className="text-gray-900 mb-2">
-              Learn the foundational principles of computational thinking including decomposition, pattern recognition, and abstraction.
+            <p className="text-gray-900 leading-relaxed">
+              This course covers the essential features of JavaScript for building interactive web apps.
             </p>
-            <ul className="text-gray-800 list-disc pl-5 mb-2">
-              <li>What is computational thinking?</li>
-              <li>Why is it important in programming?</li>
-              <li>Examples in Python</li>
-            </ul>
+            <p className="text-gray-900 leading-relaxed">
+              Each lesson includes hands-on examples and relevant explanations, suitable for both beginners and those coming from other languages.
+            </p>
           </>
-        )
-      }
-    ]
-  }
+        ),
+      },
+      {
+        id: "getting-started-with-js",
+        name: "Getting Started with JavaScript",
+        content: (
+          <>
+            <div className="bg-blue-200 rounded-lg py-2 px-6 mb-2 flex items-center">
+              <span className="font-bold mr-4 text-gray-900">1.1</span>
+              <span className="text-gray-900">History & Where JavaScript Runs</span>
+            </div>
+            <div className="bg-blue-100 rounded-lg py-2 px-6 mb-2 flex items-center">
+              <span className="font-bold mr-4 text-gray-900">1.2</span>
+              <span className="text-gray-900">Hello world in the Browser & Console</span>
+            </div>
+          </>
+        ),
+      },
+    ],
+  },
 ];
 
-export default function SectionDetailPage({ params }) {
-  const { skillId, sectionId } = React.use(params);
+export default function SkillDetailPage({ params }) {
+  const { skillId } = React.use(params);
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showExchange, setShowExchange] = useState(false);
+  const [user] = useAuthState(auth);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [loadingEnroll, setLoadingEnroll] = useState(false);
+  const [skills, setSkills] = useState(hardcodedSkills);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch Firebase lessons and merge with hardcoded skills
+  useEffect(() => {
+    async function fetchLessons() {
+      try {
+        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
+        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Firebase lesson data:', data); // Debug log
+          
+          return {
+            id: doc.id,
+            title: data.title,
+            description: data.description,
+            instructor: data.instructor,
+            image: data.image,
+            sections: [
+              {
+                id: "skill-overview",
+                name: "Skill overview",
+                title: "Skill overview",
+                content: data.description || "No description available.",
+              },
+              ...(data.sections || []).map((section, idx) => ({
+                id: `section-${idx}`,
+                name: section.title,
+                title: section.title,
+                content: section.content,
+                videoUrl: section.videoUrl,
+              })),
+            ],
+          };
+        });
+
+        console.log('All skills (merged):', [...hardcodedSkills, ...firebaseLessons]); // Debug log
+        setSkills([...hardcodedSkills, ...firebaseLessons]);
+      } catch (error) {
+        console.error("Error fetching lessons:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLessons();
+  }, []);
 
   const skill = skills.find((s) => s.id === skillId);
+
+  // Check enrollment status
+  useEffect(() => {
+    if (!user || !skillId) {
+      setIsEnrolled(false);
+      return;
+    }
+    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
+    getDoc(ref).then((docSnap) => {
+      setIsEnrolled(docSnap.exists());
+    });
+  }, [user, skillId]);
+
+  // Enroll handler
+  async function handleEnroll() {
+    if (!user) return;
+    setLoadingEnroll(true);
+    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
+    await setDoc(ref, { enrolledAt: new Date() });
+    setIsEnrolled(true);
+    setLoadingEnroll(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500 text-lg">Loading lesson...</div>
+      </div>
+    );
+  }
+
   if (!skill) return notFound();
-  const section = skill.sections.find((sec) => sec.id === sectionId);
-  if (!section) return notFound();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header
-        mobileMenuOpen={mobileMenuOpen}
-        setMobileMenuOpen={setMobileMenuOpen}
-      />
+      <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
 
-      {/* Partner Info + Swap Skill Button */}
-      <div className="flex items-center justify-between bg-white rounded-xl shadow p-5 mt-6 mb-8">
-        <div className="flex items-center gap-4">
-          <img
-            src="https://ui-avatars.com/api/?name=Sophia+Bennett&background=F8D5CB&color=555"
-            alt="Partner"
-            className="w-16 h-16 rounded-full object-cover bg-[#F8D5CB]"
-          />
-          <div>
-            <div className="text-lg font-semibold text-gray-900">Sophia Bennett</div>
-            <div className="text-sm text-gray-500">Software Engineer</div>
-          </div>
-        </div>
-        <button
-          onClick={() => setShowExchange(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded text-base"
-          type="button"
-        >
-          Swap Skill
-        </button>
-      </div>
-
-      <main className="max-w-4xl mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold text-blue-900 mb-4">{section.name}</h1>
-
-        {/* Video Area */}
-        <div className="w-full h-64 bg-gray-200 rounded flex items-center justify-center mb-8">
-          <video
-            src={section.videoUrl}
-            controls
-            className="w-full h-full object-contain rounded"
-          >
-            Your browser does not support the video tag.
-          </video>
-        </div>
-
-        {/* Lesson Content */}
-        <div className="bg-white rounded shadow p-6 mb-8">{section.content}</div>
-
-        {/* Resources & Personal Notes */}
-        <div className="bg-blue-50 rounded p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Lesson Resources</h2>
-          <ul className="mb-4">
-            {section.resources?.map((url, idx) => (
-              <li key={idx}>
-                <a
-                  href={url}
-                  className="text-blue-700 underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
+      <main className="max-w-5xl mx-auto px-4 py-10">
+        <div className="bg-gradient-to-r from-blue-100 to-blue-50 rounded-xl py-14 px-8 text-center mb-8">
+          {skill.image && (
+            <img 
+              src={skill.image} 
+              alt={skill.title}
+              className="w-32 h-32 object-cover rounded-lg mx-auto mb-6"
+            />
+          )}
+          <h1 className="text-5xl font-bold text-gray-900 mb-2">{skill.title}</h1>
+          <p className="text-lg font-medium text-blue-900 mb-2">
+            Instructor: {skill.instructor}
+          </p>
+          <p className="text-base text-blue-800">{skill.description}</p>
+          
+          {user && (
+            <div className="mt-8 flex justify-center">
+              {isEnrolled ? (
+                <button
+                  disabled
+                  className="bg-green-200 text-green-700 px-5 py-2 rounded font-semibold opacity-70 cursor-not-allowed"
                 >
-                  Resource {idx + 1}
-                </a>
-              </li>
+                  Enrolled
+                </button>
+              ) : (
+                <button
+                  className="bg-blue-600 text-white rounded px-5 py-2 font-semibold hover:bg-blue-700 disabled:opacity-70"
+                  onClick={handleEnroll}
+                  disabled={loadingEnroll}
+                >
+                  {loadingEnroll ? "Enrolling..." : "Enroll"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Show lessons only if enrolled */}
+        {isEnrolled ? (
+          <>
+            {skill.sections.map((section, idx) => (
+              <AccordionSection
+                key={idx}
+                title={section.name}
+                defaultOpen={idx === 0}
+              >
+                <div className="space-y-4">
+                  {/* Text Content */}
+                  {typeof section.content === 'string' ? (
+                    <div className="prose max-w-none">
+                      <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
+                        {section.content}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>{section.content}</div>
+                  )}
+                  
+                  {/* Video Player - Shows directly in accordion */}
+                  {section.videoUrl && (
+                    <div className="mt-6">
+                      <h4 className="text-base font-semibold text-gray-900 mb-3">📹 Video Lesson</h4>
+                      <div className="bg-black rounded-lg overflow-hidden shadow-lg">
+                        <video
+                          src={section.videoUrl}
+                          controls
+                          controlsList="nodownload"
+                          className="w-full"
+                          preload="metadata"
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </AccordionSection>
             ))}
-          </ul>
-
-          <h3 className="font-medium mb-2">Your Personal Notes</h3>
-          <textarea
-            className="w-full border rounded mb-2 p-2 min-h-[100px]"
-            placeholder="Start typing your notes here..."
-          />
-          <button className="bg-blue-600 text-white px-4 py-2 rounded">Save Notes</button>
-        </div>
-      </main>
-
-      {/* Swap Skill Modal */}
-      {showExchange && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-8 relative">
-            <button
-              onClick={() => setShowExchange(false)}
-              className="absolute top-4 right-4 text-2xl text-gray-400 hover:text-blue-600 font-bold"
-              aria-label="Close"
-            >
-              ×
-            </button>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Request an Exchange</h2>
-            <p className="text-gray-600 mb-8">You are one step away from learning a new skill!</p>
-            <div className="mb-6">
-              <label className="block font-semibold text-gray-800 mb-2">Skill to offer in return</label>
-              <select className="w-full border rounded px-3 py-2 text-gray-900 bg-white">
-                <option value="">Select a skill you’ve uploaded</option>
-                <option>Web Development</option>
-                <option>UI/UX Design</option>
-                {/* Add more options as needed */}
-              </select>
-            </div>
-            <div className="mb-6">
-              <label className="block font-semibold text-gray-800 mb-2">Add a message <span className="text-gray-500 font-normal">(optional)</span></label>
-              <textarea
-                className="w-full border rounded px-3 py-2 min-h-[80px] text-gray-900"
-                placeholder="Hi! I’d love to exchange my Web Development skills for your Python course. I think we could both learn a lot!"
-              />
-            </div>
-            <div className="flex items-center mb-8">
-              <input type="checkbox" id="agree" className="mr-2" />
-              <label htmlFor="agree" className="text-gray-700 text-sm">
-                I agree to the SkillSwap <a className="text-blue-600 underline" href="#">Term</a> and <a className="text-blue-600 underline" href="#">Conditions</a>.
-              </label>
-            </div>
-            <button
-              className="w-full bg-blue-900 hover:bg-blue-800 text-white text-lg font-semibold rounded py-3 mt-2 transition"
-            >
-              Skill Exchange Request
-            </button>
+          </>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <p className="text-gray-600 text-lg">
+              Please enroll in this course to access the lessons.
+            </p>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

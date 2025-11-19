@@ -6,9 +6,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
 
-const skills = [
+const hardcodedSkills = [
   {
     id: "python-for-beginners",
     title: "Python for Beginners",
@@ -92,20 +92,68 @@ const skills = [
   },
 ];
 
-export default function SkillDetailPage({ params }) {
-  // ✅ Proper params unwrapping for Next.js 15+
+export default function SkillPage({ params }) {
   const { skillId } = React.use(params);
 
-  // ✅ Add header state to fix setMobileMenuOpen error
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
+  const [skills, setSkills] = useState(hardcodedSkills);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch Firebase lessons and merge with hardcoded skills
+  useEffect(() => {
+    async function fetchLessons() {
+      try {
+        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
+        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Firebase lesson data:', data); // Debug log
+          
+          return {
+            id: doc.id,
+            title: data.title,
+            description: data.description,
+            instructor: data.instructor,
+            image: data.image,
+            sections: [
+              {
+                id: "skill-overview",
+                name: "Skill overview",
+                title: "Skill overview",
+                content: (
+                  <p className="text-gray-900 leading-relaxed">
+                    {data.description}
+                  </p>
+                ),
+              },
+              ...(data.sections || []).map((section, idx) => ({
+                id: `section-${idx}`,
+                name: section.title,
+                title: section.title,
+                content: section.content,
+                videoUrl: section.videoUrl,
+              })),
+            ],
+          };
+        });
+
+        console.log('All skills (merged):', [...hardcodedSkills, ...firebaseLessons]); // Debug log
+        setSkills([...hardcodedSkills, ...firebaseLessons]);
+      } catch (error) {
+        console.error("Error fetching lessons:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLessons();
+  }, []);
 
   const skill = skills.find((s) => s.id === skillId);
-  if (!skill) return notFound();
 
-  // Check enrollment status when component mounts or skill/user changes
+  // Check enrollment status
   useEffect(() => {
     if (!user || !skillId) {
       setIsEnrolled(false);
@@ -127,18 +175,35 @@ export default function SkillDetailPage({ params }) {
     setLoadingEnroll(false);
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500 text-lg">Loading lesson...</div>
+      </div>
+    );
+  }
+
+  if (!skill) return notFound();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
 
       <main className="max-w-5xl mx-auto px-4 py-10">
         <div className="bg-gradient-to-r from-blue-100 to-blue-50 rounded-xl py-14 px-8 text-center mb-8">
+          {skill.image && (
+            <img 
+              src={skill.image} 
+              alt={skill.title}
+              className="w-32 h-32 object-cover rounded-lg mx-auto mb-6"
+            />
+          )}
           <h1 className="text-5xl font-bold text-gray-900 mb-2">{skill.title}</h1>
           <p className="text-lg font-medium text-blue-900 mb-2">
             Instructor: {skill.instructor}
           </p>
           <p className="text-base text-blue-800">{skill.description}</p>
-          {/* ENROLL BUTTON LOGIC */}
+          
           {user && (
             <div className="mt-8 flex justify-center">
               {isEnrolled ? (
@@ -161,26 +226,58 @@ export default function SkillDetailPage({ params }) {
           )}
         </div>
 
-        {skill.sections.map((section, idx) => (
-          <AccordionSection
-            key={idx}
-            title={
-              ["skill-overview", "js-skill-overview"].includes(section.id)
-                ? section.name
-                : (
-                    <Link
-                      href={`/skills/${skill.id}/${section.id}`}
-                      className="text-blue-800 hover:underline"
-                    >
-                      {section.name}
-                    </Link>
-                  )
-            }
-            defaultOpen={idx === 0}
-          >
-            {section.content}
-          </AccordionSection>
-        ))}
+        {/* Show lessons only if enrolled */}
+        {isEnrolled ? (
+          <>
+            {skill.sections.map((section, idx) => (
+              <AccordionSection
+                key={idx}
+                title={section.name || section.title}
+                defaultOpen={idx === 0}
+              >
+                {typeof section.content === 'string' ? (
+                  <div className="space-y-4">
+                    {/* Text Content */}
+                    {section.content && (
+                      <div className="text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
+                        {section.content}
+                      </div>
+                    )}
+                    
+                    {/* Video Player */}
+                    {section.videoUrl && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Video Lesson</h4>
+                        <video
+                          src={section.videoUrl}
+                          controls
+                          controlsList="nodownload"
+                          className="w-full max-w-3xl rounded-lg border border-gray-200 shadow-sm"
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                    )}
+                    
+                    {/* Empty State */}
+                    {!section.content && !section.videoUrl && (
+                      <p className="text-gray-500 italic">No content available for this section.</p>
+                    )}
+                  </div>
+                ) : (
+                  // For hardcoded sections (Python, JS)
+                  section.content
+                )}
+              </AccordionSection>
+            ))}
+          </>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <p className="text-gray-600 text-lg">
+              Please enroll in this course to access the lessons.
+            </p>
+          </div>
+        )}
       </main>
     </div>
   );
