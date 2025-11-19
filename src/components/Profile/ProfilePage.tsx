@@ -1,18 +1,17 @@
-"use client";
+ "use client";
 import React, { useState } from "react";
 import Header from "../shared/header/Header";
 import ProfileSidebar from "./ProfileSidebar";
 import ProfileLessons from "./ProfileLessons";
 import ProfileMessages from "./ProfileMessages";
 import EditProfile from "./EditProfile";
+import MySkills from "./MySkills"; // <-- import your skills component
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "../../lib/firebase/firebaseConfig"
+import { auth } from "../../lib/firebase/firebaseConfig";
 
 export default function ProfilePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState(
-    "dashboard"
-  );
+  const [activeSection, setActiveSection] = useState("dashboard");
   const [user, loading, error] = useAuthState(auth);
 
   return (
@@ -29,12 +28,13 @@ export default function ProfilePage() {
           {activeSection === "dashboard" && (
             <>
               <h1 className="text-3xl font-bold mb-1">
-                {loading
-                  ? "Loading..."
-                  : user && user.displayName
-                  ? `Welcome back, ${user.displayName}!`
-                  : "Welcome!"
-                }
+                {loading ? "Loading..." : (
+                  user && user.displayName ? (
+                    <>
+                      Welcome back, <span className="text-black">{user.displayName}</span>!
+                    </>
+                  ) : "Welcome!"
+                )}
               </h1>
               <p className="text-gray-500 mb-6">
                 Here's what's happening on SkillSwap today.
@@ -43,12 +43,7 @@ export default function ProfilePage() {
               <ProfileMessages />
             </>
           )}
-          {activeSection === "skills" && (
-            <div>
-              <h1 className="text-2xl font-semibold mb-4">My Skills</h1>
-              {/* Insert your Skills code or component here */}
-            </div>
-          )}
+          {activeSection === "skills" && <MySkills />}
           {activeSection === "messages" && <ProfileMessages />}
           {activeSection === "explore" && (
             <div>
