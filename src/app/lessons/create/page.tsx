@@ -3,7 +3,8 @@ import React, { useState, useRef } from 'react';
 import { ChevronUp, Trash2, Plus, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase/firebaseConfig';
+import { db, auth } from '@/lib/firebase/firebaseConfig';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 function initialSection() {
   return {
@@ -19,6 +20,7 @@ function initialSection() {
 
 export default function CreateLessonPage() {
   const router = useRouter();
+  const [user] = useAuthState(auth);
 
   // Meta fields
   const [lessonTitle, setLessonTitle] = useState('');
@@ -37,28 +39,18 @@ export default function CreateLessonPage() {
   const [isPublishing, setIsPublishing] = useState(false);
 
   // Add a new section
-  const handleAddSection = () => {
-    setSections(secs => [...secs, initialSection()]);
-  };
+  const handleAddSection = () => setSections(secs => [...secs, initialSection()]);
 
   // Remove a section
-  const handleRemoveSection = idx => {
-    setSections(secs => secs.filter((_, i) => i !== idx));
-  };
+  const handleRemoveSection = idx => setSections(secs => secs.filter((_, i) => i !== idx));
 
-  // Handle video upload for a section
+  // Handle video upload
   const handleVideoUpload = async (file, idx) => {
     if (!file) return;
     setSections(secs =>
       secs.map((s, i) =>
         i === idx
-          ? {
-              ...s,
-              isUploading: true,
-              videoFileName: file.name,
-              progress: 0,
-              error: null,
-            }
+          ? { ...s, isUploading: true, videoFileName: file.name, progress: 0, error: null }
           : s
       )
     );
@@ -79,26 +71,13 @@ export default function CreateLessonPage() {
           const res = JSON.parse(xhr.responseText);
           setSections(secs =>
             secs.map((s, i) =>
-              i === idx
-                ? {
-                    ...s,
-                    isUploading: false,
-                    videoUrl: res.url,
-                    progress: 100,
-                  }
-                : s
+              i === idx ? { ...s, isUploading: false, videoUrl: res.url, progress: 100 } : s
             )
           );
         } else {
           setSections(secs =>
             secs.map((s, i) =>
-              i === idx
-                ? {
-                    ...s,
-                    isUploading: false,
-                    error: 'Upload failed',
-                  }
-                : s
+              i === idx ? { ...s, isUploading: false, error: 'Upload failed' } : s
             )
           );
         }
@@ -106,28 +85,16 @@ export default function CreateLessonPage() {
       xhr.addEventListener('error', () => {
         setSections(secs =>
           secs.map((s, i) =>
-            i === idx
-              ? {
-                  ...s,
-                  isUploading: false,
-                  error: 'Network error',
-                }
-              : s
+            i === idx ? { ...s, isUploading: false, error: 'Network error' } : s
           )
         );
       });
       xhr.open('POST', '/api/upload-video');
       xhr.send(formData);
-    } catch (error) {
+    } catch {
       setSections(secs =>
         secs.map((s, i) =>
-          i === idx
-            ? {
-                ...s,
-                isUploading: false,
-                error: 'Client error',
-              }
-            : s
+          i === idx ? { ...s, isUploading: false, error: 'Client error' } : s
         )
       );
     }
@@ -136,15 +103,7 @@ export default function CreateLessonPage() {
   const handleRemoveVideo = idx => {
     setSections(secs =>
       secs.map((s, i) =>
-        i === idx
-          ? {
-              ...s,
-              videoUrl: '',
-              videoFileName: '',
-              progress: 0,
-              error: null,
-            }
-          : s
+        i === idx ? { ...s, videoUrl: '', videoFileName: '', progress: 0, error: null } : s
       )
     );
     if (fileInputRefs.current[idx]) fileInputRefs.current[idx].value = '';
@@ -206,34 +165,21 @@ export default function CreateLessonPage() {
 
   // Handle lesson publish (save all fields to Firebase)
   const handlePublishLesson = async () => {
-    if (!lessonTitle.trim()) {
-      alert('Please enter a lesson title');
-      return;
-    }
-    if (!lessonDesc.trim()) {
-      alert('Please enter a lesson description');
-      return;
-    }
-    if (!skillCategory) {
-      alert('Please select a skill category');
-      return;
-    }
-    if (!instructor.trim()) {
-      alert('Please enter an instructor name');
-      return;
-    }
-    if (sections.some(s => !s.title.trim())) {
-      alert('Please fill in all section titles');
-      return;
-    }
-    if (sections.some(s => s.isUploading)) {
-      alert('Please wait for all videos to finish uploading');
-      return;
-    }
+    if (!lessonTitle.trim()) { alert('Please enter a lesson title'); return; }
+    if (!lessonDesc.trim()) { alert('Please enter a lesson description'); return; }
+    if (!skillCategory) { alert('Please select a skill category'); return; }
+    if (!instructor.trim()) { alert('Please enter an instructor name'); return; }
+    if (sections.some(s => !s.title.trim())) { alert('Please fill in all section titles'); return; }
+    if (sections.some(s => s.isUploading)) { alert('Please wait for all videos to finish uploading'); return; }
 
     setIsPublishing(true);
 
     try {
+      if (!user || !user.uid) {
+        alert('You must be logged in to publish a lesson.');
+        setIsPublishing(false);
+        return;
+      }
       const payload = {
         title: lessonTitle,
         description: lessonDesc,
@@ -245,18 +191,15 @@ export default function CreateLessonPage() {
           content: s.content,
           videoUrl: s.videoUrl,
         })),
+        creatorId: user.uid, // <-- this ensures only you see it in "My Lessons"
         createdAt: new Date().toISOString(),
       };
 
-      // Save to Firestore
       const docRef = await addDoc(collection(db, 'lessons'), payload);
 
       console.log('Lesson saved with ID:', docRef.id);
       alert('Lesson published successfully!');
-
-      // Redirect to my lessons page
-      router.push('/Profile/MySkills');
-
+      router.push('/profile/MySkills');
     } catch (error) {
       console.error('Error saving lesson:', error);
       alert('Failed to publish lesson. Please try again.');

@@ -2,18 +2,31 @@
 import React, { useEffect, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase/firebaseConfig";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase/firebaseConfig";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 export default function MyLessonsPage() {
   const router = useRouter();
+  const [user] = useAuthState(auth);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      setLessons([]);
+      setLoading(false);
+      return;
+    }
     async function fetchLessons() {
+      setLoading(true);
       try {
-        const snapshot = await getDocs(collection(db, "lessons"));
+        // Only fetch lessons created by the current user
+        const lessonsQuery = query(
+          collection(db, "lessons"),
+          where("creatorId", "==", user.uid)
+        );
+        const snapshot = await getDocs(lessonsQuery);
         const lessonList = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -26,7 +39,7 @@ export default function MyLessonsPage() {
       }
     }
     fetchLessons();
-  }, []);
+  }, [user]);
 
   const handleManage = (lessonId) => {
     router.push(`/lessons/manage/${lessonId}`);
@@ -37,7 +50,7 @@ export default function MyLessonsPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-10">
           <h1 className="text-3xl font-bold text-gray-900">
-            Uploaded Lessons {loading ? "" : `(${lessons.length})`}
+            My Uploaded Lessons {loading ? "" : `(${lessons.length})`}
           </h1>
           <button
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium shadow hover:bg-blue-700"
@@ -57,9 +70,9 @@ export default function MyLessonsPage() {
                 className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm flex items-center gap-6"
               >
                 <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-4xl overflow-hidden">
-                  {lesson.image && lesson.image.startsWith('http') ? (
-                    <img 
-                      src={lesson.image} 
+                  {lesson.image && lesson.image.startsWith("http") ? (
+                    <img
+                      src={lesson.image}
                       alt={lesson.title}
                       className="w-full h-full object-cover"
                     />
@@ -71,7 +84,7 @@ export default function MyLessonsPage() {
                   <div className="font-bold text-gray-900 text-[20px] mb-2">
                     {lesson.title}
                   </div>
-                  <button 
+                  <button
                     onClick={() => handleManage(lesson.id)}
                     className="text-blue-600 hover:text-blue-700 font-medium text-base"
                   >
