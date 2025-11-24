@@ -5,9 +5,12 @@ import { Bell, Menu, X } from "lucide-react";
 import { useNotifications, Notification } from "../../../hooks/useNotifications";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../lib/firebase/firebaseConfig";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase/firebaseConfig";
 import NotificationList from "./NotificationList";
+import { useTrackUserActivity } from "@/hooks/useTrackUserActivity";
+import { useEffect } from "react";
+import { setDoc, serverTimestamp } from "firebase/firestore";
 
 interface HeaderProps {
   mobileMenuOpen: boolean;
@@ -20,40 +23,90 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
   const [user] = useAuthState(auth);
   const userId = user?.uid;
   const [notifications, setNotifications] = useNotifications(userId);
+  
+  // Track user activity (updates every 60 seconds)
+  useTrackUserActivity(60000);
 
-  const handleNotificationAction = async (notifId: string | number, action: string, notif: Notification) => {
-    if (action === "View") {
-      // Mark message as read in Firestore
+  // Ensure user document exists in Firestore
+  useEffect(() => {
+    async function ensureUserDocument() {
+      if (!user) return;
+      
       try {
-        const messageRef = doc(db, "messages", notifId as string);
-        await updateDoc(messageRef, {
+        await setDoc(
+          doc(db, "users", user.uid),
+          {
+            displayName: user.displayName || user.email?.split('@')[0] || "Anonymous",
+            email: user.email || "",
+            photoURL: user.photoURL || "",
+            lastActive: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          },
+          { merge: true }
+        );
+        console.log("✅ User document ensured for:", user.email);
+      } catch (error) {
+        console.error("❌ Error ensuring user document:", error);
+      }
+    }
+    
+    ensureUserDocument();
+  }, [user]);
+
+  // Dismiss: always use "notifications" collection!
+  const dismissNotification = async (notifId: string | number) => {
+    try {
+      const notifRef = doc(db, "notifications", String(notifId));
+      const snap = await getDoc(notifRef);
+      if (snap.exists()) {
+        await updateDoc(notifRef, {
           read: true,
           readAt: new Date()
         });
-      } catch (error) {
-        console.error("Error marking message as read:", error);
+        setNotifications(prev => prev.filter(n => n.id !== notifId));
+      } else {
+        console.warn("Notification not found:", notifId);
       }
-
-      // Navigate to chat
-      if (notif.chatId) {
-        router.push(`/chat/${notif.chatId}`);
-      }
-      // Remove from local notifications
-      setNotifications(prev => prev.filter(n => n.id !== notifId));
-      setNotificationsOpen(false);
+    } catch (error) {
+      console.error("Error dismissing notification:", error);
     }
   };
 
-  const dismissNotification = async (notifId: string | number) => {
-    try {
-      const messageRef = doc(db, "messages", notifId as string);
-      await updateDoc(messageRef, {
-        read: true,
-        readAt: new Date()
-      });
-      setNotifications(prev => prev.filter(n => n.id !== notifId));
-    } catch (error) {
-      console.error("Error dismissing notification:", error);
+  const handleNotificationAction = async (notifId: string | number, action: string, notif: Notification) => {
+    // Mark as read in the notifications collection
+    await dismissNotification(notifId);
+
+    // Swap request notifications
+    if (notif.type === "swap_request" && action === "View") {
+      router.push("/swap-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    // Chat/message notifications
+    if ((notif.type === "chat" || notif.type === "message") && action === "View") {
+      if (notif.chatId) {
+        // Navigate to the specific chat using the chatId
+        router.push(`/chat/${notif.chatId}`);
+      } else if (notif.senderId && notif.senderName) {
+        // Fallback: Navigate with user selection if no chatId
+        const userInfo = encodeURIComponent(JSON.stringify({
+          uid: notif.senderId,
+          displayName: notif.senderName,
+          email: notif.senderEmail || ""
+        }));
+        router.push(`/chat?selectUser=${userInfo}`);
+      } else {
+        // Last resort: just go to chat page
+        alert("Unable to open chat. Missing chat information.");
+      }
+      setNotificationsOpen(false);
+      return;
+    }
+
+    // Default action for other notification types
+    if (action === "Open" || action === "View") {
+      setNotificationsOpen(false);
     }
   };
 
@@ -63,9 +116,9 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
         <div className="flex items-center justify-between">
           {/* Logo Section */}
           <div className="flex items-center gap-2">
-            <img 
-              src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png" 
-              alt="Company Logo" 
+            <img
+              src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png"
+              alt="Company Logo"
               className="w-20 h-10 sm:w-25 sm:h-10"
             />
           </div>
@@ -97,8 +150,10 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
                   onClose={() => setNotificationsOpen(false)}
                   onActionClick={handleNotificationAction}
                   onDismiss={dismissNotification}
-                  onClearAll={() => {
-                    notifications.forEach(n => dismissNotification(n.id));
+                  onClearAll={async () => {
+                    await Promise.all(
+                      notifications.map(n => dismissNotification(n.id))
+                    );
                   }}
                 />
               )}
