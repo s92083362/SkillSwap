@@ -2,14 +2,14 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { logout } from "../../lib/firebase/auth";
-import { LogOut, Home, Layers, MessageSquare, Compass, User, X } from "lucide-react";
+import { LogOut, Home, Layers, MessageSquare, ArrowLeftRight, User, X } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../lib/firebase/firebaseConfig";
 
 interface ProfileSidebarProps {
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
-  setActiveSection: (section: "dashboard" | "skills" | "messages" | "explore" | "profile") => void;
+  setActiveSection: (section: "dashboard" | "skills" | "messages" | "swap" | "profile") => void;
   activeSection: string;
 }
 
@@ -29,7 +29,7 @@ export default function ProfileSidebar({
     { key: "dashboard", icon: <Home className="w-5 h-5" />, label: "Dashboard" },
     { key: "skills", icon: <Layers className="w-5 h-5" />, label: "My Skills" },
     { key: "messages", icon: <MessageSquare className="w-5 h-5" />, label: "Messages" },
-    { key: "explore", icon: <Compass className="w-5 h-5" />, label: "Explore" },
+    { key: "swap", icon: <ArrowLeftRight className="w-5 h-5" />, label: "Swap Request" }, // Updated nav item
     { key: "profile", icon: <User className="w-5 h-5" />, label: "Profile" },
   ];
 
