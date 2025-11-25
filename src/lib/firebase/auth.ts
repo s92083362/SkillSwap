@@ -7,25 +7,34 @@ import {
   FacebookAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
-  updateProfile
-} from 'firebase/auth';
-import { auth } from './firebaseConfig';
+  updateProfile,
+  User
+} from "firebase/auth";
+import { auth } from "./firebaseConfig";
 
-// Email/Password Login function
-export async function login(email: string, password: string) {
+/**
+ * Logs in a user with email/password.
+ * @returns Promise<User>
+ * @throws FirebaseAuthError
+ */
+export async function login(email: string, password: string): Promise<User> {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error) {
+    // You can augment error handling here, e.g. parse Firebase error codes
     throw error;
   }
 }
 
-// Email/Password Register function (now sets name)
-export async function register(email: string, password: string, name: string) {
+/**
+ * Registers a new user and sets display name.
+ * @returns Promise<User>
+ * @throws FirebaseAuthError
+ */
+export async function register(email: string, password: string, name: string): Promise<User> {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    // Set the user's displayName
     await updateProfile(userCredential.user, { displayName: name });
     return userCredential.user;
   } catch (error) {
@@ -33,8 +42,12 @@ export async function register(email: string, password: string, name: string) {
   }
 }
 
-// Logout function
-export async function logout() {
+/**
+ * Logs out the current user.
+ * @returns Promise<void>
+ * @throws FirebaseAuthError
+ */
+export async function logout(): Promise<void> {
   try {
     await signOut(auth);
   } catch (error) {
@@ -42,8 +55,12 @@ export async function logout() {
   }
 }
 
-// Google Sign-In function
-export async function googleLogin() {
+/**
+ * Logs in user via Google Sign-In popup.
+ * @returns Promise<User>
+ * @throws FirebaseAuthError
+ */
+export async function googleLogin(): Promise<User> {
   try {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
@@ -53,11 +70,14 @@ export async function googleLogin() {
   }
 }
 
-// Facebook Sign-In function
-export async function facebookLogin() {
+/**
+ * Logs in user via Facebook Sign-In popup.
+ * @returns Promise<User>
+ * @throws FirebaseAuthError
+ */
+export async function facebookLogin(): Promise<User> {
   try {
     const provider = new FacebookAuthProvider();
-    // Optionally request additional permissions
     const result = await signInWithPopup(auth, provider);
     return result.user;
   } catch (error) {
@@ -65,8 +85,12 @@ export async function facebookLogin() {
   }
 }
 
-// Password Reset function
-export async function resetPassword(email: string) {
+/**
+ * Sends a password reset email to the user.
+ * @returns Promise<void>
+ * @throws FirebaseAuthError
+ */
+export async function resetPassword(email: string): Promise<void> {
   try {
     await sendPasswordResetEmail(auth, email);
   } catch (error) {

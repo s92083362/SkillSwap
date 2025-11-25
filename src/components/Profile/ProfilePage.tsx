@@ -5,7 +5,7 @@ import ProfileSidebar from "./ProfileSidebar";
 import ProfileLessons from "./ProfileLessons";
 import ProfileMessages from "./ProfileMessages";
 import EditProfile from "./EditProfile";
-import MySkills from "./MySkills"; // <-- import your skills component
+import MySkills from "./MySkills"; 
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../lib/firebase/firebaseConfig";
 
