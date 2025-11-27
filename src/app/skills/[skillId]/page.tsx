@@ -5,7 +5,6 @@ import AccordionSection from "../../../components/dashboard/AccordionSection";
 import { notFound } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
-import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
 import LessonNotes from "../../../components/lessons/LessonNotes";
 import { doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
