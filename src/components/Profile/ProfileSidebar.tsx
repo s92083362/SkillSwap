@@ -29,7 +29,7 @@ export default function ProfileSidebar({
     { key: "dashboard", icon: <Home className="w-5 h-5" />, label: "Dashboard" },
     { key: "skills", icon: <Layers className="w-5 h-5" />, label: "My Skills" },
     { key: "messages", icon: <MessageSquare className="w-5 h-5" />, label: "Messages" },
-    { key: "swap", icon: <ArrowLeftRight className="w-5 h-5" />, label: "Swap Request" }, // Updated nav item
+    { key: "swap", icon: <ArrowLeftRight className="w-5 h-5" />, label: "Accepted Swaps" }, // Updated label
     { key: "profile", icon: <User className="w-5 h-5" />, label: "Profile" },
   ];
 
@@ -85,7 +85,13 @@ export default function ProfileSidebar({
             <button
               type="button"
               className={getButtonClasses(item.key)}
-              onClick={() => setActiveSection(item.key as ProfileSidebarProps["activeSection"])}
+              onClick={() => {
+                setActiveSection(item.key as ProfileSidebarProps["setActiveSection"]);
+                // Close mobile menu when navigating
+                if (mobileMenuOpen) {
+                  setMobileMenuOpen(false);
+                }
+              }}
             >
               {item.icon} {item.label}
             </button>

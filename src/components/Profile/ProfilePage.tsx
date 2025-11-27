@@ -1,4 +1,4 @@
- "use client";
+"use client";
 import React, { useState } from "react";
 import Header from "../shared/header/Header";
 import ProfileSidebar from "./ProfileSidebar";
@@ -6,12 +6,13 @@ import ProfileLessons from "./ProfileLessons";
 import ProfileMessages from "./ProfileMessages";
 import EditProfile from "./EditProfile";
 import MySkills from "./MySkills"; 
+import AcceptedSwapRequests from "./AcceptedSwapRequests";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../lib/firebase/firebaseConfig";
 
 export default function ProfilePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [activeSection, setActiveSection] = useState<"dashboard" | "skills" | "messages" | "swap" | "profile">("dashboard");
   const [user, loading, error] = useAuthState(auth);
 
   return (
@@ -45,12 +46,7 @@ export default function ProfilePage() {
           )}
           {activeSection === "skills" && <MySkills />}
           {activeSection === "messages" && <ProfileMessages />}
-          {activeSection === "explore" && (
-            <div>
-              <h1 className="text-2xl font-semibold mb-4">Explore</h1>
-              {/* Insert your explore code or component here */}
-            </div>
-          )}
+          {activeSection === "swap" && <AcceptedSwapRequests />}
           {activeSection === "profile" && <EditProfile />}
         </main>
       </div>
