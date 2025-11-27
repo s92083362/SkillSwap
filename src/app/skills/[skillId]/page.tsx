@@ -5,6 +5,8 @@ import AccordionSection from "../../../components/dashboard/AccordionSection";
 import { notFound } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
+import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
+import LessonNotes from "../../../components/lessons/LessonNotes";
 import { doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
 const hardcodedSkills = [
@@ -354,6 +356,17 @@ export default function SkillPage({ params }) {
                         </video>
                       </div>
                     )}
+
+                    {/* Lesson Notes */}
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Your Notes</h4>
+                        <LessonNotes 
+                          skillId={skillId} 
+                          sectionId={section.id} 
+                        />
+                      </div>
+
+                    {/* Empty State */}
                     {!section.content && !section.videoUrl && (
                       <p className="text-gray-500 italic">No content available for this section.</p>
                     )}
