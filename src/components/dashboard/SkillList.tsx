@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
 import SkillCard from "./ SkillCard";
-import SearchBar from "./ SearchBar";
+import SearchBar from "./SearchBar";
 import { collection, query, where, getDocs, orderBy, startAt, endAt } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
 
