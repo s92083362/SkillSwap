@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
 import LessonNotes from "../../../components/lessons/LessonNotes";
-import { doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, getDocs, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
 
 const hardcodedSkills = [
   {
@@ -175,6 +175,16 @@ export default function SkillPage({ params }) {
         status: "pending",
         createdAt: new Date(),
         updatedAt: new Date()
+      });
+
+      const chatId = [user.uid, authorId].sort().join("_");
+
+      // Add the swap message to the chat
+      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+        senderId: user.uid,
+        senderName: user.displayName || user.email || "Anonymous",
+        content: swapMessage,
+        timestamp: serverTimestamp(),
       });
 
       // Create notification for the author (FIXED!)

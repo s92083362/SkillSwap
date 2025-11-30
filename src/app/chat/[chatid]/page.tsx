@@ -19,6 +19,7 @@ import { useTrackUserActivity } from "@/hooks/useTrackUserActivity";
 import { useAllUsers } from "@/hooks/useAllUsers";
 import { useActiveUsers } from "@/hooks/useActiveUsers";
 import MessageBubble from "../../../components/chat/MessageBubble";
+import { useSearchParams } from 'next/navigation';
 
 export default function ChatPage() {
   const router = useRouter();
@@ -33,8 +34,19 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
   const messagesEndRef = useRef(null);
+  const searchParams = useSearchParams();
+  const initialUserId = searchParams.get('user');
 
   useTrackUserActivity(60000);
+
+  useEffect(() => {
+    if (initialUserId && allUsers.length > 0 && user) {
+      const targetUser = allUsers.find(u => u.uid === initialUserId);
+      if (targetUser) {
+        selectUser(targetUser);
+      }
+    }
+  }, [initialUserId, allUsers, user]);
 
   // Fetch all conversations for the current user
   useEffect(() => {
