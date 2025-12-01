@@ -8,90 +8,6 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../../lib/firebase/firebaseConfig";
 import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
 
-const hardcodedSkills = [
-  {
-    id: "python-for-beginners",
-    title: "Python for Beginners",
-    description: "Learn Python basics with clear lessons and sample code.",
-    instructor: "Alex Doe",
-    sections: [
-      {
-        id: "skill-overview",
-        name: "Skill overview",
-        content: (
-          <>
-            <p className="text-gray-900 leading-relaxed">
-              This is an easy-to-follow guide to the fundamentals of how software applications are created and maintained. You'll learn core concepts, modern techniques, and practical skills that apply to any programming language.
-            </p>
-            <p className="text-gray-900 leading-relaxed">
-              We've condensed months of study into concise and informative lessons, designed for beginners but valuable for developing real world projects.
-            </p>
-          </>
-        ),
-      },
-      {
-        id: "computational-thinking-basics",
-        name: "Computational thinking basics",
-        content: (
-          <div className="bg-blue-200 rounded-lg py-2 px-6 mb-2 flex items-center">
-            <span className="font-bold mr-4 text-gray-900">1.1</span>
-            <span className="text-gray-900">Computational thinking basics</span>
-          </div>
-        ),
-      },
-      {
-        id: "what-is-python",
-        name: "What is Python?",
-        content: (
-          <div className="bg-blue-100 rounded-lg py-2 px-6 mb-2 flex items-center">
-            <span className="font-bold mr-4 text-gray-900">1.2</span>
-            <span className="text-gray-900">What is Python?</span>
-          </div>
-        ),
-      },
-    ],
-  },
-  {
-    id: "js-essentials",
-    title: "JavaScript Essentials",
-    description:
-      "Master JavaScript for modern web development, including all the fundamental building blocks.",
-    instructor: "Sam Smith",
-    sections: [
-      {
-        id: "js-skill-overview",
-        name: "Skill overview",
-        content: (
-          <>
-            <p className="text-gray-900 leading-relaxed">
-              This course covers the essential features of JavaScript for building interactive web apps.
-            </p>
-            <p className="text-gray-900 leading-relaxed">
-              Each lesson includes hands-on examples and relevant explanations, suitable for both beginners and those coming from other languages.
-            </p>
-          </>
-        ),
-      },
-      {
-        id: "getting-started-with-js",
-        name: "Getting Started with JavaScript",
-        content: (
-          <>
-            <div className="bg-blue-200 rounded-lg py-2 px-6 mb-2 flex items-center">
-              <span className="font-bold mr-4 text-gray-900">1.1</span>
-              <span className="text-gray-900">History & Where JavaScript Runs</span>
-            </div>
-            <div className="bg-blue-100 rounded-lg py-2 px-6 mb-2 flex items-center">
-              <span className="font-bold mr-4 text-gray-900">1.2</span>
-              <span className="text-gray-900">Hello world in the Browser & Console</span>
-            </div>
-          </>
-        ),
-      },
-    ],
-  },
-];
-
 export default function SkillDetailPage({ params }) {
   const { skillId } = React.use(params);
 
@@ -99,55 +15,59 @@ export default function SkillDetailPage({ params }) {
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
-  const [skills, setSkills] = useState(hardcodedSkills);
+  const [skill, setSkill] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch Firebase lessons and merge with hardcoded skills
+  // Fetch lesson from Firebase
   useEffect(() => {
-    async function fetchLessons() {
+    async function fetchLesson() {
       try {
-        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
-        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log('Firebase lesson data:', data); // Debug log
-          
-          return {
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            instructor: data.instructor,
-            image: data.image,
-            sections: [
-              {
-                id: "skill-overview",
-                name: "Skill overview",
-                title: "Skill overview",
-                content: data.description || "No description available.",
-              },
-              ...(data.sections || []).map((section, idx) => ({
-                id: `section-${idx}`,
-                name: section.title,
-                title: section.title,
-                content: section.content,
-                videoUrl: section.videoUrl,
-              })),
-            ],
-          };
-        });
+        const lessonDoc = await getDoc(doc(db, "lessons", skillId));
+        
+        if (!lessonDoc.exists()) {
+          setSkill(null);
+          setLoading(false);
+          return;
+        }
 
-        console.log('All skills (merged):', [...hardcodedSkills, ...firebaseLessons]); // Debug log
-        setSkills([...hardcodedSkills, ...firebaseLessons]);
+        const data = lessonDoc.data();
+        console.log('Firebase lesson data:', data);
+        
+        const fetchedSkill = {
+          id: lessonDoc.id,
+          title: data.title,
+          description: data.description,
+          instructor: data.instructor,
+          image: data.image,
+          sections: [
+            {
+              id: "skill-overview",
+              name: "Skill overview",
+              title: "Skill overview",
+              content: data.description || "No description available.",
+            },
+            ...(data.sections || []).map((section, idx) => ({
+              id: `section-${idx}`,
+              name: section.title,
+              title: section.title,
+              content: section.content,
+              videoUrl: section.videoUrl,
+            })),
+          ],
+        };
+
+        console.log('Fetched skill:', fetchedSkill);
+        setSkill(fetchedSkill);
       } catch (error) {
-        console.error("Error fetching lessons:", error);
+        console.error("Error fetching lesson:", error);
+        setSkill(null);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLessons();
-  }, []);
-
-  const skill = skills.find((s) => s.id === skillId);
+    fetchLesson();
+  }, [skillId]);
 
   // Check enrollment status
   useEffect(() => {

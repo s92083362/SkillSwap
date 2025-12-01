@@ -5,28 +5,8 @@ import AccordionSection from "../../../components/dashboard/AccordionSection";
 import { notFound } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
-import { doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
-
-const hardcodedSkills = [
-  {
-    id: "python-for-beginners",
-    title: "Python for Beginners",
-    description: "Learn Python basics with clear lessons and sample code.",
-    instructor: "Alex Doe",
-    sections: [
-      // ...sections omitted for brevity...
-    ],
-  },
-  {
-    id: "js-essentials",
-    title: "JavaScript Essentials",
-    description: "Master JavaScript for modern web development, including all the fundamental building blocks.",
-    instructor: "Sam Smith",
-    sections: [
-      // ...sections omitted for brevity...
-    ],
-  },
-];
+import LessonNotes from "../../../components/lessons/LessonNotes";
+import { doc, setDoc, getDoc, collection, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
 
 export default function SkillPage({ params }) {
   const { skillId } = React.use(params);
@@ -35,7 +15,7 @@ export default function SkillPage({ params }) {
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
-  const [skills, setSkills] = useState(hardcodedSkills);
+  const [skill, setSkill] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Swap Skill Popup State
@@ -45,49 +25,56 @@ export default function SkillPage({ params }) {
   const [sendingSwap, setSendingSwap] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
+  // Fetch lesson from Firebase
   useEffect(() => {
-    async function fetchLessons() {
+    async function fetchLesson() {
       try {
-        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
-        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            title: data.title,
-            description: data.description,
-            instructor: data.instructor,
-            image: data.image,
-            sections: [
-              {
-                id: "skill-overview",
-                name: "Skill overview",
-                title: "Skill overview",
-                content: <p className="text-gray-900 leading-relaxed">{data.description}</p>,
-              },
-              ...(data.sections || []).map((section, idx) => ({
-                id: `section-${idx}`,
-                name: section.title,
-                title: section.title,
-                content: section.content,
-                videoUrl: section.videoUrl,
-              })),
-            ],
-          };
-        });
+        const lessonDoc = await getDoc(doc(db, "lessons", skillId));
+        
+        if (!lessonDoc.exists()) {
+          setSkill(null);
+          setLoading(false);
+          return;
+        }
 
-        setSkills([...hardcodedSkills, ...firebaseLessons]);
+        const data = lessonDoc.data();
+        
+        const fetchedSkill = {
+          id: lessonDoc.id,
+          title: data.title,
+          description: data.description,
+          instructor: data.instructor,
+          image: data.image,
+          creatorId: data.creatorId,
+          sections: [
+            {
+              id: "skill-overview",
+              name: "Skill overview",
+              title: "Skill overview",
+              content: data.description || "No description available.",
+            },
+            ...(data.sections || []).map((section, idx) => ({
+              id: `section-${idx}`,
+              name: section.title,
+              title: section.title,
+              content: section.content,
+              videoUrl: section.videoUrl,
+            })),
+          ],
+        };
+
+        setSkill(fetchedSkill);
       } catch (error) {
-        console.error("Error fetching lessons:", error);
+        console.error("Error fetching lesson:", error);
+        setSkill(null);
       } finally {
         setLoading(false);
       }
     }
-    fetchLessons();
-  }, []);
+    fetchLesson();
+  }, [skillId]);
 
-  const skill = skills.find((s) => s.id === skillId);
-  const isHardcodedLesson = hardcodedSkills.some(s => s.id === skillId);
-
+  // Check enrollment status
   useEffect(() => {
     if (!user || !skillId) {
       setIsEnrolled(false);
@@ -99,6 +86,7 @@ export default function SkillPage({ params }) {
     });
   }, [user, skillId]);
 
+  // Toggle enroll/unenroll
   async function handleEnrollToggle() {
     if (!user) return;
     setLoadingEnroll(true);
@@ -119,32 +107,12 @@ export default function SkillPage({ params }) {
     }
   }
 
+  // Handle swap request submission
   async function handleSwapSubmit() {
-    if (!offeredSkillTitle.trim() || !agreed || !user) return;
+    if (!offeredSkillTitle.trim() || !agreed || !user || !skill) return;
     setSendingSwap(true);
     try {
-      // Check if this is a hardcoded lesson
-      const isHardcodedLesson = hardcodedSkills.some(s => s.id === skillId);
-      
-      if (isHardcodedLesson) {
-        alert("Sorry, skill swap is only available for user-uploaded lessons, not sample lessons.");
-        setSendingSwap(false);
-        return;
-      }
-
-      // Get the author's user ID from the lesson
-      const lessonDoc = await getDoc(doc(db, "lessons", skillId));
-      
-      if (!lessonDoc.exists()) {
-        alert("Lesson not found in database.");
-        setSendingSwap(false);
-        return;
-      }
-
-      const lessonData = lessonDoc.data();
-      
-      // Get the creator ID from the lesson
-      const authorId = lessonData.creatorId;
+      const authorId = skill.creatorId;
 
       if (!authorId) {
         alert("This lesson doesn't have creator information. Please contact support.");
@@ -176,20 +144,30 @@ export default function SkillPage({ params }) {
         updatedAt: new Date()
       });
 
-      // Create notification for the author (FIXED!)
+      const chatId = [user.uid, authorId].sort().join("_");
+
+      // Add the swap message to the chat
+      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+        senderId: user.uid,
+        senderName: user.displayName || user.email || "Anonymous",
+        content: swapMessage,
+        timestamp: serverTimestamp(),
+      });
+
+      // Create notification for the author
       const notificationRef = doc(collection(db, "notifications"));
       await setDoc(notificationRef, {
-        userId: authorId,                    // Who receives the notification
+        userId: authorId,
         type: "swap_request",
         title: "New Skill Swap Request",
         message: `${user.displayName || user.email || "Someone"} wants to exchange "${offeredSkillTitle.trim()}" for your "${skill.title}" lesson`,
         swapRequestId: swapRequestRef.id,
-        senderId: user.uid,                  // Added: Who sent the request
-        senderName: user.displayName || user.email || "Anonymous", // Added
-        senderEmail: user.email,             // Added
-        timestamp: new Date(),               // Changed from createdAt to timestamp
+        senderId: user.uid,
+        senderName: user.displayName || user.email || "Anonymous",
+        senderEmail: user.email,
+        timestamp: new Date(),
         read: false,
-        actions: ["View"]                    // Added: Action buttons
+        actions: ["View"]
       });
 
       console.log("✅ Swap request and notification created successfully");
@@ -233,7 +211,8 @@ export default function SkillPage({ params }) {
             Instructor: {skill.instructor}
           </p>
           <p className="text-base text-blue-800">{skill.description}</p>
-          {/* ------ Swap Skill Button ------ */}
+          
+          {/* Swap Skill Button */}
           {user && isEnrolled && (
             <div className="mt-4 flex justify-center">
               <button
@@ -246,6 +225,8 @@ export default function SkillPage({ params }) {
               </button>
             </div>
           )}
+          
+          {/* Enroll/Unenroll Button */}
           {user && (
             <div className="mt-8 flex justify-center">
               <button
@@ -269,7 +250,7 @@ export default function SkillPage({ params }) {
           )}
         </div>
 
-        {/* Swap Skill Modal with blur */}
+        {/* Swap Skill Modal */}
         {showExchange && (
           <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/30">
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-8 relative">
@@ -282,6 +263,7 @@ export default function SkillPage({ params }) {
               </button>
               <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Request an Exchange</h2>
               <p className="text-gray-600 mb-8">You are one step away from learning a new skill!</p>
+              
               <div className="mb-6">
                 <label className="block font-semibold text-gray-800 mb-2">Skill to offer in return</label>
                 <input
@@ -293,8 +275,11 @@ export default function SkillPage({ params }) {
                 />
                 <p className="text-gray-500 text-sm mt-1">Enter the skill you can teach in exchange</p>
               </div>
+              
               <div className="mb-6">
-                <label className="block font-semibold text-gray-800 mb-2">Add a message <span className="text-gray-500 font-normal">(optional)</span></label>
+                <label className="block font-semibold text-gray-800 mb-2">
+                  Add a message <span className="text-gray-500 font-normal">(optional)</span>
+                </label>
                 <textarea
                   className="w-full border rounded px-3 py-2 min-h-[80px] text-gray-900"
                   placeholder="Hi! I'd love to exchange my Web Development skills for your course."
@@ -302,6 +287,7 @@ export default function SkillPage({ params }) {
                   onChange={e => setSwapMessage(e.target.value)}
                 />
               </div>
+              
               <div className="flex items-center mb-8">
                 <input
                   type="checkbox"
@@ -311,9 +297,11 @@ export default function SkillPage({ params }) {
                   onChange={e => setAgreed(e.target.checked)}
                 />
                 <label htmlFor="agree" className="text-gray-700 text-sm">
-                  I agree to the SkillSwap <a className="text-blue-600 underline" href="#">Terms</a> and <a className="text-blue-600 underline" href="#">Conditions</a>.
+                  I agree to the SkillSwap <a className="text-blue-600 underline" href="#">Terms</a> and{" "}
+                  <a className="text-blue-600 underline" href="#">Conditions</a>.
                 </label>
               </div>
+              
               <button
                 className="w-full bg-blue-900 hover:bg-blue-800 text-white text-lg font-semibold rounded py-3 mt-2 transition disabled:opacity-60"
                 disabled={sendingSwap || !offeredSkillTitle.trim() || !agreed}
@@ -325,7 +313,7 @@ export default function SkillPage({ params }) {
           </div>
         )}
 
-        {/* Show lessons only if enrolled */}
+        {/* Lesson Content - Show only if enrolled */}
         {isEnrolled ? (
           <>
             {skill.sections.map((section, idx) => (
@@ -334,34 +322,43 @@ export default function SkillPage({ params }) {
                 title={section.name || section.title}
                 defaultOpen={idx === 0}
               >
-                {typeof section.content === 'string' ? (
-                  <div className="space-y-4">
-                    {section.content && (
-                      <div className="text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
-                        {section.content}
-                      </div>
-                    )}
-                    {section.videoUrl && (
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Video Lesson</h4>
-                        <video
-                          src={section.videoUrl}
-                          controls
-                          controlsList="nodownload"
-                          className="w-full max-w-3xl rounded-lg border border-gray-200 shadow-sm"
-                        >
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-                    )}
-                    {!section.content && !section.videoUrl && (
-                      <p className="text-gray-500 italic">No content available for this section.</p>
-                    )}
+                <div className="space-y-4">
+                  {/* Text Content */}
+                  {section.content && (
+                    <div className="text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
+                      {section.content}
+                    </div>
+                  )}
+                  
+                  {/* Video Content */}
+                  {section.videoUrl && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Video Lesson</h4>
+                      <video
+                        src={section.videoUrl}
+                        controls
+                        controlsList="nodownload"
+                        className="w-full max-w-3xl rounded-lg border border-gray-200 shadow-sm"
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    </div>
+                  )}
+
+                  {/* Lesson Notes */}
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Your Notes</h4>
+                    <LessonNotes 
+                      skillId={skillId} 
+                      sectionId={section.id} 
+                    />
                   </div>
-                ) : (
-                  // For hardcoded sections (Python, JS)
-                  section.content
-                )}
+
+                  {/* Empty State */}
+                  {!section.content && !section.videoUrl && (
+                    <p className="text-gray-500 italic">No content available for this section.</p>
+                  )}
+                </div>
               </AccordionSection>
             ))}
           </>
