@@ -4,6 +4,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../lib/firebase/firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { MessageSquare, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 interface AcceptedSwapRequestsProps {
   // Add any props if needed
@@ -13,6 +14,7 @@ export default function AcceptedSwapRequests() {
   const [user] = useAuthState(auth);
   const [acceptedRequests, setAcceptedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     if (!user) return;
@@ -43,10 +45,10 @@ export default function AcceptedSwapRequests() {
     fetchAcceptedSwaps();
   }, [user]);
 
-  const handleChatClick = (requestId, requesterName) => {
-    // Navigate to chat - you can customize this based on your routing
-    window.location.href = `/chat/${requestId}`;
+  const handleChatClick = (requesterId: string) => {
+    router.push(`/chat/[chatid]?user=${requesterId}`);
   };
+
 
   if (!user) {
     return (
@@ -142,7 +144,7 @@ export default function AcceptedSwapRequests() {
 
                 {/* Chat Button */}
                 <button
-                  onClick={() => handleChatClick(request.id, request.requesterName)}
+                  onClick={() => handleChatClick(request.requesterId)}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
                 >
                   <MessageSquare className="w-5 h-5" />

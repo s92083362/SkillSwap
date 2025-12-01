@@ -8,6 +8,27 @@ import { auth, db } from "../../../lib/firebase/firebaseConfig";
 import LessonNotes from "../../../components/lessons/LessonNotes";
 import { doc, setDoc, getDoc, collection, getDocs, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
 
+const hardcodedSkills = [
+  {
+    id: "python-for-beginners",
+    title: "Python for Beginners",
+    description: "Learn Python basics with clear lessons and sample code.",
+    instructor: "Alex Doe",
+    sections: [
+      // ...sections omitted for brevity...
+    ],
+  },
+  {
+    id: "js-essentials",
+    title: "JavaScript Essentials",
+    description: "Master JavaScript for modern web development, including all the fundamental building blocks.",
+    instructor: "Sam Smith",
+    sections: [
+      // ...sections omitted for brevity...
+    ],
+  },
+];
+
 export default function SkillPage({ params }) {
   const { skillId } = React.use(params);
 
@@ -156,7 +177,7 @@ export default function SkillPage({ params }) {
         timestamp: serverTimestamp(),
       });
 
-      // Create notification for the author
+      // Create notification for the author (FIXED!)
       const notificationRef = doc(collection(db, "notifications"));
       await setDoc(notificationRef, {
         userId: authorId,
@@ -336,13 +357,13 @@ export default function SkillPage({ params }) {
                     )}
 
                     {/* Lesson Notes */}
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Your Notes</h4>
-                      <LessonNotes 
-                        skillId={skillId} 
-                        sectionId={section.id} 
-                      />
-                    </div>
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">Your Notes</h4>
+                        <LessonNotes 
+                          skillId={skillId} 
+                          sectionId={section.id} 
+                        />
+                      </div>
 
                     {/* Empty State */}
                     {!section.content && !section.videoUrl && (
