@@ -8,26 +8,7 @@ import { auth, db } from "../../../lib/firebase/firebaseConfig";
 import LessonNotes from "../../../components/lessons/LessonNotes";
 import { doc, setDoc, getDoc, collection, getDocs, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
 
-const hardcodedSkills = [
-  {
-    id: "python-for-beginners",
-    title: "Python for Beginners",
-    description: "Learn Python basics with clear lessons and sample code.",
-    instructor: "Alex Doe",
-    sections: [
-      // ...sections omitted for brevity...
-    ],
-  },
-  {
-    id: "js-essentials",
-    title: "JavaScript Essentials",
-    description: "Master JavaScript for modern web development, including all the fundamental building blocks.",
-    instructor: "Sam Smith",
-    sections: [
-      // ...sections omitted for brevity...
-    ],
-  },
-];
+
 
 export default function SkillPage({ params }) {
   const { skillId } = React.use(params);
@@ -36,7 +17,7 @@ export default function SkillPage({ params }) {
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
-  const [skills, setSkills] = useState(hardcodedSkills);
+  const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Swap Skill Popup State
@@ -76,7 +57,7 @@ export default function SkillPage({ params }) {
           };
         });
 
-        setSkills([...hardcodedSkills, ...firebaseLessons]);
+        setSkills(firebaseLessons);
       } catch (error) {
         console.error("Error fetching lessons:", error);
       } finally {
@@ -87,7 +68,6 @@ export default function SkillPage({ params }) {
   }, []);
 
   const skill = skills.find((s) => s.id === skillId);
-  const isHardcodedLesson = hardcodedSkills.some(s => s.id === skillId);
 
   useEffect(() => {
     if (!user || !skillId) {
@@ -124,15 +104,6 @@ export default function SkillPage({ params }) {
     if (!offeredSkillTitle.trim() || !agreed || !user) return;
     setSendingSwap(true);
     try {
-      // Check if this is a hardcoded lesson
-      const isHardcodedLesson = hardcodedSkills.some(s => s.id === skillId);
-      
-      if (isHardcodedLesson) {
-        alert("Sorry, skill swap is only available for user-uploaded lessons, not sample lessons.");
-        setSendingSwap(false);
-        return;
-      }
-
       // Get the author's user ID from the lesson
       const lessonDoc = await getDoc(doc(db, "lessons", skillId));
       
@@ -190,17 +161,17 @@ export default function SkillPage({ params }) {
       // Create notification for the author (FIXED!)
       const notificationRef = doc(collection(db, "notifications"));
       await setDoc(notificationRef, {
-        userId: authorId,                    // Who receives the notification
+        userId: authorId,
         type: "swap_request",
         title: "New Skill Swap Request",
         message: `${user.displayName || user.email || "Someone"} wants to exchange "${offeredSkillTitle.trim()}" for your "${skill.title}" lesson`,
         swapRequestId: swapRequestRef.id,
-        senderId: user.uid,                  // Added: Who sent the request
-        senderName: user.displayName || user.email || "Anonymous", // Added
-        senderEmail: user.email,             // Added
-        timestamp: new Date(),               // Changed from createdAt to timestamp
+        senderId: user.uid,
+        senderName: user.displayName || user.email || "Anonymous",
+        senderEmail: user.email,
+        timestamp: new Date(),
         read: false,
-        actions: ["View"]                    // Added: Action buttons
+        actions: ["View"]
       });
 
       console.log("✅ Swap request and notification created successfully");
@@ -381,7 +352,6 @@ export default function SkillPage({ params }) {
                     )}
                   </div>
                 ) : (
-                  // For hardcoded sections (Python, JS)
                   section.content
                 )}
               </AccordionSection>
