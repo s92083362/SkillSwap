@@ -15,59 +15,55 @@ export default function SkillDetailPage({ params }) {
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
-  const [skill, setSkill] = useState(null);
+  const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch lesson from Firebase
+  // Fetch Firebase lessons
   useEffect(() => {
-    async function fetchLesson() {
+    async function fetchLessons() {
       try {
-        const lessonDoc = await getDoc(doc(db, "lessons", skillId));
-        
-        if (!lessonDoc.exists()) {
-          setSkill(null);
-          setLoading(false);
-          return;
-        }
+        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
+        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Firebase lesson data:', data);
+          
+          return {
+            id: doc.id,
+            title: data.title,
+            description: data.description,
+            instructor: data.instructor,
+            image: data.image,
+            sections: [
+              {
+                id: "skill-overview",
+                name: "Skill overview",
+                title: "Skill overview",
+                content: data.description || "No description available.",
+              },
+              ...(data.sections || []).map((section, idx) => ({
+                id: `section-${idx}`,
+                name: section.title,
+                title: section.title,
+                content: section.content,
+                videoUrl: section.videoUrl,
+              })),
+            ],
+          };
+        });
 
-        const data = lessonDoc.data();
-        console.log('Firebase lesson data:', data);
-        
-        const fetchedSkill = {
-          id: lessonDoc.id,
-          title: data.title,
-          description: data.description,
-          instructor: data.instructor,
-          image: data.image,
-          sections: [
-            {
-              id: "skill-overview",
-              name: "Skill overview",
-              title: "Skill overview",
-              content: data.description || "No description available.",
-            },
-            ...(data.sections || []).map((section, idx) => ({
-              id: `section-${idx}`,
-              name: section.title,
-              title: section.title,
-              content: section.content,
-              videoUrl: section.videoUrl,
-            })),
-          ],
-        };
-
-        console.log('Fetched skill:', fetchedSkill);
-        setSkill(fetchedSkill);
+        console.log('All skills:', firebaseLessons);
+        setSkills(firebaseLessons);
       } catch (error) {
-        console.error("Error fetching lesson:", error);
-        setSkill(null);
+        console.error("Error fetching lessons:", error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLesson();
-  }, [skillId]);
+    fetchLessons();
+  }, []);
+
+  const skill = skills.find((s) => s.id === skillId);
 
   // Check enrollment status
   useEffect(() => {
