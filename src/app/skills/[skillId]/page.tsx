@@ -6,9 +6,18 @@ import { notFound } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
 import LessonNotes from "../../../components/lessons/LessonNotes";
-import { doc, setDoc, getDoc, collection, getDocs, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore";
-
-
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  getDocs,
+  deleteDoc,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+} from "firebase/firestore";
 
 export default function SkillPage({ params }) {
   const { skillId } = React.use(params);
@@ -27,33 +36,30 @@ export default function SkillPage({ params }) {
   const [sendingSwap, setSendingSwap] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
+  // Sections unlocked for the user
+  const [allowedSections, setAllowedSections] = useState<string[]>([]);
+
+  // Fetch lessons
   useEffect(() => {
     async function fetchLessons() {
       try {
         const lessonsSnapshot = await getDocs(collection(db, "lessons"));
-        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
+        const firebaseLessons = lessonsSnapshot.docs.map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
             title: data.title,
             description: data.description,
             instructor: data.instructor,
+            creatorId: data.creatorId,
             image: data.image,
-            sections: [
-              {
-                id: "skill-overview",
-                name: "Skill overview",
-                title: "Skill overview",
-                content: <p className="text-gray-900 leading-relaxed">{data.description}</p>,
-              },
-              ...(data.sections || []).map((section, idx) => ({
-                id: `section-${idx}`,
-                name: section.title,
-                title: section.title,
-                content: section.content,
-                videoUrl: section.videoUrl,
-              })),
-            ],
+            sections: (data.sections || []).map((section, idx) => ({
+              id: section.id || `section-${idx}`,
+              name: section.title,
+              title: section.title,
+              content: section.content,
+              videoUrl: section.videoUrl,
+            })),
           };
         });
 
@@ -69,17 +75,58 @@ export default function SkillPage({ params }) {
 
   const skill = skills.find((s) => s.id === skillId);
 
+  // Fetch enrollment & allowed sections
   useEffect(() => {
-    if (!user || !skillId) {
-      setIsEnrolled(false);
-      return;
-    }
-    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
-    getDoc(ref).then((docSnap) => {
-      setIsEnrolled(docSnap.exists());
-    });
-  }, [user, skillId]);
+    if (!user || !skillId) return;
 
+    const fetchEnrollment = async () => {
+      const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        setIsEnrolled(true);
+        const data = snap.data();
+        // Only allow first section initially
+        setAllowedSections(data.allowedSections || [skill?.sections[0]?.id]);
+      } else {
+        setIsEnrolled(false);
+        setAllowedSections([]);
+      }
+    };
+
+    fetchEnrollment();
+  }, [user, skillId, skill]);
+
+  // Check if user has an accepted swap request for this skill
+  useEffect(() => {
+    if (!user || !skillId) return;
+
+    const checkSwapRequest = async () => {
+      try {
+        const q = query(
+          collection(db, "swapRequests"),
+          where("requesterId", "==", user.uid),
+          where("requestedLessonId", "==", skillId),
+          where("status", "==", "accepted")
+        );
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const allSections = skill?.sections.map((sec) => sec.id) || [];
+          setAllowedSections(allSections);
+
+          // Persist allowed sections in Firestore
+          const enrollmentRef = doc(db, "users", user.uid, "enrolledSkills", skillId);
+          await setDoc(enrollmentRef, { allowedSections: allSections }, { merge: true });
+        }
+      } catch (err) {
+        console.error("Error checking swap request status:", err);
+      }
+    };
+
+    checkSwapRequest();
+  }, [user, skillId, skill]);
+
+  // Enroll / Unenroll toggle
   async function handleEnrollToggle() {
     if (!user) return;
     setLoadingEnroll(true);
@@ -89,9 +136,14 @@ export default function SkillPage({ params }) {
       if (isEnrolled) {
         await deleteDoc(ref);
         setIsEnrolled(false);
+        setAllowedSections([]);
       } else {
-        await setDoc(ref, { enrolledAt: new Date() });
+        await setDoc(ref, {
+          enrolledAt: new Date(),
+          allowedSections: [skill?.sections[0]?.id], // Only first section
+        });
         setIsEnrolled(true);
+        setAllowedSections([skill?.sections[0]?.id]);
       }
     } catch (error) {
       alert(`Error: ${error.message}`);
@@ -100,13 +152,14 @@ export default function SkillPage({ params }) {
     }
   }
 
+  // Submit Swap Request
   async function handleSwapSubmit() {
     if (!offeredSkillTitle.trim() || !agreed || !user) return;
     setSendingSwap(true);
     try {
       // Get the author's user ID from the lesson
       const lessonDoc = await getDoc(doc(db, "lessons", skillId));
-      
+
       if (!lessonDoc.exists()) {
         alert("Lesson not found in database.");
         setSendingSwap(false);
@@ -114,7 +167,7 @@ export default function SkillPage({ params }) {
       }
 
       const lessonData = lessonDoc.data();
-      
+
       // Get the creator ID from the lesson
       const authorId = lessonData.creatorId;
 
@@ -133,7 +186,7 @@ export default function SkillPage({ params }) {
 
       // Create swap request document
       const swapRequestRef = doc(collection(db, "swapRequests"));
-      
+
       await setDoc(swapRequestRef, {
         requesterId: user.uid,
         requesterName: user.displayName || user.email || "Anonymous",
@@ -145,7 +198,7 @@ export default function SkillPage({ params }) {
         message: swapMessage,
         status: "pending",
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       const chatId = [user.uid, authorId].sort().join("_");
@@ -215,7 +268,8 @@ export default function SkillPage({ params }) {
             Instructor: {skill.instructor}
           </p>
           <p className="text-base text-blue-800">{skill.description}</p>
-          {/* ------ Swap Skill Button ------ */}
+
+          {/* Swap Skill Button */}
           {user && isEnrolled && (
             <div className="mt-4 flex justify-center">
               <button
@@ -251,37 +305,44 @@ export default function SkillPage({ params }) {
           )}
         </div>
 
-        {/* Swap Skill Modal with blur */}
+        {/* Swap Request Modal */}
         {showExchange && (
           <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/30">
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl p-8 relative">
               <button
                 onClick={() => setShowExchange(false)}
                 className="absolute top-4 right-4 text-2xl text-gray-400 hover:text-blue-600 font-bold"
-                aria-label="Close"
               >
                 ×
               </button>
-              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Request an Exchange</h2>
-              <p className="text-gray-600 mb-8">You are one step away from learning a new skill!</p>
+              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">
+                Request an Exchange
+              </h2>
+              <p className="text-gray-600 mb-8">
+                You are one step away from learning a new skill!
+              </p>
               <div className="mb-6">
-                <label className="block font-semibold text-gray-800 mb-2">Skill to offer in return</label>
+                <label className="block font-semibold text-gray-800 mb-2">
+                  Skill to offer in return
+                </label>
                 <input
                   type="text"
                   className="w-full border rounded px-3 py-2 text-gray-900"
-                  placeholder="e.g. Web Development, Graphic Design, Photography..."
+                  placeholder="e.g. Web Development, Graphic Design..."
                   value={offeredSkillTitle}
-                  onChange={e => setOfferedSkillTitle(e.target.value)}
+                  onChange={(e) => setOfferedSkillTitle(e.target.value)}
                 />
-                <p className="text-gray-500 text-sm mt-1">Enter the skill you can teach in exchange</p>
               </div>
               <div className="mb-6">
-                <label className="block font-semibold text-gray-800 mb-2">Add a message <span className="text-gray-500 font-normal">(optional)</span></label>
+                <label className="block font-semibold text-gray-800 mb-2">
+                  Add a message{" "}
+                  <span className="text-gray-500 font-normal">(optional)</span>
+                </label>
                 <textarea
                   className="w-full border rounded px-3 py-2 min-h-[80px] text-gray-900"
-                  placeholder="Hi! I'd love to exchange my Web Development skills for your course."
+                  placeholder="Hi! I'd love to exchange my skills for your course."
                   value={swapMessage}
-                  onChange={e => setSwapMessage(e.target.value)}
+                  onChange={(e) => setSwapMessage(e.target.value)}
                 />
               </div>
               <div className="flex items-center mb-8">
@@ -290,10 +351,18 @@ export default function SkillPage({ params }) {
                   id="agree"
                   className="mr-2"
                   checked={agreed}
-                  onChange={e => setAgreed(e.target.checked)}
+                  onChange={(e) => setAgreed(e.target.checked)}
                 />
                 <label htmlFor="agree" className="text-gray-700 text-sm">
-                  I agree to the SkillSwap <a className="text-blue-600 underline" href="#">Terms</a> and <a className="text-blue-600 underline" href="#">Conditions</a>.
+                  I agree to the SkillSwap{" "}
+                  <a className="text-blue-600 underline" href="#">
+                    Terms
+                  </a>{" "}
+                  and{" "}
+                  <a className="text-blue-600 underline" href="#">
+                    Conditions
+                  </a>
+                  .
                 </label>
               </div>
               <button
@@ -310,52 +379,54 @@ export default function SkillPage({ params }) {
         {/* Show lessons only if enrolled */}
         {isEnrolled ? (
           <>
-            {skill.sections.map((section, idx) => (
-              <AccordionSection
-                key={idx}
-                title={section.name || section.title}
-                defaultOpen={idx === 0}
-              >
-                {typeof section.content === 'string' ? (
-                  <div className="space-y-4">
-                    {section.content && (
-                      <div className="text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
-                        {section.content}
-                      </div>
-                    )}
-                    {section.videoUrl && (
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Video Lesson</h4>
-                        <video
-                          src={section.videoUrl}
-                          controls
-                          controlsList="nodownload"
-                          className="w-full max-w-3xl rounded-lg border border-gray-200 shadow-sm"
-                        >
-                          Your browser does not support the video tag.
-                        </video>
-                      </div>
-                    )}
-
-                    {/* Lesson Notes */}
-                      <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Your Notes</h4>
-                        <LessonNotes 
-                          skillId={skillId} 
-                          sectionId={section.id} 
-                        />
-                      </div>
-
-                    {/* Empty State */}
-                    {!section.content && !section.videoUrl && (
-                      <p className="text-gray-500 italic">No content available for this section.</p>
-                    )}
-                  </div>
-                ) : (
-                  section.content
-                )}
-              </AccordionSection>
-            ))}
+            {skill.sections.map((section, idx) => {
+              const sectionId = section.id || `section-${idx}`;
+              const isAllowed = allowedSections.includes(sectionId);
+              return (
+                <AccordionSection
+                  key={idx}
+                  title={section.title || section.name}
+                  defaultOpen={idx === 0}
+                >
+                  {isAllowed ? (
+                    <div className="space-y-4">
+                      {section.content && (
+                        <div className="text-gray-900 leading-relaxed whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
+                          {section.content}
+                        </div>
+                      )}
+                      {section.videoUrl && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            Video Lesson
+                          </h4>
+                          <video
+                            src={section.videoUrl}
+                            controls
+                            controlsList="nodownload"
+                            className="w-full max-w-3xl rounded-lg border border-gray-200 shadow-sm"
+                          />
+                        </div>
+                      )}
+                      {sectionId && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">
+                            Your Notes
+                          </h4>
+                          <LessonNotes skillId={skillId} sectionId={sectionId} />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-6 rounded-lg text-center">
+                      <p className="text-gray-600">
+                        This section is locked. Swap request approval will unlock it.
+                      </p>
+                    </div>
+                  )}
+                </AccordionSection>
+              );
+            })}
           </>
         ) : (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">

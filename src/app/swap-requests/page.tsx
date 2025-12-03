@@ -71,8 +71,12 @@ export default function SwapRequestsPage() {
 
       await updateDoc(requestRef, {
         status: newStatus,
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        // Notify requester about the owner's decision
+        requesterStatus: newStatus,
+        requesterNotifiedAt: new Date()
       });
+
 
       setRequests(prev =>
         prev.map(req =>
