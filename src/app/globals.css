@@ -36,6 +36,15 @@ body {
   .card.up-2, .card.down-2 { transform: translateY(-130px) scale(0.85); }
 }
 
-textarea{
+input,
+textarea,
+select {
   color: #0a0a0a;
+}
+
+input::placeholder,
+textarea::placeholder,
+select::placeholder {
+  color: #6b7280;
+  opacity: 1;
 }
