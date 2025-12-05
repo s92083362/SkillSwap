@@ -117,6 +117,31 @@ export default function SkillPage({ params }) {
           // Persist allowed sections in Firestore
           const enrollmentRef = doc(db, "users", user.uid, "enrolledSkills", skillId);
           await setDoc(enrollmentRef, { allowedSections: allSections }, { merge: true });
+
+          const swapData = snapshot.docs[0].data();
+
+          const ownerId = swapData.creatorId; // Creator of THIS skill
+          const offeredSkillId = swapData.offeredSkillId;
+
+          // Fetch offered course sections
+          const offeredLessonDoc = await getDoc(doc(db, "lessons", offeredSkillId));
+          const offeredLesson = offeredLessonDoc.data();
+          const offeredSections = offeredLesson.sections.map((s, i) => s.id || `section-${i}`);
+
+          // Grant the owner access
+          const ownerEnrollmentRef = doc(
+            db,
+            "users",
+            ownerId,
+            "enrolledSkills",
+            offeredSkillId
+          );
+
+          await setDoc(
+            ownerEnrollmentRef,
+            { allowedSections: offeredSections },
+            { merge: true }
+          );
         }
       } catch (err) {
         console.error("Error checking swap request status:", err);
@@ -171,20 +196,27 @@ export default function SkillPage({ params }) {
       // Get the creator ID from the lesson
       const authorId = lessonData.creatorId;
 
-      if (!authorId) {
-        alert("This lesson doesn't have creator information. Please contact support.");
-        setSendingSwap(false);
-        return;
-      }
-
-      // Don't allow swapping with yourself
       if (authorId === user.uid) {
-        alert("You cannot send a swap request for your own lesson.");
+        alert("You cannot swap with yourself.");
         setSendingSwap(false);
         return;
       }
 
-      // Create swap request document
+      // Find offered lesson
+      const offeredLessonSnap = await getDocs(
+        query(collection(db, "lessons"), where("title", "==", offeredSkillTitle.trim()))
+      );
+
+      if (offeredLessonSnap.empty) {
+        alert("Your offered skill does not match any of your lessons.");
+        setSendingSwap(false);
+        return;
+      }
+
+      const offeredLessonDoc = offeredLessonSnap.docs[0];
+      const offeredLessonData = offeredLessonDoc.data();
+
+      // Create swap request
       const swapRequestRef = doc(collection(db, "swapRequests"));
 
       await setDoc(swapRequestRef, {
@@ -194,7 +226,9 @@ export default function SkillPage({ params }) {
         creatorId: authorId,
         requestedLessonId: skillId,
         requestedLessonTitle: skill.title,
-        offeredSkillTitle: offeredSkillTitle.trim(),
+        offeredSkillId: offeredLessonDoc.id,
+        offeredSkillTitle: offeredLessonData.title,
+        offeredSkillCreatorId: offeredLessonData.creatorId,
         message: swapMessage,
         status: "pending",
         createdAt: new Date(),
@@ -217,14 +251,14 @@ export default function SkillPage({ params }) {
         userId: authorId,
         type: "swap_request",
         title: "New Skill Swap Request",
-        message: `${user.displayName || user.email || "Someone"} wants to exchange "${offeredSkillTitle.trim()}" for your "${skill.title}" lesson`,
+        message: `${user.displayName || user.email} wants to exchange "${offeredSkillTitle.trim()}" for your "${skill.title}"`,
         swapRequestId: swapRequestRef.id,
         senderId: user.uid,
-        senderName: user.displayName || user.email || "Anonymous",
+        senderName: user.displayName || user.email,
         senderEmail: user.email,
         timestamp: new Date(),
         read: false,
-        actions: ["View"]
+        actions: ["View"],
       });
 
       console.log("✅ Swap request and notification created successfully");
