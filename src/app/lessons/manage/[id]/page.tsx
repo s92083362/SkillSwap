@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Trash2, Plus, X, ArrowLeft, Eye, Edit } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebaseConfig';
 
 function initialSection() {
@@ -42,6 +42,7 @@ export default function ManageLessonPage() {
   // Loading states
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch lesson data
   useEffect(() => {
@@ -270,6 +271,29 @@ export default function ManageLessonPage() {
     router.push('/profile'); // or wherever your My Skills page is
   };
 
+  const handleDeleteLesson = async () => {
+    const confirmDelete = window.confirm(
+      'Are you sure you want to permanently delete this lesson? This action cannot be undone.'
+    );
+    
+    if (!confirmDelete) return;
+
+    setIsDeleting(true);
+
+    try {
+      const docRef = doc(db, 'lessons', lessonId);
+      await deleteDoc(docRef);
+      
+      alert('Lesson deleted successfully!');
+      router.push('/profile'); // Redirect to My Skills page
+    } catch (error) {
+      console.error('Error deleting lesson:', error);
+      alert('Failed to delete lesson. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleSaveChanges = async () => {
     // Validate required fields
     if (!lessonTitle.trim()) {
@@ -341,7 +365,7 @@ export default function ManageLessonPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 md:p-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 relative">
           <button
             onClick={() => router.push('/profile')} // Update to your My Skills route
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
@@ -377,6 +401,18 @@ export default function ManageLessonPage() {
                   Preview Mode
                 </>
               )}
+            </button>
+          </div>
+          
+          {/* Delete Button */}
+          <div className="mt-4 sm:mt-0 sm:absolute sm:top-0 sm:right-0">
+            <button
+              onClick={handleDeleteLesson}
+              disabled={isDeleting}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+            >
+              <Trash2 size={18} />
+              {isDeleting ? 'Deleting...' : 'Delete Lesson'}
             </button>
           </div>
         </div>
