@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import Header from "../shared/header/Header";
 import ProfileSidebar from "./ProfileSidebar";
 import ProfileLessons from "./ProfileLessons";
@@ -14,6 +15,20 @@ export default function ProfilePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<"dashboard" | "skills" | "messages" | "swap" | "profile">("dashboard");
   const [user, loading, error] = useAuthState(auth);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section === "skills") {
+      setActiveSection("skills");
+    }
+    else if (section === "swap") {
+      setActiveSection("swap");
+    }
+    else if (section === "dashboard") {
+      setActiveSection("dashboard");
+    }
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">

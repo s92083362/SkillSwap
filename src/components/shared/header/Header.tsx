@@ -116,18 +116,20 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
         <div className="flex items-center justify-between">
           {/* Logo Section */}
           <div className="flex items-center gap-2">
-            <img
-              src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png"
-              alt="Company Logo"
-              className="w-20 h-10 sm:w-25 sm:h-10"
-            />
+            <a href="/dash-board">
+              <img
+                src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png"
+                alt="Company Logo"
+                className="w-20 h-10 sm:w-25 sm:h-10"
+              />
+            </a>
           </div>
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-8">
-            <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">Home</a>
-            <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">My Skills</a>
-            <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">Learn</a>
-            <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">Teach</a>
+            <a href="/dash-board" className="text-gray-700 hover:text-gray-900 font-medium">Home</a>
+            <a href="/profile?section=skills" className="text-gray-700 hover:text-gray-900 font-medium">My Skills</a>
+            <a href="/profile?section=dashboard" className="text-gray-700 hover:text-gray-900 font-medium">Learn</a>
+            <a href="/profile?section=swap" className="text-gray-700 hover:text-gray-900 font-medium">Teach</a>
           </nav>
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Notifications Dropdown */}
