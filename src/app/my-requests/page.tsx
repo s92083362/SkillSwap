@@ -2,7 +2,16 @@
 import React, { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+  deleteDoc,
+  addDoc,
+} from "firebase/firestore";
 import Header from "@/components/shared/header/Header";
 import Link from "next/link";
 
@@ -48,6 +57,44 @@ export default function MyRequestsPage() {
 
     return unsubscribe;
   }, [user]);
+
+  // Delete request
+  const handleDelete = async (requestId) => {
+    if (!confirm("Are you sure you want to delete this request?")) return;
+
+    try {
+      await deleteDoc(doc(db, "swapRequests", requestId));
+
+      // Update local state immediately
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+
+      alert("Request deleted successfully.");
+    } catch (err) {
+      console.error("Error deleting request:", err);
+      alert("Failed to delete request.");
+    }
+  };
+
+  // Ping owner
+  const handlePing = async (request) => {
+    try {
+      if (!request.creatorId) return;
+
+      await addDoc(collection(db, "notifications"), {
+        userId: request.creatorId, // Owner of the course
+        type: "ping",
+        requestId: request.id,
+        message: `You have been pinged about the swap request for "${request.requestedLessonTitle}".`,
+        createdAt: new Date(),
+        read: false,
+      });
+
+      alert("Owner has been pinged!");
+    } catch (err) {
+      console.error("Error pinging owner:", err);
+      alert("Failed to ping owner.");
+    }
+  };
 
   if (!user) {
     return (
@@ -105,7 +152,6 @@ export default function MyRequestsPage() {
         ) : (
           <div className="space-y-4">
             {filteredRequests.map((req) => {
-              // Safe fields
               const title = req.requestedLessonTitle || "Untitled Lesson";
               const owner = req.ownerName || "Unknown Owner";
               const offered = req.offeredSkillTitle || "Unknown Skill";
@@ -142,24 +188,22 @@ export default function MyRequestsPage() {
                     >
                       {req.status}
                     </span>
-
                   </div>
 
-                  {/* Details */}
-
+                  {/* Arrow link to requested lesson */}
                   <div className="flex items-center gap-2 mt-2">
-                        {req.requestedLessonId && (
-                            <Link
-                            href={`/skills/${req.requestedLessonId}`}
-                            className="text-black hover:text-blue-800 transition text-lg"
-                            aria-label={`Go to requested lesson`}
-                            >
-                            ➔
-                            </Link>
-                        )}
-                   </div>
+                    {req.requestedLessonId && (
+                      <Link
+                        href={`/skills/${req.requestedLessonId}`}
+                        className="text-black hover:text-blue-800 transition text-lg"
+                        aria-label={`Go to requested lesson`}
+                      >
+                        ➔
+                      </Link>
+                    )}
+                  </div>
 
-                  <p className="text-gray-700">
+                  <p className="text-gray-700 mt-2">
                     <span className="font-semibold">Owner:</span> {owner}
                   </p>
 
@@ -197,6 +241,22 @@ export default function MyRequestsPage() {
                       ✗ This request was rejected.
                     </div>
                   )}
+
+                  {/* Ping & Delete Buttons */}
+                  <div className="flex gap-4 mt-4">
+                    <button
+                      onClick={() => handlePing(req)}
+                      className="text-sm text-blue-600 hover:text-blue-800 transition"
+                    >
+                      Ping Owner
+                    </button>
+                    <button
+                      onClick={() => handleDelete(req.id)}
+                      className="text-sm text-red-600 hover:text-red-800 transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               );
             })}
