@@ -199,7 +199,7 @@ export default function CreateLessonPage() {
 
       console.log('Lesson saved with ID:', docRef.id);
       alert('Lesson published successfully!');
-      router.push('/profile/MySkills');
+      router.push('/profile?section=skills');
     } catch (error) {
       console.error('Error saving lesson:', error);
       alert('Failed to publish lesson. Please try again.');
@@ -457,7 +457,7 @@ export default function CreateLessonPage() {
           <button 
             type="button" 
             className="w-full sm:w-auto px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
-            onClick={() => router.push('/profile/MySkills')}
+            onClick={() => router.push('/profile?section=skills')}
             disabled={isPublishing}
           >
             Cancel
