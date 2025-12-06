@@ -9,7 +9,8 @@ import {
   getDocs,
   doc,
   updateDoc,
-  getDoc
+  getDoc,
+  addDoc
 } from "firebase/firestore";
 import Header from "../../components/shared/header/Header";
 
@@ -75,6 +76,17 @@ export default function SwapRequestsPage() {
         // Notify requester about the owner's decision
         requesterStatus: newStatus,
         requesterNotifiedAt: new Date()
+      });
+      
+      await addDoc(collection(db, "notifications"), {
+        userId: requestData.requesterId, // requester
+        type: newStatus === "accepted" ? "requestAccepted" : "requestRejected",
+        requestId: requestId,
+        courseTitle: requestData.requestedLessonTitle,
+        ownerName: user.displayName || "Unknown",
+        message: `Your request for "${requestData.requestedLessonTitle}" was ${newStatus}.`,
+        createdAt: new Date(),
+        read: false,
       });
 
 
