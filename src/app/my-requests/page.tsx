@@ -243,6 +243,7 @@ export default function MyRequestsPage() {
                   )}
 
                   {/* Ping & Delete Buttons */}
+                  {req.status !== "accepted" && (
                   <div className="flex gap-4 mt-4">
                     <button
                       onClick={() => handlePing(req)}
@@ -257,6 +258,7 @@ export default function MyRequestsPage() {
                       Delete
                     </button>
                   </div>
+                  )}
                 </div>
               );
             })}
