@@ -4,7 +4,7 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { useRouter } from "next/navigation";
 import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
 import { db, auth } from "../../lib/firebase/firebaseConfig";
-
+ 
 // Helper to format Firestore Timestamp to "x min/hours ago"
 function formatTime(timestamp) {
   if (!timestamp) return "";
@@ -20,26 +20,30 @@ function formatTime(timestamp) {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-
+ 
   if (diffMins < 1) return "Just now";
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
 }
-
+ 
 export default function ProfileMessages() {
   const [user] = useAuthState(auth);
   const router = useRouter();
   const [messages, setMessages] = useState([]);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
-
+  const [loading, setLoading] = useState(true);
+ 
   useEffect(() => {
     if (!user) {
       setMessages([]);
+      setLoading(false);
       return;
     }
-
+ 
+    setLoading(true);
+    
     // Query Firestore for messages sent to the current user (limited to 5 recent)
     const q = query(
       collection(db, "messages"),
@@ -58,15 +62,16 @@ export default function ProfileMessages() {
       // Count unread messages
       const unreadCount = msgs.filter(msg => msg.read === false).length;
       setTotalUnreadCount(unreadCount);
+      setLoading(false);
     });
     
     return unsub;
   }, [user]);
-
+ 
   const handleViewAll = () => {
-    router.push("/chat/[chatid]"); 
+    router.push("/chat/[chatid]");
   };
-
+ 
   const handleMessageClick = (msg) => {
     // Navigate to chat with the sender
     if (msg.senderId) {
@@ -80,12 +85,12 @@ export default function ProfileMessages() {
       router.push("/chat");
     }
   };
-
+ 
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <h2 className="font-bold text-xl">Recent Messages</h2>
+          <h2 className="font-bold text-xl text-black">Recent Messages</h2>
           {totalUnreadCount > 0 && (
             <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
               {totalUnreadCount}
@@ -101,17 +106,34 @@ export default function ProfileMessages() {
       </div>
       
       <ul className="space-y-3">
-        {messages.length === 0 && (
+        {loading ? (
+          <li className="flex justify-center items-center py-12">
+            <div className="relative flex justify-center items-center">
+              <div className="w-12 h-12 relative">
+                <div className="absolute inset-0 flex justify-center items-center">
+                  <div className="w-2.5 h-2.5 bg-blue-600 rounded-full absolute animate-pulse" style={{top: '0%', left: '50%', transform: 'translate(-50%, -50%)', animationDelay: '0s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-600 rounded-full absolute animate-pulse" style={{top: '14.6%', left: '85.4%', transform: 'translate(-50%, -50%)', animationDelay: '0.1s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full absolute animate-pulse" style={{top: '50%', left: '100%', transform: 'translate(-50%, -50%)', animationDelay: '0.2s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-400 rounded-full absolute animate-pulse" style={{top: '85.4%', left: '85.4%', transform: 'translate(-50%, -50%)', animationDelay: '0.3s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-300 rounded-full absolute animate-pulse" style={{top: '100%', left: '50%', transform: 'translate(-50%, -50%)', animationDelay: '0.4s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-200 rounded-full absolute animate-pulse" style={{top: '85.4%', left: '14.6%', transform: 'translate(-50%, -50%)', animationDelay: '0.5s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-200 rounded-full absolute animate-pulse" style={{top: '50%', left: '0%', transform: 'translate(-50%, -50%)', animationDelay: '0.6s'}}></div>
+                  <div className="w-2.5 h-2.5 bg-blue-300 rounded-full absolute animate-pulse" style={{top: '14.6%', left: '14.6%', transform: 'translate(-50%, -50%)', animationDelay: '0.7s'}}></div>
+                </div>
+              </div>
+            </div>
+          </li>
+        ) : messages.length === 0 ? (
           <li className="text-gray-500 text-center py-8">
             No messages yet.
           </li>
-        )}
-        {messages.map((msg) => (
+        ) : (
+          messages.map((msg) => (
           <li
             key={msg.id}
             onClick={() => handleMessageClick(msg)}
-            className={`bg-white p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors ${
-              msg.read === false ? "border-l-4 border-blue-500" : ""
+            className={`bg-white p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 cursor-pointer hover:bg-blue-50 hover:shadow-md transition-all duration-200 ${
+              msg.read === false ? "border-l-4 border-blue-500 bg-blue-50/30" : ""
             }`}
           >
             <img
@@ -146,7 +168,8 @@ export default function ProfileMessages() {
               )}
             </div>
           </li>
-        ))}
+        ))
+        )}
       </ul>
       
       {/* Show View All button again at bottom if there are messages */}
