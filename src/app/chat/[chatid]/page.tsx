@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "../../../lib/firebase/firebaseConfig";
 import {
   collection,
@@ -12,36 +12,63 @@ import {
   setDoc,
   doc,
   where,
-  getDocs
+  getDocs,
 } from "firebase/firestore";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTrackUserActivity } from "@/hooks/useTrackUserActivity";
 import { useAllUsers } from "@/hooks/useAllUsers";
 import { useActiveUsers } from "@/hooks/useActiveUsers";
 import MessageBubble from "../../../components/chat/MessageBubble";
-import { useSearchParams } from 'next/navigation';
+import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
+import { PhotoIcon } from "@heroicons/react/24/solid";
 
 export default function ChatPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialUserId = searchParams.get("user");
+
   const user = useCurrentUser();
   const { allUsers, error: usersError } = useAllUsers();
   const activeUsers = useActiveUsers();
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState([]);
+
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const [showUserList, setShowUserList] = useState(true);
   const [search, setSearch] = useState("");
-  const [conversations, setConversations] = useState([]);
-  const [unreadCounts, setUnreadCounts] = useState({});
-  const messagesEndRef = useRef(null);
-  const searchParams = useSearchParams();
-  const initialUserId = searchParams.get('user');
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [fileCaption, setFileCaption] = useState("");
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const attachMenuRef = useRef<HTMLDivElement | null>(null);
 
   useTrackUserActivity(60000);
 
+  // Close attach menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        attachMenuRef.current &&
+        !attachMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowAttachMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Pre-select user from query param
   useEffect(() => {
     if (initialUserId && allUsers.length > 0 && user) {
-      const targetUser = allUsers.find(u => u.uid === initialUserId);
+      const targetUser = allUsers.find((u) => u.uid === initialUserId);
       if (targetUser) {
         selectUser(targetUser);
       }
@@ -55,21 +82,23 @@ export default function ChatPage() {
     const fetchConversations = async () => {
       try {
         const chatsSnapshot = await getDocs(collection(db, "privateChats"));
-        const userChats = [];
+        const userChats: any[] = [];
 
         for (const chatDoc of chatsSnapshot.docs) {
           const chatData = chatDoc.data();
           if (chatData.participants?.includes(user.uid)) {
             const chatId = chatDoc.id;
-            const otherUserId = chatData.participants.find(id => id !== user.uid);
+            const otherUserId = chatData.participants.find(
+              (id: string) => id !== user.uid
+            );
 
-            const unreadQuery = query(
+            const unreadQueryRef = query(
               collection(db, "messages"),
               where("receiverId", "==", user.uid),
               where("senderId", "==", otherUserId),
               where("read", "==", false)
             );
-            const unreadSnapshot = await getDocs(unreadQuery);
+            const unreadSnapshot = await getDocs(unreadQueryRef);
             const unreadCount = unreadSnapshot.size;
 
             userChats.push({
@@ -77,7 +106,7 @@ export default function ChatPage() {
               otherUserId,
               lastMessage: chatData.lastMessage || "",
               lastUpdated: chatData.lastUpdated?.toDate() || new Date(0),
-              unreadCount
+              unreadCount,
             });
           }
         }
@@ -85,8 +114,8 @@ export default function ChatPage() {
         userChats.sort((a, b) => b.lastUpdated - a.lastUpdated);
         setConversations(userChats);
 
-        const counts = {};
-        userChats.forEach(chat => {
+        const counts: Record<string, number> = {};
+        userChats.forEach((chat) => {
           counts[chat.otherUserId] = chat.unreadCount;
         });
         setUnreadCounts(counts);
@@ -96,59 +125,64 @@ export default function ChatPage() {
     };
 
     fetchConversations();
-
     const interval = setInterval(fetchConversations, 10000);
     return () => clearInterval(interval);
   }, [user]);
 
-  const isUserOnline = (userId) => {
-    return activeUsers.some(u => u.uid === userId);
-  };
+  const isUserOnline = (userId: string) =>
+    activeUsers.some((u) => u.uid === userId);
 
-  const getUserById = (userId) => {
-    return allUsers.find(u => u.uid === userId);
-  };
+  const getUserById = (userId: string) =>
+    allUsers.find((u) => u.uid === userId);
 
   const usersWithConversations = conversations
-    .map(conv => getUserById(conv.otherUserId))
-    .filter(Boolean);
+    .map((conv) => getUserById(conv.otherUserId))
+    .filter(Boolean) as any[];
 
   const usersWithoutConversations = allUsers
-    .filter(u => u.uid !== user?.uid)
-    .filter(u => !conversations.some(conv => conv.otherUserId === u.uid));
+    .filter((u) => u.uid !== user?.uid)
+    .filter((u) => !conversations.some((conv) => conv.otherUserId === u.uid));
 
-  const filterUsers = (users) => {
+  const filterUsers = (users: any[]) => {
     if (!search.trim()) return users;
-    return users.filter(u => {
+    return users.filter((u) => {
       const name = (u.displayName || "").toLowerCase();
       const email = (u.email || "").toLowerCase();
-      return name.includes(search.toLowerCase()) || email.includes(search.toLowerCase());
+      return (
+        name.includes(search.toLowerCase()) ||
+        email.includes(search.toLowerCase())
+      );
     });
   };
 
   const filteredUsersWithConv = filterUsers(usersWithConversations);
   const filteredUsersWithoutConv = filterUsers(usersWithoutConversations);
 
-  const selectUser = async (targetUser) => {
+  const selectUser = async (targetUser: any) => {
+    if (!user) return;
     setSelectedUser(targetUser);
     setShowUserList(false);
     const chatId = [user.uid, targetUser.uid].sort().join("_");
 
     try {
-      const unreadQuery = query(
+      const unreadQueryRef = query(
         collection(db, "messages"),
         where("receiverId", "==", user.uid),
         where("senderId", "==", targetUser.uid),
         where("read", "==", false)
       );
-      const unreadSnapshot = await getDocs(unreadQuery);
+      const unreadSnapshot = await getDocs(unreadQueryRef);
 
-      const updatePromises = unreadSnapshot.docs.map(msgDoc => 
-        setDoc(doc(db, "messages", msgDoc.id), { read: true }, { merge: true })
+      const updatePromises = unreadSnapshot.docs.map((msgDoc) =>
+        setDoc(
+          doc(db, "messages", msgDoc.id),
+          { read: true },
+          { merge: true }
+        )
       );
       await Promise.all(updatePromises);
 
-      setUnreadCounts(prev => ({ ...prev, [targetUser.uid]: 0 }));
+      setUnreadCounts((prev) => ({ ...prev, [targetUser.uid]: 0 }));
     } catch (error) {
       console.error("Error marking messages as read:", error);
     }
@@ -159,7 +193,7 @@ export default function ChatPage() {
         participants: [user.uid, targetUser.uid],
         participantNames: {
           [user.uid]: user.displayName || user.email,
-          [targetUser.uid]: targetUser.displayName || targetUser.email
+          [targetUser.uid]: targetUser.displayName || targetUser.email,
         },
         lastUpdated: serverTimestamp(),
       },
@@ -171,7 +205,7 @@ export default function ChatPage() {
       orderBy("timestamp")
     );
     const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMessages(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   };
@@ -180,60 +214,182 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setShowAttachMenu(false);
+
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const cancelFileUpload = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    setFileCaption("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   async function sendMessage() {
     if (!user || !input.trim() || !selectedUser) return;
     const chatId = [user.uid, selectedUser.uid].sort().join("_");
+    const text = input.trim();
+
     try {
       await addDoc(collection(db, "privateChats", chatId, "messages"), {
         senderId: user.uid,
         senderName: user.displayName || "Anonymous",
-        content: input,
+        content: text,
+        type: "text",
+        fileUrl: null,
+        fileName: null,
         timestamp: serverTimestamp(),
       });
+
       await addDoc(collection(db, "messages"), {
         senderId: user.uid,
         senderName: user.displayName || "Anonymous",
         receiverId: selectedUser.uid,
-        content: input,
+        content: text,
+        type: "text",
+        fileUrl: null,
         conversationId: chatId,
         timestamp: serverTimestamp(),
         read: false,
       });
+
       await addDoc(collection(db, "notifications"), {
         userId: selectedUser.uid,
         type: "chat",
         title: "New Message",
-        message: `${user.displayName || "Someone"} sent you a message: "${input.substring(0, 50)}${input.length > 50 ? '...' : ''}"`,
+        message: `${user.displayName || "Someone"} sent you a message: "${text.substring(0, 50)}${
+          text.length > 50 ? "..." : ""
+        }"`,
         chatId,
         senderId: user.uid,
         senderName: user.displayName || user.email || "Anonymous",
         senderEmail: user.email,
         timestamp: serverTimestamp(),
         read: false,
-        actions: ["View"]
+        actions: ["View"],
       });
+
       await setDoc(
         doc(db, "privateChats", chatId),
         {
-          lastMessage: input,
+          lastMessage: text,
           lastUpdated: serverTimestamp(),
         },
         { merge: true }
       );
+
       setInput("");
     } catch (error) {
       console.error("❌ Error sending message:", error);
     }
   }
 
+  async function sendFileMessage() {
+    if (!user || !selectedUser || !selectedFile) return;
+    const chatId = [user.uid, selectedUser.uid].sort().join("_");
+    const file = selectedFile;
+
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setUploadError("File size must be less than 10MB");
+      setTimeout(() => setUploadError(null), 5000);
+      return;
+    }
+
+    try {
+      setUploading(true);
+      setUploadError(null);
+
+      const { url, resourceType } = await uploadChatFileToCloudinary(file);
+      const isImage = resourceType === "image" && file.type.startsWith("image/");
+
+      const displayContent = fileCaption || (isImage ? "" : file.name);
+      const type = isImage ? "image" : "file";
+
+      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+        senderId: user.uid,
+        senderName: user.displayName || "Anonymous",
+        content: displayContent,
+        type,
+        fileUrl: url,
+        fileName: file.name,
+        timestamp: serverTimestamp(),
+      });
+
+      await addDoc(collection(db, "messages"), {
+        senderId: user.uid,
+        senderName: user.displayName || "Anonymous",
+        receiverId: selectedUser.uid,
+        content: displayContent,
+        type,
+        fileUrl: url,
+        conversationId: chatId,
+        timestamp: serverTimestamp(),
+        read: false,
+      });
+
+      await addDoc(collection(db, "notifications"), {
+        userId: selectedUser.uid,
+        type: "chat",
+        title: isImage ? "New Photo" : "New File",
+        message: `${user.displayName || "Someone"} sent you a ${
+          isImage ? "photo" : "file"
+        }.`,
+        chatId,
+        senderId: user.uid,
+        senderName: user.displayName || user.email || "Anonymous",
+        senderEmail: user.email,
+        timestamp: serverTimestamp(),
+        read: false,
+        actions: ["View"],
+      });
+
+      await setDoc(
+        doc(db, "privateChats", chatId),
+        {
+          lastMessage: isImage ? "📷 Photo" : `📎 ${file.name}`,
+          lastUpdated: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      cancelFileUpload();
+    } catch (error) {
+      console.error("❌ Error sending file message:", error);
+      setUploadError(
+        error instanceof Error ? error.message : "Failed to upload file"
+      );
+      setTimeout(() => setUploadError(null), 5000);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   if (!user) return null;
 
-  const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
+  const totalUnread = Object.values(unreadCounts).reduce(
+    (sum, count) => sum + count,
+    0
+  );
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      <header className="bg-white px-4 py-4 shadow flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+      {/* Header */}
+      <header className="bg-white px-3 sm:px-4 py-3 sm:py-4 shadow flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {selectedUser && (
             <button
               onClick={() => {
@@ -241,200 +397,391 @@ export default function ChatPage() {
                 setShowUserList(true);
                 setMessages([]);
               }}
-              className="text-blue-600 hover:text-blue-800 font-medium"
+              className="text-blue-600 hover:text-blue-800 font-medium text-sm sm:text-base flex-shrink-0"
             >
               ← Back
             </button>
           )}
-          <div>
-            <h1 className="text-xl font-bold text-blue-900">
-              {selectedUser 
-                ? `Chat with ${selectedUser.displayName || selectedUser.email}` 
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base sm:text-xl font-bold text-blue-900 truncate">
+              {selectedUser
+                ? `${selectedUser.displayName || selectedUser.email}`
                 : "Messages"}
             </h1>
             {selectedUser && (
               <div className="flex items-center gap-2 mt-1">
-                <span className={`w-2 h-2 rounded-full ${
-                  isUserOnline(selectedUser.uid) ? 'bg-green-500' : 'bg-gray-400'
-                }`}></span>
-                <span className="text-sm text-black">
-                  {isUserOnline(selectedUser.uid) ? 'Online' : 'Offline'}
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    isUserOnline(selectedUser.uid)
+                      ? "bg-green-500"
+                      : "bg-gray-400"
+                  }`}
+                ></span>
+                <span className="text-xs sm:text-sm text-gray-600">
+                  {isUserOnline(selectedUser.uid) ? "Online" : "Offline"}
                 </span>
               </div>
             )}
           </div>
         </div>
         {totalUnread > 0 && !selectedUser && (
-          <div className="bg-blue-600 text-black px-3 py-1 rounded-full text-sm font-semibold">
-            {totalUnread} unread
+          <div className="bg-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
+            {totalUnread}
           </div>
         )}
       </header>
-      
-      <div className="flex-1 overflow-hidden flex">
-        {/* Sidebar: Searchable user list */}
-        {showUserList && (
-          <div className="w-80 bg-white border-r shadow-sm overflow-y-auto">
-            <div className="p-4">
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="border px-3 py-2 rounded-lg w-full mb-4 focus:outline-none focus:border-blue-500"
-                placeholder="Search users..."
-              />
-              
-              {usersError && <div className="text-red-500 mb-3">{usersError}</div>}
-              
-              {/* Users with conversations (sorted by recent) */}
-              {filteredUsersWithConv.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">Recent Chats</div>
-                  <ul className="flex flex-col gap-1">
-                    {filteredUsersWithConv.map(u => {
-                      const conv = conversations.find(c => c.otherUserId === u.uid);
-                      const unreadCount = unreadCounts[u.uid] || 0;
-                      
-                      return (
-                        <li
-                          key={u.uid}
-                          onClick={() => selectUser(u)}
-                          className={`px-3 py-3 rounded-lg cursor-pointer transition-all ${
-                            selectedUser?.uid === u.uid
-                              ? "bg-blue-500 text-white"
-                              : unreadCount > 0
-                              ? "bg-blue-50 hover:bg-blue-100"
-                              : "hover:bg-gray-100"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1 min-w-0">
-                              <div className={`font-medium truncate text-black ${unreadCount > 0 && selectedUser?.uid !== u.uid ? 'font-bold' : ''}`}>
-                                {u.displayName || "Anonymous"}
-                              </div>
-                              <div className={`text-sm truncate ${
-                                selectedUser?.uid === u.uid ? "text-blue-100" : "text-gray-500"
-                              }`}>
-                                {conv?.lastMessage || u.email}
-                              </div>
-                            </div>
-                            {unreadCount > 0 && (
-                              <div className="bg-green-500 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold ml-2 flex-shrink-0">
-                                {unreadCount}
-                              </div>
-                            )}
-                            <span className={`w-2 h-2 rounded-full flex-shrink-0 self-center ml-2 ${
-                              isUserOnline(u.uid) ? "bg-green-500" : "bg-gray-400"
-                            }`}></span>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
+
+      {/* Upload Error Toast */}
+      {uploadError && (
+        <div className="fixed top-16 sm:top-20 right-2 sm:right-4 bg-red-500 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg z-50 max-w-[calc(100vw-1rem)] sm:max-w-sm">
+          <div className="flex items-start gap-2">
+            <span className="text-lg sm:text-xl flex-shrink-0">⚠️</span>
+            <div className="min-w-0">
+              <p className="font-semibold text-sm sm:text-base">Upload Failed</p>
+              <p className="text-xs sm:text-sm break-words">{uploadError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <div
+          className={`${
+            selectedUser ? "hidden" : "flex"
+          } md:flex w-full md:w-80 lg:w-96 bg-white md:border-r shadow-sm overflow-y-auto flex-shrink-0`}
+        >
+          <div className="p-3 sm:p-4 w-full">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="border px-3 py-2 rounded-lg w-full mb-3 sm:mb-4 focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+              placeholder="Search users..."
+            />
+
+            {usersError && (
+              <div className="text-red-500 mb-3 text-sm">{usersError}</div>
+            )}
+
+            {filteredUsersWithConv.length > 0 && (
+              <div className="mb-4">
+                <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
+                  Recent Chats
                 </div>
-              )}
-              
-              {/* Users without conversations */}
-              {filteredUsersWithoutConv.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">All Users</div>
-                  <ul className="flex flex-col gap-1">
-                    {filteredUsersWithoutConv.map(u => (
+                <ul className="flex flex-col gap-1">
+                  {filteredUsersWithConv.map((u) => {
+                    const conv = conversations.find(
+                      (c) => c.otherUserId === u.uid
+                    );
+                    const unreadCount = unreadCounts[u.uid] || 0;
+
+                    return (
                       <li
                         key={u.uid}
                         onClick={() => selectUser(u)}
-                        className={`px-3 py-3 rounded-lg cursor-pointer transition-all ${
+                        className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
                           selectedUser?.uid === u.uid
-                            ? "bg-blue-500 text-black"
+                            ? "bg-blue-500 text-white"
+                            : unreadCount > 0
+                            ? "bg-blue-50 hover:bg-blue-100"
                             : "hover:bg-gray-100"
                         }`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate text-black">{u.displayName || "Anonymous"}</div>
-                            <div className={`text-sm truncate ${
-                              selectedUser?.uid === u.uid ? "text-black" : "text-black"
-                            }`}>
-                              {u.email || "No email"}
+                            <div
+                              className={`font-medium truncate text-sm sm:text-base ${
+                                selectedUser?.uid === u.uid
+                                  ? "text-white"
+                                  : "text-black"
+                              } ${
+                                unreadCount > 0 &&
+                                selectedUser?.uid !== u.uid
+                                  ? "font-bold"
+                                  : ""
+                              }`}
+                            >
+                              {u.displayName || "Anonymous"}
+                            </div>
+                            <div
+                              className={`text-xs sm:text-sm truncate ${
+                                selectedUser?.uid === u.uid
+                                  ? "text-blue-100"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              {conv?.lastMessage || u.email}
                             </div>
                           </div>
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            isUserOnline(u.uid) ? "bg-green-500" : "bg-gray-400"
-                          }`}></span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {unreadCount > 0 && (
+                              <div className="bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
+                                {unreadCount}
+                              </div>
+                            )}
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                isUserOnline(u.uid)
+                                  ? "bg-green-500"
+                                  : "bg-gray-400"
+                              }`}
+                            ></span>
+                          </div>
                         </div>
                       </li>
-                    ))}
-                  </ul>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {filteredUsersWithoutConv.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
+                  All Users
                 </div>
-              )}
-              
-              {filteredUsersWithConv.length === 0 && filteredUsersWithoutConv.length === 0 && (
-                <div className="text-center text-gray-400 py-8">
+                <ul className="flex flex-col gap-1">
+                  {filteredUsersWithoutConv.map((u) => (
+                    <li
+                      key={u.uid}
+                      onClick={() => selectUser(u)}
+                      className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
+                        selectedUser?.uid === u.uid
+                          ? "bg-blue-500 text-white"
+                          : "hover:bg-gray-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className={`font-medium truncate text-sm sm:text-base ${
+                              selectedUser?.uid === u.uid
+                                ? "text-white"
+                                : "text-black"
+                            }`}
+                          >
+                            {u.displayName || "Anonymous"}
+                          </div>
+                          <div
+                            className={`text-xs sm:text-sm truncate ${
+                              selectedUser?.uid === u.uid
+                                ? "text-blue-100"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {u.email || "No email"}
+                          </div>
+                        </div>
+                        <span
+                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                            isUserOnline(u.uid)
+                              ? "bg-green-500"
+                              : "bg-gray-400"
+                          }`}
+                        ></span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {filteredUsersWithConv.length === 0 &&
+              filteredUsersWithoutConv.length === 0 && (
+                <div className="text-center text-gray-400 py-8 text-sm">
                   {search ? "No users found" : "No users available"}
                 </div>
               )}
-            </div>
           </div>
-        )}
-        
+        </div>
+
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <div
+          className={`${
+            selectedUser ? "flex" : "hidden md:flex"
+          } flex-1 flex-col min-w-0`}
+        >
           {selectedUser ? (
             <>
-              <div className="flex-1 overflow-y-auto p-4 pb-32">
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-2 sm:p-4">
                 <div className="flex flex-col gap-2 max-w-4xl mx-auto">
                   {messages.length === 0 ? (
-                    <div className="text-center text-gray-500 mt-8">
-                      <p className="text-lg mb-2">No messages yet</p>
-                      <p className="text-sm">
-                        Start the conversation with {selectedUser.displayName || selectedUser.email}!
+                    <div className="text-center text-gray-500 mt-8 px-4">
+                      <p className="text-base sm:text-lg mb-2">No messages yet</p>
+                      <p className="text-xs sm:text-sm">
+                        Start the conversation with{" "}
+                        {selectedUser.displayName || selectedUser.email}!
                       </p>
                     </div>
                   ) : (
-                    messages.map(msg => (
+                    messages.map((msg: any) => (
                       <MessageBubble
                         key={msg.id}
                         content={msg.content}
                         isSender={msg.senderId === user.uid}
-                        timestamp={
-                          msg.timestamp?.toDate?.()?.toLocaleTimeString?.([], {
-                            hour: "2-digit", minute: "2-digit"
-                          })
-                        }
+                        timestamp={msg.timestamp
+                          ?.toDate?.()
+                          ?.toLocaleTimeString?.([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                         senderName={msg.senderName}
+                        type={msg.type}
+                        fileUrl={msg.fileUrl}
+                        fileName={msg.fileName}
                       />
                     ))
                   )}
                   <div ref={messagesEndRef} />
                 </div>
               </div>
-              
+
+              {/* File Preview */}
+              {selectedFile && (
+                <div className="bg-gray-50 border-t p-2 sm:p-4 flex-shrink-0">
+                  <div className="max-w-4xl mx-auto">
+                    <div className="bg-white rounded-lg p-3 sm:p-4 shadow-sm">
+                      <div className="flex items-start gap-2 sm:gap-4">
+                        {filePreview ? (
+                          <img
+                            src={filePreview}
+                            alt="Preview"
+                            className="w-16 h-16 sm:w-24 sm:h-24 object-cover rounded flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl sm:text-4xl">📄</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2 truncate">
+                            {selectedFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500 mb-2 sm:mb-3">
+                            {(selectedFile.size / 1024).toFixed(2)} KB
+                          </p>
+                          <input
+                            type="text"
+                            placeholder="Add a caption..."
+                            value={fileCaption}
+                            onChange={(e) => setFileCaption(e.target.value)}
+                            className="w-full border rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <button
+                          onClick={cancelFileUpload}
+                          className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-lg sm:text-xl"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="flex gap-2 mt-3 sm:mt-4">
+                        <button
+                          onClick={sendFileMessage}
+                          disabled={uploading}
+                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                        >
+                          {uploading ? "Sending..." : "Send"}
+                        </button>
+                        <button
+                          onClick={cancelFileUpload}
+                          className="px-3 sm:px-4 py-1.5 sm:py-2 border rounded-lg hover:bg-gray-50 text-sm sm:text-base"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Input Area */}
               <form
-                onSubmit={e => {
+                onSubmit={(e) => {
                   e.preventDefault();
                   sendMessage();
                 }}
-                className="bg-white border-t p-4"
+                className="bg-white border-t p-2 sm:p-4 flex-shrink-0"
               >
-                <div className="max-w-4xl mx-auto flex items-center gap-2">
+                <div className="max-w-4xl mx-auto flex items-center gap-1.5 sm:gap-2">
+                  {/* Attach button */}
+                  <div className="relative" ref={attachMenuRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowAttachMenu(!showAttachMenu)}
+                      disabled={uploading || !!selectedFile}
+                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                    >
+                      <span className="text-xl sm:text-2xl">+</span>
+                    </button>
+
+                    {showAttachMenu && (
+                      <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg border py-2 w-48 sm:w-56 z-10">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            fileInputRef.current?.click();
+                            setShowAttachMenu(false);
+                          }}
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 flex items-center gap-2 sm:gap-3 text-left"
+                        >
+                          <span className="text-xl sm:text-2xl">📁</span>
+                          <span className="font-medium text-black text-sm sm:text-base">
+                            File
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            fileInputRef.current?.setAttribute(
+                              "accept",
+                              "image/*,video/*"
+                            );
+                            fileInputRef.current?.click();
+                            setShowAttachMenu(false);
+                          }}
+                          className="w-full px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 flex items-center gap-2 sm:gap-3 text-left"
+                        >
+                          <span className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400">
+                            <PhotoIcon />
+                          </span>
+                          <span className="font-medium text-black text-sm sm:text-base">
+                            Photos & Videos
+                          </span>
+                        </button>
+                      </div>
+                    )}
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleFileSelect(file);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </div>
+
                   <input
                     type="text"
-                    className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
-                    placeholder={`Message ${selectedUser.displayName || selectedUser.email}...`}
+                    className="flex-1 min-w-0 border rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+                    placeholder={`Message ${
+                      selectedUser.displayName || selectedUser.email
+                    }...`}
                     value={input}
-                    onChange={e => setInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendMessage();
-                      }
-                    }}
-                    required
+                    onChange={(e) => setInput(e.target.value)}
+                    disabled={uploading || !!selectedFile}
                   />
                   <button
                     type="submit"
-                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg transition-all"
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-3 sm:px-6 py-1.5 sm:py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base flex-shrink-0"
+                    disabled={uploading || !input.trim() || !!selectedFile}
                   >
                     Send
                   </button>
@@ -442,17 +789,27 @@ export default function ChatPage() {
               </form>
             </>
           ) : (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="flex-1 flex items-center justify-center text-gray-500 p-4">
               <div className="text-center">
-                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path
-                    strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
                     d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                   />
                 </svg>
-                <p className="text-lg">Select a user to start chatting</p>
+                <p className="text-base sm:text-lg">Select a user to start chatting</p>
                 {totalUnread > 0 && (
-                  <p className="text-sm text-blue-600 mt-2">You have {totalUnread} unread message{totalUnread > 1 ? 's' : ''}</p>
+                  <p className="text-xs sm:text-sm text-blue-600 mt-2">
+                    You have {totalUnread} unread message
+                    {totalUnread > 1 ? "s" : ""}
+                  </p>
                 )}
               </div>
             </div>
