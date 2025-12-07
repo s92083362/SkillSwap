@@ -128,8 +128,8 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
           <nav className="hidden lg:flex items-center gap-8">
             <a href="/dash-board" className="text-gray-700 hover:text-gray-900 font-medium">Home</a>
             <a href="/profile?section=skills" className="text-gray-700 hover:text-gray-900 font-medium">My Skills</a>
-            <a href="/profile?section=dashboard" className="text-gray-700 hover:text-gray-900 font-medium">Learn</a>
-            <a href="/profile?section=swap" className="text-gray-700 hover:text-gray-900 font-medium">Teach</a>
+            <a href="/my-requests" className="text-gray-700 hover:text-gray-900 font-medium">Learn</a>
+            <a href="/swap-requests" className="text-gray-700 hover:text-gray-900 font-medium">Teach</a>
           </nav>
           <div className="flex items-center gap-2 sm:gap-4">
             {/* Notifications Dropdown */}

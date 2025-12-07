@@ -77,6 +77,17 @@ export default function SwapRequestsPage() {
         requesterNotifiedAt: new Date()
       });
 
+      await addDoc(collection(db, "notifications"), {
+        userId: requestData.requesterId,  // requester receives the notification
+        type: "swap_request_update",
+        status: newStatus,                // accepted or rejected
+        courseTitle: requestData.requestedLessonTitle,
+        ownerName: user.displayName || user.email,
+        requestId: requestId,
+        isRead: false,
+        createdAt: new Date()
+      });
+
 
       setRequests(prev =>
         prev.map(req =>
