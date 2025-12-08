@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,12 +21,14 @@ import { useAllUsers } from "@/hooks/useAllUsers";
 import { useActiveUsers } from "@/hooks/useActiveUsers";
 import MessageBubble from "../../../components/chat/MessageBubble";
 import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
-import { PhotoIcon } from "@heroicons/react/24/solid";
+import { PhotoIcon, VideoCameraIcon } from "@heroicons/react/24/solid";
+import VideoCall from "../../../components/chat/VideoCall";
 
 export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialUserId = searchParams.get("user");
+  const autoAnswerCallId = searchParams.get("callId");
 
   const user = useCurrentUser();
   const { allUsers, error: usersError } = useAllUsers();
@@ -44,6 +47,8 @@ export default function ChatPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [fileCaption, setFileCaption] = useState("");
+  const [showVideoCall, setShowVideoCall] = useState(false);
+  const [autoAnswer, setAutoAnswer] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -51,7 +56,6 @@ export default function ChatPage() {
 
   useTrackUserActivity(60000);
 
-  // Close attach menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -65,17 +69,25 @@ export default function ChatPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Pre-select user from query param
   useEffect(() => {
-    if (initialUserId && allUsers.length > 0 && user) {
+    if (autoAnswerCallId && initialUserId && allUsers.length > 0 && user) {
+      const targetUser = allUsers.find((u) => u.uid === initialUserId);
+      if (targetUser) {
+        selectUser(targetUser);
+        setShowVideoCall(true);
+        setAutoAnswer(true);
+        
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+      }
+    } else if (initialUserId && allUsers.length > 0 && user) {
       const targetUser = allUsers.find((u) => u.uid === initialUserId);
       if (targetUser) {
         selectUser(targetUser);
       }
     }
-  }, [initialUserId, allUsers, user]);
+  }, [initialUserId, autoAnswerCallId, allUsers, user]);
 
-  // Fetch all conversations for the current user
   useEffect(() => {
     if (!user) return;
 
@@ -238,6 +250,16 @@ export default function ChatPage() {
     }
   };
 
+  const startVideoCall = () => {
+    setShowVideoCall(true);
+    setAutoAnswer(false);
+  };
+
+  const closeVideoCall = () => {
+    setShowVideoCall(false);
+    setAutoAnswer(false);
+  };
+
   async function sendMessage() {
     if (!user || !input.trim() || !selectedUser) return;
     const chatId = [user.uid, selectedUser.uid].sort().join("_");
@@ -387,7 +409,17 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-      {/* Header */}
+      {showVideoCall && selectedUser && (
+        <VideoCall
+          currentUserId={user.uid}
+          currentUserName={user.displayName || user.email || "Anonymous"}
+          otherUserId={selectedUser.uid}
+          otherUserName={selectedUser.displayName || selectedUser.email || "Unknown"}
+          onClose={closeVideoCall}
+          autoAnswer={autoAnswer}
+        />
+      )}
+
       <header className="bg-white px-3 sm:px-4 py-3 sm:py-4 shadow flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {selectedUser && (
@@ -424,6 +456,17 @@ export default function ChatPage() {
             )}
           </div>
         </div>
+        
+        {selectedUser && (
+          <button
+            onClick={startVideoCall}
+            className="bg-blue-500 hover:bg-blue-600 text-white p-2 sm:p-2.5 rounded-full transition-all flex-shrink-0 ml-2"
+            title="Start Video Call"
+          >
+            <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        )}
+        
         {totalUnread > 0 && !selectedUser && (
           <div className="bg-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
             {totalUnread}
@@ -431,7 +474,6 @@ export default function ChatPage() {
         )}
       </header>
 
-      {/* Upload Error Toast */}
       {uploadError && (
         <div className="fixed top-16 sm:top-20 right-2 sm:right-4 bg-red-500 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg z-50 max-w-[calc(100vw-1rem)] sm:max-w-sm">
           <div className="flex items-start gap-2">
@@ -445,7 +487,6 @@ export default function ChatPage() {
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
         <div
           className={`${
             selectedUser ? "hidden" : "flex"
@@ -596,7 +637,6 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Chat Area */}
         <div
           className={`${
             selectedUser ? "flex" : "hidden md:flex"
@@ -604,7 +644,6 @@ export default function ChatPage() {
         >
           {selectedUser ? (
             <>
-              {/* Messages */}
               <div className="flex-1 overflow-y-auto p-2 sm:p-4">
                 <div className="flex flex-col gap-2 max-w-4xl mx-auto">
                   {messages.length === 0 ? (
@@ -638,7 +677,6 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* File Preview */}
               {selectedFile && (
                 <div className="bg-gray-50 border-t p-2 sm:p-4 flex-shrink-0">
                   <div className="max-w-4xl mx-auto">
@@ -697,7 +735,6 @@ export default function ChatPage() {
                 </div>
               )}
 
-              {/* Input Area */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -706,7 +743,6 @@ export default function ChatPage() {
                 className="bg-white border-t p-2 sm:p-4 flex-shrink-0"
               >
                 <div className="max-w-4xl mx-auto flex items-center gap-1.5 sm:gap-2">
-                  {/* Attach button */}
                   <div className="relative" ref={attachMenuRef}>
                     <button
                       type="button"
@@ -735,8 +771,7 @@ export default function ChatPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            fileInputRef.current?.setAttribute(
-                              "accept",
+                            fileInputRef.current?.setAttribute("accept",
                               "image/*,video/*"
                             );
                             fileInputRef.current?.click();
