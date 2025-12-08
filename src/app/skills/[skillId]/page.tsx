@@ -53,6 +53,7 @@ export default function SkillPage({ params }) {
             instructor: data.instructor,
             creatorId: data.creatorId,
             image: data.image,
+            visibility: data.visibility || "swap-only", // NEW: visibility field
             sections: (data.sections || []).map((section, idx) => ({
               id: section.id || `section-${idx}`,
               name: section.title,
@@ -77,7 +78,7 @@ export default function SkillPage({ params }) {
 
   // Fetch enrollment & allowed sections
   useEffect(() => {
-    if (!user || !skillId) return;
+    if (!user || !skillId || !skill) return;
 
     const fetchEnrollment = async () => {
       const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
@@ -86,8 +87,7 @@ export default function SkillPage({ params }) {
       if (snap.exists()) {
         setIsEnrolled(true);
         const data = snap.data();
-        // Only allow first section initially
-        setAllowedSections(data.allowedSections || [skill?.sections[0]?.id]);
+        setAllowedSections(data.allowedSections || [skill.sections[0]?.id]);
       } else {
         setIsEnrolled(false);
         setAllowedSections([]);
@@ -97,12 +97,25 @@ export default function SkillPage({ params }) {
     fetchEnrollment();
   }, [user, skillId, skill]);
 
-  // Check if user has an accepted swap request for this skill
+  // Check swap request or public lesson access
   useEffect(() => {
-    if (!user || !skillId) return;
+    if (!user || !skillId || !skill) return;
 
-    const checkSwapRequest = async () => {
+    const checkAccess = async () => {
       try {
+        const allSections = skill.sections?.map((sec) => sec.id) || [];
+
+        // If public, grant access to all sections
+        if (skill.visibility === "public") {
+          setAllowedSections(allSections);
+
+          // Persist in Firestore
+          const enrollmentRef = doc(db, "users", user.uid, "enrolledSkills", skillId);
+          await setDoc(enrollmentRef, { allowedSections: allSections }, { merge: true });
+          return;
+        }
+
+        // Swap-only: check if user has an accepted swap request
         const q = query(
           collection(db, "swapRequests"),
           where("requesterId", "==", user.uid),
@@ -111,19 +124,17 @@ export default function SkillPage({ params }) {
         );
         const snapshot = await getDocs(q);
         if (!snapshot.empty) {
-          const allSections = skill?.sections.map((sec) => sec.id) || [];
           setAllowedSections(allSections);
 
-          // Persist allowed sections in Firestore
           const enrollmentRef = doc(db, "users", user.uid, "enrolledSkills", skillId);
           await setDoc(enrollmentRef, { allowedSections: allSections }, { merge: true });
         }
       } catch (err) {
-        console.error("Error checking swap request status:", err);
+        console.error("Error checking access:", err);
       }
     };
 
-    checkSwapRequest();
+    checkAccess();
   }, [user, skillId, skill]);
 
   // Enroll / Unenroll toggle
@@ -172,7 +183,7 @@ export default function SkillPage({ params }) {
       const authorId = lessonData.creatorId;
 
       if (!authorId) {
-        alert("This lesson doesn't have creator information. Please contact support.");
+        alert("This lesson doesn't have creator information.");
         setSendingSwap(false);
         return;
       }
