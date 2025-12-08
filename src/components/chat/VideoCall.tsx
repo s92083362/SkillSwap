@@ -1,5 +1,6 @@
 // components/chat/VideoCall.tsx
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { db } from "../../lib/firebase/firebaseConfig";
 import {
@@ -12,6 +13,7 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  getDoc,
 } from "firebase/firestore";
 import {
   VideoCameraIcon,
@@ -25,8 +27,19 @@ import {
   XMarkIcon,
   PaperAirplaneIcon,
   PhotoIcon,
+  ArrowsPointingOutIcon,
+  ComputerDesktopIcon,
 } from "@heroicons/react/24/solid";
 import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
+import { getLiveKitToken } from "@/app/actions/getLiveKitToken";
+import {
+  Room,
+  RoomEvent,
+  RemoteParticipant,
+  RemoteTrackPublication,
+  RemoteTrack,
+  Track,
+} from "livekit-client";
 
 interface VideoCallProps {
   currentUserId: string;
@@ -56,16 +69,17 @@ export default function VideoCall({
   onClose,
   autoAnswer = false,
 }: VideoCallProps) {
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const [isCalling, setIsCalling] = useState(false);
   const [isReceivingCall, setIsReceivingCall] = useState(false);
   const [callStatus, setCallStatus] = useState<string>("Initializing...");
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   // Chat state
   const [showChat, setShowChat] = useState(false);
@@ -88,60 +102,55 @@ export default function VideoCall({
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
-  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-  const callDocRef = useRef<string | null>(null);
+  const screenShareRef = useRef<HTMLVideoElement>(null);
+  const callDocIdRef = useRef<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const outgoingAudioRef = useRef<HTMLAudioElement | null>(null);
   const incomingAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const servers: RTCConfiguration = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-      {
-        urls: "turn:openrelay.metered.ca:80",
-        username: "openrelayproject",
-        credential: "openrelayproject",
-      },
-      {
-        urls: "turn:openrelay.metered.ca:443",
-        username: "openrelayproject",
-        credential: "openrelayproject",
-      },
-      {
-        urls: "turn:openrelay.metered.ca:443?transport=tcp",
-        username: "openrelayproject",
-        credential: "openrelayproject",
-      },
-    ],
+  const hasEndedRef = useRef(false); // prevent double end
+
+  // Unified chatId / roomName
+  const chatId = [currentUserId, otherUserId].sort().join("_");
+  const roomName = chatId;
+
+  // ----- Helpers for safe call doc updates -----
+
+  const safeUpdateCall = async (callId: string, data: any) => {
+    const ref = doc(db, "calls", callId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    await updateDoc(ref, data);
   };
 
-  // Unified chatId
-  const chatId = [currentUserId, otherUserId].sort().join("_");
+  const safeDeleteCall = async (callId: string) => {
+    const ref = doc(db, "calls", callId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+    await deleteDoc(ref);
+  };
 
   // ----- Effects -----
 
   useEffect(() => {
-    setupMediaStream();
     const unsubscribeIncoming = listenForIncomingCalls();
     const unsubscribeCallStatus = listenForCallDisconnect();
 
     return () => {
       unsubscribeIncoming?.();
       unsubscribeCallStatus?.();
-      cleanup();
+      cleanup(true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (autoAnswer && isReceivingCall && localStream && callDocRef.current) {
+    if (autoAnswer && isReceivingCall && callDocIdRef.current) {
       answerCall();
     }
-  }, [autoAnswer, isReceivingCall, localStream]);
+  }, [autoAnswer, isReceivingCall]);
 
   useEffect(() => {
     const messagesRef = collection(db, "privateChats", chatId, "messages");
@@ -212,21 +221,23 @@ export default function VideoCall({
     };
   }, [minimized, offset.x, offset.y]);
 
-  // ----- Call disconnect listener -----
+  // ----- Call disconnect listener (other side ended) -----
 
   const listenForCallDisconnect = () => {
-    if (!callDocRef.current) return;
+    if (!callDocIdRef.current) return;
 
-    const callDocRefLocal = doc(db, "calls", callDocRef.current);
-    const unsubscribe = onSnapshot(callDocRefLocal, (snapshot) => {
+    const callRef = doc(db, "calls", callDocIdRef.current);
+    const unsubscribe = onSnapshot(callRef, (snapshot) => {
       const data = snapshot.data();
-
       if (!snapshot.exists() || data?.ended) {
-        setCallStatus("Call ended by other user");
-        setTimeout(() => {
-          cleanup();
-          onClose();
-        }, 1500);
+        if (!hasEndedRef.current) {
+          setCallStatus("Call ended");
+          hasEndedRef.current = true;
+          setTimeout(() => {
+            cleanup(true);
+            onClose();
+          }, 1200);
+        }
       }
     });
 
@@ -261,68 +272,137 @@ export default function VideoCall({
     }
   };
 
-  // ----- Media -----
+  // ----- LiveKit Room Setup -----
 
-  const setupMediaStream = async () => {
+  const setupLiveKitRoom = async () => {
     try {
-      setCallStatus("Requesting camera and microphone access...");
+      const token = await getLiveKitToken(
+        roomName,
+        currentUserName,
+        currentUserId
+      );
 
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Your browser doesn't support video calling");
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
+      const newRoom = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        videoCaptureDefaults: {
+          resolution: {
+            width: 1280,
+            height: 720,
+          },
         },
       });
 
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
+      newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+      newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      newRoom.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
+      newRoom.on(
+        RoomEvent.ParticipantDisconnected,
+        handleParticipantDisconnected
+      );
+      newRoom.on(RoomEvent.Disconnected, handleDisconnected);
+      newRoom.on(RoomEvent.Connected, () => {
+        setIsConnected(true);
+        setCallStatus("Connected");
+        stopOutgoingRingtone();
+        stopIncomingRingtone();
+      });
+
+      const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+      console.log("LiveKit wsUrl =", wsUrl);
+      if (!wsUrl) throw new Error("Missing NEXT_PUBLIC_LIVEKIT_URL");
+
+      await newRoom.connect(wsUrl, token); // must be wss://...livekit.cloud[web:38]
+
+      await newRoom.localParticipant.enableCameraAndMicrophone();
+
+      const videoPubs = Array.from(
+        newRoom.localParticipant.videoTrackPublications.values()
+      );
+      if (localVideoRef.current && videoPubs.length > 0) {
+        const videoTrack = videoPubs[0];
+        if (videoTrack.track) {
+          videoTrack.track.attach(localVideoRef.current);
+        }
       }
-      setCallStatus("Ready to call");
-      setPermissionError(null);
+
+      setRoom(newRoom);
+      setCallStatus("Connected");
+      return newRoom;
     } catch (error: any) {
-      console.error("Error accessing media devices:", error);
-
-      let errorMessage = "Failed to access camera/microphone";
-
+      console.error("Error setting up LiveKit room:", error);
       if (
-        error.name === "NotAllowedError" ||
-        error.name === "PermissionDeniedError"
+        error?.name === "NotAllowedError" ||
+        error?.name === "NotFoundError" ||
+        error?.message?.toLowerCase().includes("permission")
       ) {
-        errorMessage =
-          "Camera/microphone access denied. Please allow permissions in your browser settings.";
+        setPermissionError(
+          "Camera or microphone access was blocked. Please allow access in your browser and try again."
+        );
         setShowPermissionGuide(true);
-      } else if (
-        error.name === "NotFoundError" ||
-        error.name === "DevicesNotFoundError"
-      ) {
-        errorMessage = "No camera or microphone found on your device";
-      } else if (
-        error.name === "NotReadableError" ||
-        error.name === "TrackStartError"
-      ) {
-        errorMessage =
-          "Camera/microphone is already in use by another application";
-      } else if (error.name === "OverconstrainedError") {
-        errorMessage = "Camera doesn't support the requested settings";
-      } else if (error.name === "SecurityError") {
-        errorMessage = "Video calling requires a secure connection (HTTPS)";
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else {
+        setCallStatus("Failed to connect");
       }
-
-      setPermissionError(errorMessage);
-      setCallStatus(errorMessage);
+      throw error;
     }
   };
+
+  // ----- LiveKit Event Handlers -----
+
+  const handleTrackSubscribed = (
+    track: RemoteTrack,
+    _publication: RemoteTrackPublication,
+    _participant: RemoteParticipant
+  ) => {
+    if (track.kind === Track.Kind.Video) {
+      if (track.source === Track.Source.ScreenShare) {
+        if (screenShareRef.current) {
+          track.attach(screenShareRef.current);
+        } else {
+          track.attach();
+        }
+      } else {
+        if (remoteVideoRef.current) {
+          track.attach(remoteVideoRef.current);
+        } else {
+          track.attach();
+        }
+      }
+    } else if (track.kind === Track.Kind.Audio) {
+      track.attach();
+    }
+  };
+
+  const handleTrackUnsubscribed = (
+    track: RemoteTrack,
+    _publication: RemoteTrackPublication,
+    _participant: RemoteParticipant
+  ) => {
+    track.detach();
+  };
+
+  const handleParticipantConnected = (participant: RemoteParticipant) => {
+    console.log("Participant connected:", participant.identity);
+    setCallStatus("Connected");
+  };
+
+  const handleParticipantDisconnected = (participant: RemoteParticipant) => {
+    console.log("Participant disconnected:", participant.identity);
+  };
+
+  const handleDisconnected = () => {
+    console.log("Disconnected from room");
+    if (!hasEndedRef.current) {
+      setCallStatus("Call ended");
+      hasEndedRef.current = true;
+      setTimeout(() => {
+        cleanup(true);
+        onClose();
+      }, 1200);
+    }
+  };
+
+  // ----- Listen for incoming calls (for this 1:1 chat) -----
 
   const listenForIncomingCalls = () => {
     const callsRef = collection(db, "calls");
@@ -337,7 +417,7 @@ export default function VideoCall({
             !data.ended
           ) {
             setIsReceivingCall(true);
-            callDocRef.current = change.doc.id;
+            callDocIdRef.current = change.doc.id;
             setCallStatus(`Incoming call from ${otherUserName}...`);
             playIncomingRingtone();
           }
@@ -351,93 +431,27 @@ export default function VideoCall({
   // ----- Call flow -----
 
   const startCall = async () => {
-    if (!localStream) {
-      setCallStatus("Please allow camera/microphone access first");
-      return;
-    }
-
     setIsCalling(true);
     setCallStatus("Calling...");
     playOutgoingRingtone();
 
     try {
-      const peerConnection = new RTCPeerConnection(servers);
-      peerConnectionRef.current = peerConnection;
-
-      localStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localStream);
-      });
-
-      peerConnection.ontrack = (event) => {
-        const remote = event.streams[0];
-        setRemoteStream(remote);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remote;
-        }
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remote;
-          remoteAudioRef.current.play().catch(() => {});
-        }
-        setCallStatus("Connected");
-        stopOutgoingRingtone();
-      };
-
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
       const callDoc = await addDoc(collection(db, "calls"), {
         from: currentUserId,
         fromName: currentUserName,
         to: otherUserId,
         toName: otherUserName,
-        offer: {
-          type: offer.type,
-          sdp: offer.sdp,
-        },
+        roomName: roomName,
         answered: false,
         ended: false,
+        declined: false,
         timestamp: serverTimestamp(),
       });
 
-      callDocRef.current = callDoc.id;
+      callDocIdRef.current = callDoc.id;
+      hasEndedRef.current = false;
 
-      onSnapshot(doc(db, "calls", callDoc.id), async (snapshot) => {
-        const data = snapshot.data();
-        if (!snapshot.exists() || data?.ended) {
-          setCallStatus("Call ended");
-          setTimeout(() => {
-            cleanup();
-            onClose();
-          }, 1500);
-          return;
-        }
-
-        if (data?.answer && !peerConnection.currentRemoteDescription) {
-          const answer = new RTCSessionDescription(data.answer);
-          await peerConnection.setRemoteDescription(answer);
-        }
-
-        if (data?.answered) {
-          setCallStatus("Call connected");
-          stopOutgoingRingtone();
-        }
-      });
-
-      const candidatesRef = collection(db, "calls", callDoc.id, "candidates");
-      onSnapshot(candidatesRef, (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === "added") {
-            const candidate = new RTCIceCandidate(change.doc.data());
-            await peerConnection.addIceCandidate(candidate);
-          }
-        });
-      });
-
-      peerConnection.onicecandidate = async (event) => {
-        if (event.candidate) {
-          await addDoc(candidatesRef, event.candidate.toJSON());
-        }
-      };
+      await setupLiveKitRoom();
 
       await addDoc(collection(db, "notifications"), {
         userId: otherUserId,
@@ -451,121 +465,82 @@ export default function VideoCall({
         read: false,
         actions: ["Answer", "Decline"],
       });
+
+      setCallStatus("Ringing...");
     } catch (error) {
       console.error("Error starting call:", error);
       setCallStatus("Failed to start call");
       stopOutgoingRingtone();
+      setIsCalling(false);
     }
   };
 
   const answerCall = async () => {
-    if (!localStream || !callDocRef.current) {
-      setCallStatus("Please allow camera/microphone access first");
+    if (!callDocIdRef.current) {
+      setCallStatus("Call information not found");
       return;
     }
 
     setCallStatus("Connecting...");
     stopIncomingRingtone();
+    setIsReceivingCall(false);
+    hasEndedRef.current = false;
 
     try {
-      const peerConnection = new RTCPeerConnection(servers);
-      peerConnectionRef.current = peerConnection;
-
-      localStream.getTracks().forEach((track) => {
-        peerConnection.addTrack(track, localStream);
+      await safeUpdateCall(callDocIdRef.current, {
+        answered: true,
+        answeredAt: serverTimestamp(),
       });
 
-      peerConnection.ontrack = (event) => {
-        const remote = event.streams[0];
-        setRemoteStream(remote);
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remote;
-        }
-        if (remoteAudioRef.current) {
-          remoteAudioRef.current.srcObject = remote;
-          remoteAudioRef.current.play().catch(() => {});
-        }
-        setCallStatus("Connected");
-      };
-
-      const callDocRefLocal = doc(db, "calls", callDocRef.current);
-
-      onSnapshot(callDocRefLocal, async (snapshot) => {
-        const data = snapshot.data();
-        if (!snapshot.exists() || data?.ended) {
-          setCallStatus("Call ended");
-          setTimeout(() => {
-            cleanup();
-            onClose();
-          }, 1500);
-          return;
-        }
-
-        if (!data || !data.offer) return;
-
-        if (!peerConnection.currentRemoteDescription) {
-          await peerConnection.setRemoteDescription(
-            new RTCSessionDescription(data.offer)
-          );
-
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-
-          await updateDoc(callDocRefLocal, {
-            answer: {
-              type: answer.type,
-              sdp: answer.sdp,
-            },
-            answered: true,
-          });
-        }
-      });
-
-      const candidatesRef = collection(
-        db,
-        "calls",
-        callDocRef.current!,
-        "candidates"
-      );
-      onSnapshot(candidatesRef, (snapshot) => {
-        snapshot.docChanges().forEach(async (change) => {
-          if (change.type === "added") {
-            const candidate = new RTCIceCandidate(change.doc.data());
-            await peerConnection.addIceCandidate(candidate);
-          }
-        });
-      });
-
-      peerConnection.onicecandidate = async (event) => {
-        if (event.candidate) {
-          await addDoc(candidatesRef, event.candidate.toJSON());
-        }
-      };
-
-      setIsReceivingCall(false);
+      await setupLiveKitRoom();
+      setCallStatus("Connected");
     } catch (error) {
       console.error("Error answering call:", error);
       setCallStatus("Failed to answer call");
     }
   };
 
+  const declineCall = async () => {
+    stopIncomingRingtone();
+
+    if (callDocIdRef.current) {
+      try {
+        await safeUpdateCall(callDocIdRef.current, {
+          ended: true,
+          declined: true,
+          declinedAt: serverTimestamp(),
+        });
+
+        setTimeout(async () => {
+          if (callDocIdRef.current) {
+            await safeDeleteCall(callDocIdRef.current);
+          }
+        }, 500);
+      } catch (error) {
+        console.error("Error declining call:", error);
+      }
+    }
+
+    hasEndedRef.current = true;
+    cleanup(true);
+    onClose();
+  };
+
   // ----- Controls -----
 
-  const toggleMute = () => {
-    if (localStream) {
-      localStream.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsMuted((v) => !v);
+  const toggleMute = async () => {
+    if (room) {
+      const enabled = !room.localParticipant.isMicrophoneEnabled;
+      await room.localParticipant.setMicrophoneEnabled(enabled);
+      setIsMuted(!enabled);
     }
   };
 
-  const toggleVideo = () => {
-    if (localStream) {
-      localStream.getVideoTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoOff((v) => !v);
+  const toggleVideo = async () => {
+    if (room) {
+      const enabled = !room.localParticipant.isCameraEnabled;
+      await room.localParticipant.setCameraEnabled(enabled);
+      setIsVideoOff(!enabled);
     }
   };
 
@@ -573,10 +548,24 @@ export default function VideoCall({
     if (remoteVideoRef.current) {
       remoteVideoRef.current.muted = !remoteVideoRef.current.muted;
     }
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.muted = !remoteAudioRef.current.muted;
-    }
     setIsSpeakerOff((v) => !v);
+  };
+
+  const toggleScreenShare = async () => {
+    if (!room) return;
+
+    try {
+      if (isScreenSharing) {
+        await room.localParticipant.setScreenShareEnabled(false);
+        setIsScreenSharing(false);
+      } else {
+        await room.localParticipant.setScreenShareEnabled(true);
+        setIsScreenSharing(true);
+      }
+    } catch (error) {
+      console.error("Error toggling screen share:", error);
+      alert("Failed to share screen. Please try again.");
+    }
   };
 
   // ----- Chat send -----
@@ -708,46 +697,62 @@ export default function VideoCall({
   // ----- End call / cleanup -----
 
   const endCall = async () => {
-    if (callDocRef.current) {
+    if (hasEndedRef.current) {
+      cleanup(true);
+      onClose();
+      return;
+    }
+
+    hasEndedRef.current = true;
+
+    if (callDocIdRef.current) {
       try {
-        await updateDoc(doc(db, "calls", callDocRef.current), {
+        await safeUpdateCall(callDocIdRef.current, {
           ended: true,
+          endedBy: currentUserId,
+          endedAt: serverTimestamp(),
         });
 
         setTimeout(async () => {
-          try {
-            await deleteDoc(doc(db, "calls", callDocRef.current!));
-          } catch (error) {
-            console.error("Error deleting call document:", error);
+          if (callDocIdRef.current) {
+            await safeDeleteCall(callDocIdRef.current);
           }
         }, 500);
       } catch (error) {
         console.error("Error ending call:", error);
       }
     }
-    cleanup();
+
+    cleanup(true);
     onClose();
   };
 
-  const cleanup = () => {
+  const cleanup = (disconnectOnly = false) => {
     stopOutgoingRingtone();
     stopIncomingRingtone();
-    if (localStream) {
-      localStream.getTracks().forEach((track) => track.stop());
+
+    if (room) {
+      room.disconnect();
+      setRoom(null);
     }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
+
+    if (!disconnectOnly) {
+      callDocIdRef.current = null;
     }
+
     setIsCalling(false);
     setIsReceivingCall(false);
-    setRemoteStream(null);
+    setIsConnected(false);
+    setIsScreenSharing(false);
   };
 
   // ----- Permission instructions -----
 
   const getBrowserInstructions = () => {
-    const userAgent = navigator.userAgent.toLowerCase();
+    const userAgent =
+      typeof navigator !== "undefined"
+        ? navigator.userAgent.toLowerCase()
+        : "";
 
     if (userAgent.includes("chrome")) {
       return "Chrome: Click the camera icon in the address bar or go to Settings > Privacy and security > Site settings > Camera/Microphone";
@@ -760,6 +765,14 @@ export default function VideoCall({
     }
 
     return "Check your browser settings to allow camera and microphone access for this website";
+  };
+
+  const retryPermissions = () => {
+    setPermissionError(null);
+    setShowPermissionGuide(false);
+    if (!room && (isCalling || isReceivingCall || isConnected)) {
+      setupLiveKitRoom().catch(() => {});
+    }
   };
 
   // ----- Render -----
@@ -790,11 +803,7 @@ export default function VideoCall({
 
           <div className="flex gap-3">
             <button
-              onClick={() => {
-                setPermissionError(null);
-                setShowPermissionGuide(false);
-                setupMediaStream();
-              }}
+              onClick={retryPermissions}
               className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg"
             >
               Try Again
@@ -840,8 +849,9 @@ export default function VideoCall({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setMinimized((v) => !v)}
-            className="text-xs px-2 py-1 bg-gray-700 rounded"
+            className="text-xs px-2 py-1 bg-gray-700 rounded flex items-center gap-1"
           >
+            <ArrowsPointingOutIcon className="w-3 h-3" />
             {minimized ? "Maximize" : "Minimize"}
           </button>
           <button
@@ -857,9 +867,9 @@ export default function VideoCall({
         <>
           <audio ref={outgoingAudioRef} src="/sounds/outgoing-call.mp3" loop />
           <audio ref={incomingAudioRef} src="/sounds/incoming-call.mp3" loop />
-          <audio ref={remoteAudioRef} autoPlay />
 
           <div className="flex-1 relative">
+            {/* Main remote video */}
             <video
               ref={remoteVideoRef}
               autoPlay
@@ -867,6 +877,22 @@ export default function VideoCall({
               className="w-full h-full object-cover"
             />
 
+            {/* Screen share display (remote) */}
+            <video
+              ref={screenShareRef}
+              autoPlay
+              playsInline
+              className="hidden"
+            />
+
+            {isScreenSharing && (
+              <div className="absolute top-20 left-4 bg-blue-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                <ComputerDesktopIcon className="w-3 h-3" />
+                <span>You are sharing your screen</span>
+              </div>
+            )}
+
+            {/* Local PiP */}
             <div className="absolute top-4 right-4 w-32 h-40 sm:w-48 sm:h-60 bg-gray-800 rounded-lg overflow-hidden shadow-2xl">
               <video
                 ref={localVideoRef}
@@ -877,6 +903,7 @@ export default function VideoCall({
               />
             </div>
 
+            {/* Call status */}
             <div className="absolute top-4 left-4 bg-black bg-opacity-60 px-4 py-2 rounded-lg">
               <p className="text-white text-sm font-medium">{callStatus}</p>
               <p className="text-gray-300 text-xs">{otherUserName}</p>
@@ -885,6 +912,39 @@ export default function VideoCall({
             {uploadError && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-2 rounded shadow text-xs max-w-xs">
                 {uploadError}
+              </div>
+            )}
+
+            {/* Incoming call overlay (for receiver) */}
+            {isReceivingCall && !isConnected && (
+              <div className="absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center">
+                <div className="bg-gray-900 text-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                  <p className="text-sm text-gray-300 mb-1">Incoming call</p>
+                  <h2 className="text-xl font-semibold mb-4">
+                    {otherUserName}
+                  </h2>
+                  <p className="text-xs text-gray-400 mb-6">{callStatus}</p>
+                  <div className="flex items-center justify-center gap-6">
+                    <button
+                      onClick={answerCall}
+                      className="flex flex-col items-center justify-center"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center mb-1">
+                        <VideoCameraIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-xs">Answer</span>
+                    </button>
+                    <button
+                      onClick={declineCall}
+                      className="flex flex-col items-center justify-center"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center mb-1">
+                        <PhoneXMarkIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <span className="text-xs">Decline</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -937,25 +997,14 @@ export default function VideoCall({
                               href={msg.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs underline block mb-1"
+                              className="text-xs underline break-all"
                             >
-                              📎 {msg.fileName || "File"}
+                              {msg.fileName || "Download file"}
                             </a>
                           )}
                           {msg.content && (
-                            <p className="text-sm break-words">
+                            <p className="text-sm whitespace-pre-wrap break-words">
                               {msg.content}
-                            </p>
-                          )}
-                          {msg.timestamp && (
-                            <p className="text-xs opacity-70 mt-1">
-                              {msg.timestamp.toDate?.()?.toLocaleTimeString?.(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
                             </p>
                           )}
                         </div>
@@ -965,262 +1014,185 @@ export default function VideoCall({
                   <div ref={chatEndRef} />
                 </div>
 
-                <div className="p-4 border-t flex-shrink-0">
-                  {selectedFile && (
-                    <div className="mb-3 bg-gray-50 border rounded-lg p-3 text-xs">
-                      <div className="flex gap-2">
-                        {filePreview ? (
-                          <img
-                            src={filePreview}
-                            alt="Preview"
-                            className="w-12 h-12 object-cover rounded flex-shrink-0"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-                            <span>📄</span>
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">
-                            {selectedFile.name}
-                          </p>
-                          <p className="text-gray-500 mt-1">
-                            {(selectedFile.size / 1024).toFixed(1)} KB
-                          </p>
-                          <input
-                            type="text"
-                            placeholder="Add a caption..."
-                            value={fileCaption}
-                            onChange={(e) => setFileCaption(e.target.value)}
-                            className="mt-1 w-full border rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={cancelFileUpload}
-                          className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          type="button"
-                          onClick={sendFileMessage}
-                          disabled={uploading}
-                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs disabled:opacity-50"
-                        >
-                          {uploading ? "Sending..." : "Send file"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelFileUpload}
-                          className="px-3 py-1.5 border rounded text-xs hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      sendChatMessage();
-                    }}
-                    className="flex gap-2"
-                  >
-                    <div className="relative">
+                {/* File preview */}
+                {selectedFile && (
+                  <div className="border-t p-3 bg-gray-50 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-600 truncate">
+                        Selected: {selectedFile.name}
+                      </p>
                       <button
-                        type="button"
-                        onClick={() => setShowAttachMenu((v) => !v)}
-                        disabled={uploading || !!selectedFile}
-                        className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 text-lg disabled:opacity-50"
+                        onClick={cancelFileUpload}
+                        className="text-xs text-red-500"
                       >
-                        +
+                        Remove
                       </button>
-                      {showAttachMenu && (
-                        <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg border py-2 w-40 z-10">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              fileInputRef.current?.setAttribute(
-                                "accept",
-                                "*/*"
-                              );
-                              fileInputRef.current?.click();
-                              setShowAttachMenu(false);
-                            }}
-                            className="w-full px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-left text-xs"
-                          >
-                            <span>📁</span>
-                            <span>File</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              fileInputRef.current?.setAttribute(
-                                "accept",
-                                "image/*,video/*"
-                              );
-                              fileInputRef.current?.click();
-                              setShowAttachMenu(false);
-                            }}
-                            className="w-full px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-left text-xs"
-                          >
-                            <span className="w-4 h-4 text-blue-400">
-                              <PhotoIcon />
-                            </span>
-                            <span>Photos & Videos</span>
-                          </button>
-                        </div>
-                      )}
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            handleFileSelect(file);
-                            e.target.value = "";
-                          }
-                        }}
-                      />
                     </div>
-
+                    {filePreview && (
+                      <img
+                        src={filePreview}
+                        alt="Preview"
+                        className="max-h-32 rounded object-cover"
+                      />
+                    )}
                     <input
                       type="text"
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="Type a message..."
-                      disabled={uploading || !!selectedFile}
-                      className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 text-sm text-gray-800"
+                      value={fileCaption}
+                      onChange={(e) => setFileCaption(e.target.value)}
+                      placeholder="Add a caption (optional)"
+                      className="text-xs border rounded px-2 py-1"
                     />
                     <button
-                      type="submit"
-                      disabled={!chatInput.trim() || uploading || !!selectedFile}
-                      className="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white p-2 rounded-lg"
+                      disabled={uploading}
+                      onClick={sendFileMessage}
+                      className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-60"
                     >
-                      <PaperAirplaneIcon className="w-5 h-5" />
-                    </button>
-                  </form>
-                </div>
-              </div>
-            )}
-
-            {/* Incoming overlay */}
-            {isReceivingCall && (
-              <div className="absolute inset-0 bg-black bg-opacity-80 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-24 h-24 rounded-full bg-blue-500 mx-auto mb-4 flex items-center justify-center">
-                    <VideoCameraIcon className="w-12 h-12 text-white" />
-                  </div>
-                  <h2 className="text-white text-2xl font-bold mb-2">
-                    Incoming Call
-                  </h2>
-                  <p className="text-gray-300 mb-6">{otherUserName}</p>
-                  <div className="flex gap-4 justify-center">
-                    <button
-                      onClick={answerCall}
-                      className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full font-semibold flex items-center gap-2"
-                    >
-                      <VideoCameraIcon className="w-6 h-6" />
-                      Answer
-                    </button>
-                    <button
-                      onClick={endCall}
-                      className="bg-red-500 hover:bg-red-600 text-white px-8 py-3 rounded-full font-semibold flex items-center gap-2"
-                    >
-                      <PhoneXMarkIcon className="w-6 h-6" />
-                      Decline
+                      {uploading ? "Uploading..." : "Send"}
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom controls */}
-          <div className="bg-gray-900 p-4 sm:p-6">
-            <div className="max-w-4xl mx-auto flex justify-center items-center gap-4">
-              <button
-                onClick={toggleMute}
-                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all ${
-                  isMuted
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "bg-gray-700 hover:bg-gray-600"
-                }`}
-              >
-                <MicrophoneIcon
-                  className={`w-6 h-6 ${
-                    isMuted ? "text-white line-through" : "text-white"
-                  }`}
-                />
-              </button>
-
-              <button
-                onClick={toggleVideo}
-                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all ${
-                  isVideoOff
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "bg-gray-700 hover:bg-gray-600"
-                }`}
-              >
-                {isVideoOff ? (
-                  <VideoCameraSlashIcon className="w-6 h-6 text-white" />
-                ) : (
-                  <VideoCameraIcon className="w-6 h-6 text-white" />
                 )}
-              </button>
 
-              {(remoteStream || isCalling) && (
+                {/* Chat input */}
+                <div className="border-t p-3 flex items-center gap-2 flex-shrink-0">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowAttachMenu((v) => !v)}
+                      className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600"
+                    >
+                      <PhotoIcon className="w-5 h-5" />
+                    </button>
+                    {showAttachMenu && (
+                      <div className="absolute bottom-9 left-0 bg-white rounded shadow-lg border text-xs z-10">
+                        <button
+                          className="px-3 py-2 hover:bg-gray-100 w-full text-left"
+                          onClick={() => {
+                            fileInputRef.current?.click();
+                          }}
+                        >
+                          Upload from device
+                        </button>
+                      </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileSelect(file);
+                      }}
+                    />
+                  </div>
+
+                  <input
+                    type="text"
+                    className="flex-1 border rounded-full px-3 py-1.5 text-sm"
+                    placeholder="Type a message..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") sendChatMessage();
+                    }}
+                  />
+                  <button
+                    onClick={sendChatMessage}
+                    className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-1.5"
+                  >
+                    <PaperAirplaneIcon className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom controls */}
+            <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-3">
+              {!isConnected && isCalling && (
+                <p className="text-xs text-gray-300 mb-1">
+                  Ringing {otherUserName}...
+                </p>
+              )}
+
+              <div className="flex items-center justify-center gap-4 bg-black bg-opacity-40 rounded-full px-4 py-2">
+                {/* Mute */}
+                <button
+                  onClick={toggleMute}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    isMuted ? "bg-red-600" : "bg-gray-800"
+                  } text-white`}
+                >
+                  <MicrophoneIcon className="w-5 h-5" />
+                </button>
+
+                {/* Video */}
+                <button
+                  onClick={toggleVideo}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    isVideoOff ? "bg-red-600" : "bg-gray-800"
+                  } text-white`}
+                >
+                  {isVideoOff ? (
+                    <VideoCameraSlashIcon className="w-5 h-5" />
+                  ) : (
+                    <VideoCameraIcon className="w-5 h-5" />
+                  )}
+                </button>
+
+                {/* Screen share */}
+                <button
+                  onClick={toggleScreenShare}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    isScreenSharing ? "bg-blue-600" : "bg-gray-800"
+                  } text-white`}
+                >
+                  <ComputerDesktopIcon className="w-5 h-5" />
+                </button>
+
+                {/* Speaker */}
+                <button
+                  onClick={toggleSpeaker}
+                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    isSpeakerOff ? "bg-red-600" : "bg-gray-800"
+                  } text-white`}
+                >
+                  {isSpeakerOff ? (
+                    <SpeakerXMarkIcon className="w-5 h-5" />
+                  ) : (
+                    <SpeakerWaveIcon className="w-5 h-5" />
+                  )}
+                </button>
+
+                {/* Chat */}
                 <button
                   onClick={() => setShowChat((v) => !v)}
-                  className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center transition-all"
+                  className="relative w-10 h-10 rounded-full flex items-center justify-center bg-gray-800 text-white"
                 >
-                  <ChatBubbleLeftIcon className="w-6 h-6 text-white" />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                  <ChatBubbleLeftIcon className="w-5 h-5" />
+                  {unreadCount > 0 && !showChat && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-[10px] text-white rounded-full px-1">
                       {unreadCount}
                     </span>
                   )}
                 </button>
-              )}
 
-              {!isCalling && !isReceivingCall && localStream && (
-                <button
-                  onClick={startCall}
-                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full font-semibold flex items-center gap-2"
-                >
-                  <VideoCameraIcon className="w-6 h-6" />
-                  Call
-                </button>
-              )}
+                {/* Start call (if not already) */}
+                {!isConnected && !isCalling && !isReceivingCall && (
+                  <button
+                    onClick={startCall}
+                    className="px-4 py-2 rounded-full bg-green-600 hover:bg-green-700 text-white text-sm font-semibold flex items-center gap-2"
+                  >
+                    <VideoCameraIcon className="w-4 h-4" />
+                    Start Call
+                  </button>
+                )}
 
-              {(isCalling || remoteStream) && !isReceivingCall && (
+                {/* End call */}
                 <button
                   onClick={endCall}
-                  className="bg-red-500 hover:bg-red-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all"
+                  className="w-12 h-12 rounded-full flex items-center justify-center bg-red-600 text-white"
                 >
                   <PhoneXMarkIcon className="w-6 h-6" />
                 </button>
-              )}
-
-              <button
-                onClick={toggleSpeaker}
-                className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-all ${
-                  isSpeakerOff
-                    ? "bg-red-500 hover:bg-red-600"
-                    : "bg-gray-700 hover:bg-gray-600"
-                }`}
-              >
-                {isSpeakerOff ? (
-                  <SpeakerXMarkIcon className="w-6 h-6 text-white" />
-                ) : (
-                  <SpeakerWaveIcon className="w-6 h-6 text-white" />
-                )}
-              </button>
+              </div>
             </div>
           </div>
         </>
