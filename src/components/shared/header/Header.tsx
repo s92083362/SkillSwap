@@ -208,6 +208,24 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
       return;
     }
 
+    if (notif.type === "ping" && action === "View") {
+      router.push("/swap-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (notif.type === "requestAccepted" && action === "View") {
+      router.push("/my-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (notif.type === "requestRejected" && action === "View") {
+      router.push("/my-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
     if (notif.type === "video_call" && action === "Answer") {
       if (!user) {
         alert("You must be logged in to answer the call.");
@@ -353,13 +371,13 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
                 My Skills
               </a>
               <a
-                href="/profile?section=dashboard"
+                href="/my-requests"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Learn
               </a>
               <a
-                href="/profile?section=swap"
+                href="/swap-requests"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Teach
