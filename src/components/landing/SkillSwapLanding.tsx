@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import React, { useState } from 'react';
 import { Users, RefreshCw, Video } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -6,17 +6,15 @@ import Link from "next/link";
 
 export default function SkillSwapLanding() {
   const router = useRouter();
-  // State to track which button is selected
-  const [selectedTab, setSelectedTab] = useState('signup');
+  const [selectedTab, setSelectedTab] = useState<'signup' | 'login'>('signup');
 
-  // Handler functions
   const handleSignUp = () => {
     setSelectedTab('signup');
-    router.push('/auth/login-and-signup');
+    router.push('/auth/login-and-signup?tab=signup');
   };
   const handleLogin = () => {
     setSelectedTab('login');
-    router.push('/auth/login-and-signup');
+    router.push('/auth/login-and-signup?tab=login');
   };
 
   return (
@@ -81,7 +79,7 @@ export default function SkillSwapLanding() {
             Exchange your expertise, learn new technologies, and grow together.
           </p>
           <button 
-            onClick={() => router.push('/auth/login-and-signup')}
+            onClick={() => router.push('/auth/login-and-signup?tab=signup')}
             className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
           >
             Start Swapping Skills
@@ -170,7 +168,7 @@ export default function SkillSwapLanding() {
             Join a vibrant community of developers and IT professionals dedicated to mutual growth.
           </p>
           <button 
-            onClick={() => router.push('/auth/login-and-signup')}
+            onClick={() => router.push('/auth/login-and-signup?tab=signup')}
             className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
           >
             Sign Up Now & Start Learning
