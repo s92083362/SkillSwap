@@ -207,20 +207,10 @@ const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-<<<<<<< HEAD
     if (
       (notif.type === "requestAccepted" || notif.type === "requestRejected") &&
       action === "View"
     ) {
-=======
-    if (notif.type === "requestAccepted" && action === "View") {
-      router.push("/my-requests");
-      setNotificationsOpen(false);
-      return;
-    }
-
-    if (notif.type === "requestRejected" && action === "View") {
->>>>>>> dev
       router.push("/my-requests");
       setNotificationsOpen(false);
       return;
@@ -472,25 +462,25 @@ const Header: React.FC<HeaderProps> = ({
           {mobileMenuOpen && (
             <nav className="lg:hidden flex flex-col gap-4 mt-4 pb-4 border-t border-gray-200 pt-4">
               <a
-                href="/dash-board"
+                href="#"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Home
               </a>
               <a
-                href="/profile?section=skills"
+                href="#"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 My Skills
               </a>
               <a
-                href="/my-requests"
+                href="#"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Learn
               </a>
               <a
-                href="/swap-requests"
+                href="#"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Teach
