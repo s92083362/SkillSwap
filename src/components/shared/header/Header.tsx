@@ -207,10 +207,20 @@ const Header: React.FC<HeaderProps> = ({
       return;
     }
 
+<<<<<<< HEAD
     if (
       (notif.type === "requestAccepted" || notif.type === "requestRejected") &&
       action === "View"
     ) {
+=======
+    if (notif.type === "requestAccepted" && action === "View") {
+      router.push("/my-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (notif.type === "requestRejected" && action === "View") {
+>>>>>>> dev
       router.push("/my-requests");
       setNotificationsOpen(false);
       return;
