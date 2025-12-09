@@ -245,12 +245,14 @@ export default function MyRequestsPage() {
                   {/* Ping & Delete Buttons */}
                   {req.status !== "accepted" && (
                   <div className="flex gap-4 mt-4">
-                    <button
-                      onClick={() => handlePing(req)}
-                      className="text-sm text-blue-600 hover:text-blue-800 transition"
-                    >
-                      Ping Owner
-                    </button>
+                    {req.status === "pending" && (
+                      <button
+                        onClick={() => handlePing(req)}
+                        className="text-sm text-blue-600 hover:text-blue-800 transition"
+                      >
+                        Ping Owner
+                      </button>
+                    )}
                     <button
                       onClick={() => handleDelete(req.id)}
                       className="text-sm text-red-600 hover:text-red-800 transition"
