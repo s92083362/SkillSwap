@@ -111,11 +111,13 @@ export default function ProfilePage() {
     const section = searchParams.get("section");
     if (section === "skills") {
       setActiveSection("skills");
-    }
-    else if (section === "swap") {
+    } else if (section === "swap") {
       setActiveSection("swap");
-    }
-    else if (section === "dashboard") {
+    } else if (section === "messages") {
+      setActiveSection("messages");
+    } else if (section === "profile") {
+      setActiveSection("profile");
+    } else {
       setActiveSection("dashboard");
     }
   }, [searchParams]);
@@ -165,16 +167,13 @@ export default function ProfilePage() {
                 requesterProfile?.displayName ||
                 data.requesterName ||
                 "Anonymous",
-
               requesterPhoto:
                 requesterProfile?.photoUrl ||
                 requesterProfile?.photoURL ||
                 data.requesterPhoto ||
                 "/default-avatar.png",
-
               requestedLessonTitle:
                 data.requestedLessonTitle || data.requestedLesson || "",
-
               offeredSkillTitle:
                 data.offeredSkillTitle || data.offeredSkill || "",
             });
@@ -193,7 +192,6 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, [user]);
 
-
   // Pending Requests Cards
   const PendingRequestsSection = () => (
     <div className="mt-8 mb-3">
@@ -207,11 +205,12 @@ export default function ProfilePage() {
         <p className="text-gray-500 text-sm mb-3">No pending requests</p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Responsive grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {pendingRequests.map((req) => (
           <div
             key={req.id}
-            className="border rounded-xl p-3 shadow-sm bg-white flex flex-col items-center text-center"
+            className="border rounded-xl p-4 shadow-sm bg-white flex flex-col items-center text-center"
           >
             <img
               src={req.requesterPhoto}
@@ -260,30 +259,49 @@ export default function ProfilePage() {
     </div>
   );
 
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-      <div className="flex flex-1">
-        <ProfileSidebar
-          mobileMenuOpen={mobileMenuOpen}
-          setMobileMenuOpen={setMobileMenuOpen}
-          setActiveSection={setActiveSection}
-          activeSection={activeSection}
-        />
-        <main className="flex-1 px-4 sm:px-10 py-8">
+      {/* Fixed Header (make sure Header root has fixed + full width classes) */}
+      <Header
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+      />
+
+      {/* Main content with top padding to account for fixed header */}
+      <div className="flex flex-1 pt-20 flex-col md:flex-row">
+        {/* Sidebar: full width on mobile, fixed width on md+; toggle with mobileMenuOpen */}
+        <div
+          className={`
+            md:block
+            ${mobileMenuOpen ? "block" : "hidden"}
+            w-full md:w-64 lg:w-72 flex-shrink-0 border-r bg-white
+          `}
+        >
+          <ProfileSidebar
+            mobileMenuOpen={mobileMenuOpen}
+            setMobileMenuOpen={setMobileMenuOpen}
+            setActiveSection={setActiveSection}
+            activeSection={activeSection}
+          />
+        </div>
+
+        {/* Main content area */}
+        <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 max-w-6xl mx-auto w-full">
           {activeSection === "dashboard" && (
             <>
-              <h1 className="text-3xl font-bold mb-1">
-                {loading ? "Loading..." : (
-                  user && user.displayName ? (
-                    <>
-                      Welcome back, <span className="text-black">{user.displayName}</span>!
-                    </>
-                  ) : "Welcome!"
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1">
+                {loading ? (
+                  "Loading..."
+                ) : user && user.displayName ? (
+                  <>
+                    Welcome back,{" "}
+                    <span className="text-black">{user.displayName}</span>!
+                  </>
+                ) : (
+                  "Welcome!"
                 )}
               </h1>
-              <p className="text-gray-500 mb-6">
+              <p className="text-gray-500 mb-6 text-sm sm:text-base">
                 Here's what's happening on SkillSwap today.
               </p>
               <PendingRequestsSection />
