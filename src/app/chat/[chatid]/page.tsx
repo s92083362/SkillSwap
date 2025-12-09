@@ -1,4 +1,3 @@
-// app/chat/page.tsx (or pages/chat/index.tsx)
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -429,6 +428,9 @@ export default function ChatPage() {
     0
   );
 
+  const getAvatarUrl = (u: any) =>
+    u?.photoURL || u?.photoUrl || "/default-avatar.png";
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       {/* Call overlays */}
@@ -473,10 +475,19 @@ export default function ChatPage() {
               ← Back
             </button>
           )}
-          <div className="min-w-0 flex-1">
+
+          {selectedUser && (
+            <img
+              src={getAvatarUrl(selectedUser)}
+              alt={selectedUser.displayName || "User avatar"}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0"
+            />
+          )}
+
+          <div className="min-w-0">
             <h1 className="text-base sm:text-xl font-bold text-blue-900 truncate">
               {selectedUser
-                ? `${selectedUser.displayName || selectedUser.email}`
+                ? selectedUser.displayName || selectedUser.email
                 : "Messages"}
             </h1>
             {selectedUser && (
@@ -557,6 +568,7 @@ export default function ChatPage() {
               <div className="text-red-500 mb-3 text-sm">{usersError}</div>
             )}
 
+            {/* Recent chats with avatar */}
             {filteredUsersWithConv.length > 0 && (
               <div className="mb-4">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
@@ -568,6 +580,7 @@ export default function ChatPage() {
                       (c) => c.otherUserId === u.uid
                     );
                     const unreadCount = unreadCounts[u.uid] || 0;
+                    const avatarUrl = getAvatarUrl(u);
 
                     return (
                       <li
@@ -581,7 +594,22 @@ export default function ChatPage() {
                             : "hover:bg-gray-100"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={avatarUrl}
+                              alt={u.displayName || "User avatar"}
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+                            />
+                            <span
+                              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                                isUserOnline(u.uid)
+                                  ? "bg-green-500"
+                                  : "bg-gray-400"
+                              }`}
+                            ></span>
+                          </div>
+
                           <div className="flex-1 min-w-0">
                             <div
                               className={`font-medium truncate text-sm sm:text-base ${
@@ -607,20 +635,12 @@ export default function ChatPage() {
                               {conv?.lastMessage || u.email}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {unreadCount > 0 && (
-                              <div className="bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
-                                {unreadCount}
-                              </div>
-                            )}
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                isUserOnline(u.uid)
-                                  ? "bg-green-500"
-                                  : "bg-gray-400"
-                              }`}
-                            ></span>
-                          </div>
+
+                          {unreadCount > 0 && (
+                            <div className="bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {unreadCount}
+                            </div>
+                          )}
                         </div>
                       </li>
                     );
@@ -629,53 +649,65 @@ export default function ChatPage() {
               </div>
             )}
 
+            {/* All users with avatar */}
             {filteredUsersWithoutConv.length > 0 && (
               <div>
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
                   All Users
                 </div>
                 <ul className="flex flex-col gap-1">
-                  {filteredUsersWithoutConv.map((u) => (
-                    <li
-                      key={u.uid}
-                      onClick={() => selectUser(u)}
-                      className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
-                        selectedUser?.uid === u.uid
-                          ? "bg-blue-500 text-white"
-                          : "hover:bg-gray-100"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className={`font-medium truncate text-sm sm:text-base ${
-                              selectedUser?.uid === u.uid
-                                ? "text-white"
-                                : "text-black"
-                            }`}
-                          >
-                            {u.displayName || "Anonymous"}
+                  {filteredUsersWithoutConv.map((u) => {
+                    const avatarUrl = getAvatarUrl(u);
+                    return (
+                      <li
+                        key={u.uid}
+                        onClick={() => selectUser(u)}
+                        className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
+                          selectedUser?.uid === u.uid
+                            ? "bg-blue-500 text-white"
+                            : "hover:bg-gray-100"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={avatarUrl}
+                              alt={u.displayName || "User avatar"}
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+                            />
+                            <span
+                              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                                isUserOnline(u.uid)
+                                  ? "bg-green-500"
+                                  : "bg-gray-400"
+                              }`}
+                            ></span>
                           </div>
-                          <div
-                            className={`text-xs sm:text-sm truncate ${
-                              selectedUser?.uid === u.uid
-                                ? "text-blue-100"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            {u.email || "No email"}
+
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className={`font-medium truncate text-sm sm:text-base ${
+                                selectedUser?.uid === u.uid
+                                  ? "text-white"
+                                  : "text-black"
+                              }`}
+                            >
+                              {u.displayName || "Anonymous"}
+                            </div>
+                            <div
+                              className={`text-xs sm:text-sm truncate ${
+                                selectedUser?.uid === u.uid
+                                  ? "text-blue-100"
+                                  : "text-gray-500"
+                              }`}
+                            >
+                              {u.email || "No email"}
+                            </div>
                           </div>
                         </div>
-                        <span
-                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            isUserOnline(u.uid)
-                              ? "bg-green-500"
-                              : "bg-gray-400"
-                          }`}
-                        ></span>
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
