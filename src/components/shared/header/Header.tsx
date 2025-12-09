@@ -260,7 +260,7 @@ const Header: React.FC<HeaderProps> = ({
       return;
     }
 
-  if (action === "Open" || action === "View") {
+    if (action === "Open" || action === "View") {
       setNotificationsOpen(false);
     }
   };
@@ -347,8 +347,8 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Header Component */}
-      <header className="bg-white border-b border-gray-200 relative">
+      {/* Fixed Header Component */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo Section */}
@@ -462,25 +462,25 @@ const Header: React.FC<HeaderProps> = ({
           {mobileMenuOpen && (
             <nav className="lg:hidden flex flex-col gap-4 mt-4 pb-4 border-t border-gray-200 pt-4">
               <a
-                href="#"
+                href="/dash-board"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Home
               </a>
               <a
-                href="#"
+                href="/profile?section=skills"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 My Skills
               </a>
               <a
-                href="#"
+                href="/my-requests"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Learn
               </a>
               <a
-                href="#"
+                href="/swap-requests"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Teach
