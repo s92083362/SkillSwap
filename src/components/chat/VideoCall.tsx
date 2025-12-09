@@ -132,6 +132,58 @@ export default function VideoCall({
     await deleteDoc(ref);
   };
 
+  // save video call message into chat history
+  const saveCallMessage = async (
+    status: "completed" | "missed" | "rejected" | "cancelled"
+  ) => {
+    try {
+      const callId = callDocIdRef.current;
+      let durationSec: number | null = null;
+
+      if (callId) {
+        const callRef = doc(db, "calls", callId);
+        const snap = await getDoc(callRef);
+        if (snap.exists()) {
+          const data: any = snap.data();
+          const started = data?.answeredAt || data?.timestamp;
+          const ended = data?.endedAt;
+          if (started?.toMillis && ended?.toMillis) {
+            durationSec = Math.max(
+              0,
+              Math.round((ended.toMillis() - started.toMillis()) / 1000)
+            );
+          }
+        }
+      }
+
+      const direction: "incoming" | "outgoing" =
+        isReceivingCall && !isCalling ? "incoming" : "outgoing";
+
+      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+        senderId: currentUserId,
+        senderName: currentUserName,
+        content: "",
+        type: "video-call",
+        fileUrl: null,
+        fileName: null,
+        callStatus: status,
+        callDuration: durationSec,
+        callDirection: direction,
+        timestamp: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, "privateChats", chatId), {
+        lastMessage:
+          status === "missed"
+            ? "Missed video call"
+            : "Video call",
+        lastUpdated: serverTimestamp(),
+      });
+    } catch (e) {
+      console.error("Failed to save video call message:", e);
+    }
+  };
+
   // ----- Effects -----
 
   useEffect(() => {
@@ -233,6 +285,7 @@ export default function VideoCall({
         if (!hasEndedRef.current) {
           setCallStatus("Call ended");
           hasEndedRef.current = true;
+          saveCallMessage(isConnected ? "completed" : "missed");
           setTimeout(() => {
             cleanup(true);
             onClose();
@@ -312,7 +365,7 @@ export default function VideoCall({
       console.log("LiveKit wsUrl =", wsUrl);
       if (!wsUrl) throw new Error("Missing NEXT_PUBLIC_LIVEKIT_URL");
 
-      await newRoom.connect(wsUrl, token); // must be wss://...livekit.cloud[web:38]
+      await newRoom.connect(wsUrl, token); // must be wss://...
 
       await newRoom.localParticipant.enableCameraAndMicrophone();
 
@@ -395,6 +448,7 @@ export default function VideoCall({
     if (!hasEndedRef.current) {
       setCallStatus("Call ended");
       hasEndedRef.current = true;
+      saveCallMessage(isConnected ? "completed" : "missed");
       setTimeout(() => {
         cleanup(true);
         onClose();
@@ -510,6 +564,8 @@ export default function VideoCall({
           declined: true,
           declinedAt: serverTimestamp(),
         });
+
+        await saveCallMessage("rejected");
 
         setTimeout(async () => {
           if (callDocIdRef.current) {
@@ -712,6 +768,8 @@ export default function VideoCall({
           endedBy: currentUserId,
           endedAt: serverTimestamp(),
         });
+
+        await saveCallMessage(isConnected ? "completed" : "cancelled");
 
         setTimeout(async () => {
           if (callDocIdRef.current) {
