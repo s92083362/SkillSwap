@@ -32,6 +32,9 @@ export default function CreateLessonPage() {
   const [imageProgress, setImageProgress] = useState(0);
   const imageInputRef = useRef(null);
 
+  // Lesson visibility
+  const [isPublic, setIsPublic] = useState(false);
+
   // Sections array
   const [sections, setSections] = useState([initialSection()]);
   const fileInputRefs = useRef([]);
@@ -191,7 +194,8 @@ export default function CreateLessonPage() {
           content: s.content,
           videoUrl: s.videoUrl,
         })),
-        creatorId: user.uid, // <-- this ensures only you see it in "My Lessons"
+        creatorId: user.uid,
+        visibility: isPublic ? "public" : "swap-only",
         createdAt: new Date().toISOString(),
       };
 
@@ -452,6 +456,34 @@ export default function CreateLessonPage() {
             </div>
           ))}
         </div>
+
+        {/* Lesson Visibility Toggle */}
+          <div className="mb-10 mt-8">
+            <label className="block text-sm font-medium text-black mb-2">Lesson Visibility</label>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center text-black gap-2">
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={isPublic}
+                  onChange={() => setIsPublic(true)}
+                  className="accent-blue-600"
+                />
+                Public (anyone can view)
+              </label>
+              <label className="flex items-center text-black gap-2">
+                <input
+                  type="radio"
+                  name="visibility"
+                  checked={!isPublic}
+                  onChange={() => setIsPublic(false)}
+                  className="accent-blue-600"
+                />
+                Swap-only (requires accepted swap)
+              </label>
+            </div>
+          </div>
+
         {/* Action Buttons */}
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-4">
           <button 
