@@ -12,7 +12,6 @@ export default function SkillSwapLanding() {
     setSelectedTab('signup');
     router.push('/auth/login-and-signup?tab=signup');
   };
-
   const handleLogin = () => {
     setSelectedTab('login');
     router.push('/auth/login-and-signup?tab=login');

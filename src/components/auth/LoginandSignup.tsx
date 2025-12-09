@@ -118,7 +118,6 @@ export default function LoginAndSignup() {
         <div className="w-full lg:w-1/2 bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center p-6">
           <img src="https://i.ibb.co/prv9CVH7/Welcome-to-Skill-Swap-1-1.png" alt="Welcome to SkillSwap" className="w-full h-full object-contain" />
         </div>
-
         {/* Right Side - Form Section */}
         <div className="w-full lg:w-1/2 p-6 lg:p-10">
           {/* Tabs */}
