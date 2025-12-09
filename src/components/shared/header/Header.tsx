@@ -1,11 +1,25 @@
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Bell, Menu, X, Phone, PhoneOff, Video } from "lucide-react";
-import { useNotifications, Notification } from "../../../hooks/useNotifications";
+import {
+  useNotifications,
+  Notification,
+} from "../../../hooks/useNotifications";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
-import { doc, getDoc, updateDoc, setDoc, serverTimestamp, onSnapshot } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  setDoc,
+  serverTimestamp,
+  collection,
+  query as fsQuery,
+  where,
+  onSnapshot as fsOnSnapshot,
+} from "firebase/firestore";
 import NotificationList from "./NotificationList";
 import { useTrackUserActivity } from "@/hooks/useTrackUserActivity";
 
@@ -19,81 +33,65 @@ interface IncomingCall {
   callerName: string;
   callerId: string;
   callerPhoto?: string;
+  callType: "audio" | "video";
 }
 
-const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) => {
+const Header: React.FC<HeaderProps> = ({
+  mobileMenuOpen,
+  setMobileMenuOpen,
+}) => {
   const router = useRouter();
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [user] = useAuthState(auth);
   const userId = user?.uid;
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useNotifications(userId);
-  
-  // Incoming call state
+
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
 
   useTrackUserActivity(60000);
 
-  // Listen for incoming video calls in real-time
+  // Listen for incoming audio/video calls for this user
   useEffect(() => {
     if (!userId) return;
 
-    const unsubscribers: (() => void)[] = [];
+    const callsRef = collection(db, "calls");
+    const q = fsQuery(
+      callsRef,
+      where("to", "==", userId),
+      where("answered", "==", false),
+      where("ended", "==", false)
+    );
 
-    // Listen to the calls collection for incoming calls
-    const callsQuery = doc(db, "calls", `${userId}_incoming`);
-    
-    // Alternative: Listen to all calls where this user is the recipient
-    const checkIncomingCalls = () => {
-      // We'll use the notifications collection but filter for video_call type
-      const notifQuery = doc(db, "notifications", userId);
-      
-      // Better approach: Listen directly to calls collection
-      import("firebase/firestore").then(({ collection, query, where, onSnapshot: fsOnSnapshot }) => {
-        const callsRef = collection(db, "calls");
-        const q = query(callsRef, where("to", "==", userId), where("answered", "==", false));
-        
-        const unsub = fsOnSnapshot(q, (snapshot) => {
-          snapshot.docChanges().forEach((change) => {
-            if (change.type === "added") {
-              const callData = change.doc.data();
-              
-              // Check if call is not ended and not already answered
-              if (!callData.ended && !callData.answered) {
-                setIncomingCall({
-                  callId: change.doc.id,
-                  callerName: callData.fromName || "Unknown",
-                  callerId: callData.from,
-                  callerPhoto: callData.fromPhoto,
-                });
-                
-                // Play ringtone
-                playRingtone();
-              }
-            } else if (change.type === "modified") {
-              const callData = change.doc.data();
-              
-              // If call was answered or ended, hide the incoming call UI
-              if (callData.answered || callData.ended) {
-                setIncomingCall(null);
-                stopRingtone();
-              }
-            } else if (change.type === "removed") {
-              // Call was removed (declined or missed)
-              setIncomingCall(null);
-              stopRingtone();
-            }
+    const unsub = fsOnSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const callData = change.doc.data();
+
+        if (change.type === "added") {
+          const callType = (callData.callType || "video") as "audio" | "video";
+
+          setIncomingCall({
+            callId: change.doc.id,
+            callerName: callData.fromName || "Unknown",
+            callerId: callData.from,
+            callerPhoto: callData.fromPhoto,
+            callType,
           });
-        });
-        
-        unsubscribers.push(unsub);
+          playRingtone();
+        } else if (change.type === "modified") {
+          if (callData.answered || callData.ended) {
+            setIncomingCall(null);
+            stopRingtone();
+          }
+        } else if (change.type === "removed") {
+          setIncomingCall(null);
+          stopRingtone();
+        }
       });
-    };
-
-    checkIncomingCalls();
+    });
 
     return () => {
-      unsubscribers.forEach(unsub => unsub());
+      unsub();
       stopRingtone();
     };
   }, [userId]);
@@ -101,9 +99,7 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
   const playRingtone = () => {
     if (ringtoneRef.current) {
       ringtoneRef.current.loop = true;
-      ringtoneRef.current.play().catch(err => {
-        console.log("Could not play ringtone:", err);
-      });
+      ringtoneRef.current.play().catch(() => {});
     }
   };
 
@@ -118,14 +114,14 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
     if (!incomingCall || !user) return;
 
     stopRingtone();
-    
-    // Build chatId same way as in ChatPage
+
     const chatId = [user.uid, incomingCall.callerId].sort().join("_");
 
-    // Navigate to chat page with auto-answer
-    const url = `/chat/${chatId}?user=${incomingCall.callerId}&callId=${encodeURIComponent(
-      incomingCall.callId
-    )}`;
+    const url =
+      `/chat/${chatId}` +
+      `?user=${incomingCall.callerId}` +
+      `&callId=${encodeURIComponent(incomingCall.callId)}` +
+      `&callType=${incomingCall.callType}`;
 
     router.push(url);
     setIncomingCall(null);
@@ -137,7 +133,6 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
     stopRingtone();
 
     try {
-      // Mark call as ended
       const callRef = doc(db, "calls", incomingCall.callId);
       await updateDoc(callRef, {
         ended: true,
@@ -151,6 +146,7 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
     setIncomingCall(null);
   };
 
+  // Ensure user document exists
   useEffect(() => {
     async function ensureUserDocument() {
       if (!user) return;
@@ -168,7 +164,6 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
           },
           { merge: true }
         );
-        console.log("✅ User document ensured for:", user.email);
       } catch (error) {
         console.error("❌ Error ensuring user document:", error);
       }
@@ -187,8 +182,6 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
           readAt: new Date(),
         });
         setNotifications((prev) => prev.filter((n) => n.id !== notifId));
-      } else {
-        console.warn("Notification not found:", notifId);
       }
     } catch (error) {
       console.error("Error dismissing notification:", error);
@@ -214,6 +207,12 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
       return;
     }
 
+<<<<<<< HEAD
+    if (
+      (notif.type === "requestAccepted" || notif.type === "requestRejected") &&
+      action === "View"
+    ) {
+=======
     if (notif.type === "requestAccepted" && action === "View") {
       router.push("/my-requests");
       setNotificationsOpen(false);
@@ -221,6 +220,7 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
     }
 
     if (notif.type === "requestRejected" && action === "View") {
+>>>>>>> dev
       router.push("/my-requests");
       setNotificationsOpen(false);
       return;
@@ -237,16 +237,21 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
       }
 
       const chatId = [user.uid, notif.senderId].sort().join("_");
-      const url = `/chat/${chatId}?user=${notif.senderId}&callId=${encodeURIComponent(
-        notif.callId || ""
-      )}`;
+      const url =
+        `/chat/${chatId}` +
+        `?user=${notif.senderId}` +
+        `&callId=${encodeURIComponent(notif.callId || "")}` +
+        `&callType=video`;
 
       router.push(url);
       setNotificationsOpen(false);
       return;
     }
 
-    if ((notif.type === "chat" || notif.type === "message") && action === "View") {
+    if (
+      (notif.type === "chat" || notif.type === "message") &&
+      action === "View"
+    ) {
       if (notif.chatId) {
         router.push(`/chat/${notif.chatId}`);
       } else if (notif.senderId && notif.senderName) {
@@ -265,10 +270,12 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
       return;
     }
 
-    if (action === "Open" || action === "View") {
+  if (action === "Open" || action === "View") {
       setNotificationsOpen(false);
     }
   };
+
+  const isAudio = incomingCall?.callType === "audio";
 
   return (
     <>
@@ -300,20 +307,26 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2">
               {incomingCall.callerName}
             </h2>
-            
+
             {/* Call Status */}
-            <p className="text-xl text-blue-100 mb-2">Incoming video call...</p>
-            
-            {/* Animated Rings */}
+            <p className="text-xl text-blue-100 mb-2">
+              {isAudio ? "Incoming audio call..." : "Incoming video call..."}
+            </p>
+
+            {/* Animated Icon */}
             <div className="relative w-20 h-20 mx-auto mb-12">
-              <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping"></div>
-              <div className="absolute inset-0 rounded-full bg-white opacity-40 animate-pulse"></div>
-              <Video className="absolute inset-0 m-auto w-10 h-10 text-white" />
+              <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping" />
+              <div className="absolute inset-0 rounded-full bg-white opacity-40 animate-pulse" />
+              {isAudio ? (
+                <Phone className="absolute inset-0 m-auto w-10 h-10 text-white" />
+              ) : (
+                <Video className="absolute inset-0 m-auto w-10 h-10 text-white" />
+              )}
             </div>
 
             {/* Action Buttons */}
             <div className="flex gap-8 justify-center items-center mt-8">
-              {/* Decline Button */}
+              {/* Decline */}
               <button
                 onClick={handleDeclineCall}
                 className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95"
@@ -322,7 +335,7 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
                 <PhoneOff className="w-10 h-10 text-white" />
               </button>
 
-              {/* Answer Button */}
+              {/* Answer */}
               <button
                 onClick={handleAnswerCall}
                 className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95 animate-bounce"
@@ -332,10 +345,13 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
               </button>
             </div>
 
-            {/* Button Labels */}
             <div className="flex gap-8 justify-center items-center mt-4">
-              <span className="text-white font-semibold w-20 text-center">Decline</span>
-              <span className="text-white font-semibold w-20 text-center">Answer</span>
+              <span className="text-white font-semibold w-20 text-center">
+                Decline
+              </span>
+              <span className="text-white font-semibold w-20 text-center">
+                Answer
+              </span>
             </div>
           </div>
         </div>
@@ -430,13 +446,9 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
                   />
                 ) : (
                   <span className="w-full h-full flex items-center justify-center text-lg font-bold text-gray-700">
-                    {user?.displayName ? (
-                      user.displayName[0].toUpperCase()
-                    ) : (
-                      <svg width="20" height="20">
-                        <circle cx="10" cy="10" r="10" fill="#F472B6" />
-                      </svg>
-                    )}
+                    {user?.displayName
+                      ? user.displayName[0].toUpperCase()
+                      : "?"}
                   </span>
                 )}
               </button>
@@ -460,25 +472,25 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
           {mobileMenuOpen && (
             <nav className="lg:hidden flex flex-col gap-4 mt-4 pb-4 border-t border-gray-200 pt-4">
               <a
-                href="#"
+                href="/dash-board"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Home
               </a>
               <a
-                href="#"
+                href="/profile?section=skills"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 My Skills
               </a>
               <a
-                href="#"
+                href="/my-requests"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Learn
               </a>
               <a
-                href="#"
+                href="/swap-requests"
                 className="text-gray-700 hover:text-gray-900 font-medium"
               >
                 Teach
@@ -490,7 +502,8 @@ const Header: React.FC<HeaderProps> = ({ mobileMenuOpen, setMobileMenuOpen }) =>
 
       <style jsx>{`
         @keyframes pulse-slow {
-          0%, 100% {
+          0%,
+          100% {
             opacity: 1;
           }
           50% {
