@@ -69,20 +69,15 @@ export default function ProfileMessages() {
   }, [user]);
  
   const handleViewAll = () => {
-    router.push("/chat/[chatid]");
+    router.push("/chat/messages");
   };
  
   const handleMessageClick = (msg) => {
     // Navigate to chat with the sender
     if (msg.senderId) {
-      const userInfo = encodeURIComponent(JSON.stringify({
-        uid: msg.senderId,
-        displayName: msg.senderName || "User",
-        email: msg.senderEmail || ""
-      }));
-      router.push(`/chat?selectUser=${userInfo}`); // Uses base chat page with query params
+      router.push(`/chat/messages?user=${msg.senderId}`);
     } else {
-      router.push("/chat");
+      router.push("/chat/messages");
     }
   };
  
