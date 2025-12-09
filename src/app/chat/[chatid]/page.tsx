@@ -1,5 +1,6 @@
-
+// app/chat/page.tsx (or pages/chat/index.tsx)
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { db } from "../../../lib/firebase/firebaseConfig";
@@ -21,14 +22,20 @@ import { useAllUsers } from "@/hooks/useAllUsers";
 import { useActiveUsers } from "@/hooks/useActiveUsers";
 import MessageBubble from "../../../components/chat/MessageBubble";
 import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
-import { PhotoIcon, VideoCameraIcon } from "@heroicons/react/24/solid";
+import {
+  PhotoIcon,
+  VideoCameraIcon,
+  PhoneIcon,
+} from "@heroicons/react/24/solid";
 import VideoCall from "../../../components/chat/VideoCall";
+import AudioCall from "../../../components/chat/AudioCall";
 
 export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialUserId = searchParams.get("user");
   const autoAnswerCallId = searchParams.get("callId");
+  const urlCallType = searchParams.get("callType"); // "audio" | "video" | null
 
   const user = useCurrentUser();
   const { allUsers, error: usersError } = useAllUsers();
@@ -47,8 +54,12 @@ export default function ChatPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [fileCaption, setFileCaption] = useState("");
-  const [showVideoCall, setShowVideoCall] = useState(false);
-  const [autoAnswer, setAutoAnswer] = useState(false);
+
+  // unified call state: audio OR video, never both
+  const [activeCall, setActiveCall] = useState<{
+    type: "video" | "audio";
+    autoAnswer: boolean;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -69,16 +80,22 @@ export default function ChatPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Auto-select user from URL + auto-answer based on callType=audio|video
   useEffect(() => {
     if (autoAnswerCallId && initialUserId && allUsers.length > 0 && user) {
       const targetUser = allUsers.find((u) => u.uid === initialUserId);
       if (targetUser) {
         selectUser(targetUser);
-        setShowVideoCall(true);
-        setAutoAnswer(true);
-        
+
+        const typeFromUrl =
+          urlCallType === "audio" || urlCallType === "video"
+            ? (urlCallType as "audio" | "video")
+            : "video"; // default to video if missing
+
+        setActiveCall({ type: typeFromUrl, autoAnswer: true });
+
         const newUrl = window.location.pathname;
-        window.history.replaceState({}, '', newUrl);
+        window.history.replaceState({}, "", newUrl);
       }
     } else if (initialUserId && allUsers.length > 0 && user) {
       const targetUser = allUsers.find((u) => u.uid === initialUserId);
@@ -86,8 +103,9 @@ export default function ChatPage() {
         selectUser(targetUser);
       }
     }
-  }, [initialUserId, autoAnswerCallId, allUsers, user]);
+  }, [initialUserId, autoAnswerCallId, urlCallType, allUsers, user]);
 
+  // Load conversations + unread
   useEffect(() => {
     if (!user) return;
 
@@ -251,13 +269,15 @@ export default function ChatPage() {
   };
 
   const startVideoCall = () => {
-    setShowVideoCall(true);
-    setAutoAnswer(false);
+    setActiveCall({ type: "video", autoAnswer: false });
   };
 
-  const closeVideoCall = () => {
-    setShowVideoCall(false);
-    setAutoAnswer(false);
+  const startAudioCall = () => {
+    setActiveCall({ type: "audio", autoAnswer: false });
+  };
+
+  const closeCall = () => {
+    setActiveCall(null);
   };
 
   async function sendMessage() {
@@ -292,9 +312,10 @@ export default function ChatPage() {
         userId: selectedUser.uid,
         type: "chat",
         title: "New Message",
-        message: `${user.displayName || "Someone"} sent you a message: "${text.substring(0, 50)}${
-          text.length > 50 ? "..." : ""
-        }"`,
+        message: `${user.displayName || "Someone"} sent you a message: "${text.substring(
+          0,
+          50
+        )}${text.length > 50 ? "..." : ""}"`,
         chatId,
         senderId: user.uid,
         senderName: user.displayName || user.email || "Anonymous",
@@ -336,7 +357,8 @@ export default function ChatPage() {
       setUploadError(null);
 
       const { url, resourceType } = await uploadChatFileToCloudinary(file);
-      const isImage = resourceType === "image" && file.type.startsWith("image/");
+      const isImage =
+        resourceType === "image" && file.type.startsWith("image/");
 
       const displayContent = fileCaption || (isImage ? "" : file.name);
       const type = isImage ? "image" : "file";
@@ -409,17 +431,34 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-      {showVideoCall && selectedUser && (
+      {/* Call overlays */}
+      {activeCall?.type === "video" && selectedUser && (
         <VideoCall
           currentUserId={user.uid}
           currentUserName={user.displayName || user.email || "Anonymous"}
           otherUserId={selectedUser.uid}
-          otherUserName={selectedUser.displayName || selectedUser.email || "Unknown"}
-          onClose={closeVideoCall}
-          autoAnswer={autoAnswer}
+          otherUserName={
+            selectedUser.displayName || selectedUser.email || "Unknown"
+          }
+          onClose={closeCall}
+          autoAnswer={activeCall.autoAnswer}
         />
       )}
 
+      {activeCall?.type === "audio" && selectedUser && (
+        <AudioCall
+          currentUserId={user.uid}
+          currentUserName={user.displayName || user.email || "Anonymous"}
+          otherUserId={selectedUser.uid}
+          otherUserName={
+            selectedUser.displayName || selectedUser.email || "Unknown"
+          }
+          onClose={closeCall}
+          autoAnswer={activeCall.autoAnswer}
+        />
+      )}
+
+      {/* Header */}
       <header className="bg-white px-3 sm:px-4 py-3 sm:py-4 shadow flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {selectedUser && (
@@ -456,17 +495,26 @@ export default function ChatPage() {
             )}
           </div>
         </div>
-        
+
         {selectedUser && (
-          <button
-            onClick={startVideoCall}
-            className="bg-blue-500 hover:bg-blue-600 text-white p-2 sm:p-2.5 rounded-full transition-all flex-shrink-0 ml-2"
-            title="Start Video Call"
-          >
-            <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
+          <div className="flex items-center gap-2 ml-2">
+            <button
+              onClick={startAudioCall}
+              className="bg-green-500 hover:bg-green-600 text-white p-2 sm:p-2.5 rounded-full transition-all flex-shrink-0"
+              title="Start Audio Call"
+            >
+              <PhoneIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+            <button
+              onClick={startVideoCall}
+              className="bg-blue-500 hover:bg-blue-600 text-white p-2 sm:p-2.5 rounded-full transition-all flex-shrink-0"
+              title="Start Video Call"
+            >
+              <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+            </button>
+          </div>
         )}
-        
+
         {totalUnread > 0 && !selectedUser && (
           <div className="bg-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0">
             {totalUnread}
@@ -479,14 +527,18 @@ export default function ChatPage() {
           <div className="flex items-start gap-2">
             <span className="text-lg sm:text-xl flex-shrink-0">⚠️</span>
             <div className="min-w-0">
-              <p className="font-semibold text-sm sm:text-base">Upload Failed</p>
+              <p className="font-semibold text-sm sm:text-base">
+                Upload Failed
+              </p>
               <p className="text-xs sm:text-sm break-words">{uploadError}</p>
             </div>
           </div>
         </div>
       )}
 
+      {/* Main layout */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Left: user list */}
         <div
           className={`${
             selectedUser ? "hidden" : "flex"
@@ -637,6 +689,7 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {/* Right: chat area */}
         <div
           className={`${
             selectedUser ? "flex" : "hidden md:flex"
@@ -648,7 +701,9 @@ export default function ChatPage() {
                 <div className="flex flex-col gap-2 max-w-4xl mx-auto">
                   {messages.length === 0 ? (
                     <div className="text-center text-gray-500 mt-8 px-4">
-                      <p className="text-base sm:text-lg mb-2">No messages yet</p>
+                      <p className="text-base sm:text-lg mb-2">
+                        No messages yet
+                      </p>
                       <p className="text-xs sm:text-sm">
                         Start the conversation with{" "}
                         {selectedUser.displayName || selectedUser.email}!
@@ -771,7 +826,8 @@ export default function ChatPage() {
                         <button
                           type="button"
                           onClick={() => {
-                            fileInputRef.current?.setAttribute("accept",
+                            fileInputRef.current?.setAttribute(
+                              "accept",
                               "image/*,video/*"
                             );
                             fileInputRef.current?.click();
@@ -839,7 +895,9 @@ export default function ChatPage() {
                     d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                   />
                 </svg>
-                <p className="text-base sm:text-lg">Select a user to start chatting</p>
+                <p className="text-base sm:text-lg">
+                  Select a user to start chatting
+                </p>
                 {totalUnread > 0 && (
                   <p className="text-xs sm:text-sm text-blue-600 mt-2">
                     You have {totalUnread} unread message
