@@ -264,6 +264,18 @@ export default function SwapRequestsPage() {
                     <p className="text-gray-700">
                       <span className="font-semibold">Offering:</span> {request.offeredSkillTitle}
                     </p>
+                    {/* Arrow link to offered skill */}
+                    <div className="flex items-center gap-2 mt-2">
+                      {request.offeredSkillId && (
+                        <a
+                          href={`/skills/${request.offeredSkillId}`}
+                          className="text-black hover:text-blue-800 transition text-lg"
+                          aria-label="Go to offered skill"
+                        >
+                          ➔
+                        </a>
+                      )}
+                    </div>
                     {request.message && (
                       <div className="mt-3 p-3 bg-gray-50 rounded">
                         <p className="text-sm font-semibold text-gray-700 mb-1">Message:</p>
