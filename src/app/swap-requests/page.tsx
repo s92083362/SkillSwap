@@ -148,7 +148,7 @@ export default function SwapRequestsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-        <main className="max-w-5xl mx-auto px-4 py-10">
+        <main className="max-w-5xl mx-auto px-4 pt-24 pb-10">
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <p className="text-gray-600 text-lg">Please log in to view swap requests.</p>
           </div>
@@ -187,7 +187,7 @@ export default function SwapRequestsPage() {
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <main className="max-w-5xl mx-auto px-4 pt-24 pb-10">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Skill Swap Requests</h1>
           <p className="text-gray-600">Manage requests from users who want to exchange skills</p>
@@ -289,33 +289,33 @@ export default function SwapRequestsPage() {
                     <div className="flex gap-3 mt-4">
                       <button
                         onClick={() => handleUpdateStatus(request.id, "accepted")}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-black font-semibold py-2 px-4 rounded transition-colors"
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded transition-colors"
                       >
                         Accept
                       </button>
                       <button
                         onClick={() => handleUpdateStatus(request.id, "rejected")}
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-black font-semibold py-2 px-4 rounded transition-colors"
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition-colors"
                       >
                         Reject
                       </button>
                     </div>
                   )}
 
-                  {/* Show accepted message */}
+                  {/* Show contact info for accepted requests */}
                   {statusNormalized === "accepted" && (
-                    <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
-                      <p className="text-sm text-green-800">
+                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-green-800 text-sm">
                         ✓ You accepted this request. You can now contact {request.requesterName} at {request.requesterEmail}
                       </p>
                     </div>
                   )}
 
-                  {/* Show rejected message */}
+                  {/* Show rejection message */}
                   {statusNormalized === "rejected" && (
-                    <div className="mt-4 p-3 bg-red-50 rounded border border-red-200">
-                      <p className="text-sm text-red-800">
-                        ✗ You rejected this request
+                    <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
+                      <p className="text-red-800 text-sm">
+                        ✗ You rejected this request.
                       </p>
                     </div>
                   )}

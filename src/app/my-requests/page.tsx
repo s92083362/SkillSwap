@@ -100,7 +100,7 @@ export default function MyRequestsPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-        <main className="max-w-4xl mx-auto p-10">
+        <main className="max-w-4xl mx-auto px-4 pt-24 pb-10">
           <p className="text-gray-600 text-lg">Please log in to view your requests.</p>
         </main>
       </div>
@@ -115,7 +115,7 @@ export default function MyRequestsPage() {
     <div className="min-h-screen bg-gray-50">
       <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
 
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <main className="max-w-5xl mx-auto px-4 pt-24 pb-10">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Sent Requests</h1>
         <p className="text-gray-600 mb-6">
           These are the swap requests you have sent to other course owners.
