@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useRouter } from "next/navigation";
-import { collection, query, where, orderBy, onSnapshot, limit } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, doc, getDoc } from "firebase/firestore";
 import { db, auth } from "../../lib/firebase/firebaseConfig";
  
 // Helper to format Firestore Timestamp to "x min/hours ago"
@@ -27,6 +27,18 @@ function formatTime(timestamp) {
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
 }
+
+// Helper to get avatar URL
+const getAvatarUrl = (userData) => {
+  if (!userData) return null;
+  return userData.photoURL || userData.photoUrl || userData.avatar || userData.profilePicture || null;
+};
+
+// Helper to get display name
+const getDisplayName = (userData) => {
+  if (!userData) return "Unknown User";
+  return userData.displayName || userData.name || userData.username || "Unknown User";
+};
  
 export default function ProfileMessages() {
   const [user] = useAuthState(auth);
@@ -52,11 +64,39 @@ export default function ProfileMessages() {
       limit(5) // Only show 5 most recent messages
     );
     
-    const unsub = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+    const unsub = onSnapshot(q, async (snapshot) => {
+      const msgs = [];
+      
+      for (const docSnap of snapshot.docs) {
+        const msgData = { id: docSnap.id, ...docSnap.data() };
+        
+        // Fetch sender profile data if senderId exists
+        if (msgData.senderId) {
+          try {
+            const senderRef = doc(db, "users", msgData.senderId);
+            const senderSnap = await getDoc(senderRef);
+            
+            if (senderSnap.exists()) {
+              const senderData = senderSnap.data();
+              
+              // Override with fresh data from users collection
+              msgData.senderAvatar = getAvatarUrl(senderData);
+              msgData.senderName = getDisplayName(senderData);
+              msgData.senderEmail = senderData.email || "";
+            }
+          } catch (error) {
+            console.error("Error fetching sender profile:", error);
+            // Keep existing data if fetch fails
+            if (!msgData.senderName) msgData.senderName = "Unknown User";
+          }
+        } else {
+          // No senderId found
+          if (!msgData.senderName) msgData.senderName = "Unknown User";
+        }
+        
+        msgs.push(msgData);
+      }
+      
       setMessages(msgs);
       
       // Count unread messages
@@ -131,17 +171,24 @@ export default function ProfileMessages() {
               msg.read === false ? "border-l-4 border-blue-500 bg-blue-50/30" : ""
             }`}
           >
-            <img
-              src={
-                msg.senderAvatar
-                  ? msg.senderAvatar
-                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      msg.senderName || "User"
-                    )}&background=F8D5CB&color=555`
-              }
-              alt={msg.senderName || "User"}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
-            />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+              {msg.senderAvatar ? (
+                <img
+                  src={msg.senderAvatar}
+                  alt={msg.senderName || "User"}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to generated avatar if image fails to load
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = `<span class="text-sm font-semibold text-blue-700">${(msg.senderName || "?").charAt(0).toUpperCase()}</span>`;
+                  }}
+                />
+              ) : (
+                <span className="text-sm font-semibold text-blue-700">
+                  {(msg.senderName || "?").charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
             <div className="flex-1 min-w-0">
               <p className={`font-semibold text-gray-800 text-base sm:text-lg truncate ${
                 msg.read === false ? "font-bold" : ""
