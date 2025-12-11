@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Header from "../../../components/shared/header/Header";
 import AccordionSection from "../../../components/dashboard/AccordionSection";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
 import LessonNotes from "../../../components/lessons/LessonNotes";
@@ -21,6 +21,7 @@ import {
 
 export default function SkillPage({ params }) {
   const { skillId } = React.use(params);
+  const router = useRouter();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user] = useAuthState(auth);
@@ -28,6 +29,14 @@ export default function SkillPage({ params }) {
   const [loadingEnroll, setLoadingEnroll] = useState(false);
   const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Swap status
+  const [hasSwapped, setHasSwapped] = useState(false);
+  const [instructorId, setInstructorId] = useState("");
+  const [instructorName, setInstructorName] = useState("");
+  const [instructorAvatar, setInstructorAvatar] = useState("");
+  const [userRole, setUserRole] = useState<"provider" | "seeker">("seeker"); // Track user's role
+  const [isLessonOwner, setIsLessonOwner] = useState(false); // Check if user owns the lesson
 
   // Swap Skill Popup State
   const [showExchange, setShowExchange] = useState(false);
@@ -38,6 +47,9 @@ export default function SkillPage({ params }) {
 
   // Sections unlocked for the user
   const [allowedSections, setAllowedSections] = useState<string[]>([]);
+
+  const getAvatarUrl = (u: any) =>
+    u?.photoURL || u?.photoUrl || "/default-avatar.png";
 
   // Fetch lessons
   useEffect(() => {
@@ -53,7 +65,7 @@ export default function SkillPage({ params }) {
             instructor: data.instructor,
             creatorId: data.creatorId,
             image: data.image,
-            visibility: data.visibility || "swap-only", // NEW: visibility field
+            visibility: data.visibility || "swap-only",
             sections: (data.sections || []).map((section, idx) => ({
               id: section.id || `section-${idx}`,
               name: section.title,
@@ -76,11 +88,26 @@ export default function SkillPage({ params }) {
 
   const skill = skills.find((s) => s.id === skillId);
 
+  // Check if current user is the lesson owner
+  useEffect(() => {
+    if (!user || !skill) return;
+    setIsLessonOwner(skill.creatorId === user.uid);
+  }, [user, skill]);
+
   // Fetch enrollment & allowed sections
   useEffect(() => {
     if (!user || !skillId || !skill) return;
 
     const fetchEnrollment = async () => {
+      // If user is the lesson owner, grant access to all sections automatically
+      if (skill.creatorId === user.uid) {
+        setIsEnrolled(true);
+        const allSections = skill.sections?.map((sec) => sec.id) || [];
+        setAllowedSections(allSections);
+        return;
+      }
+
+      // For non-owners, check enrollment status
       const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
       const snap = await getDoc(ref);
 
@@ -97,6 +124,78 @@ export default function SkillPage({ params }) {
     fetchEnrollment();
   }, [user, skillId, skill]);
 
+  // Check if user has swapped skills - check BOTH directions
+  useEffect(() => {
+    if (!user || !skillId || !skill) return;
+
+    const checkSwapStatus = async () => {
+      try {
+        // Check if current user SENT a swap request (they are the requester/seeker)
+        const qRequester = query(
+          collection(db, "swapRequests"),
+          where("requesterId", "==", user.uid),
+          where("requestedLessonId", "==", skillId),
+          where("status", "==", "accepted")
+        );
+        
+        const snapshotRequester = await getDocs(qRequester);
+        
+        if (!snapshotRequester.empty) {
+          setHasSwapped(true);
+          setUserRole("seeker"); // Current user is the skill seeker
+          const swapData = snapshotRequester.docs[0].data();
+          // Chat with the creator (skill provider)
+          const creatorId = swapData.creatorId;
+          setInstructorId(creatorId);
+          setInstructorName(skill.instructor);
+          
+          // Fetch creator's profile picture
+          const creatorRef = doc(db, "users", creatorId);
+          const creatorSnap = await getDoc(creatorRef);
+          if (creatorSnap.exists()) {
+            const creatorData = creatorSnap.data();
+            setInstructorAvatar(getAvatarUrl(creatorData));
+          }
+          return;
+        }
+
+        // Check if current user RECEIVED a swap request (they are the creator/provider)
+        const qCreator = query(
+          collection(db, "swapRequests"),
+          where("creatorId", "==", user.uid),
+          where("requestedLessonId", "==", skillId),
+          where("status", "==", "accepted")
+        );
+        
+        const snapshotCreator = await getDocs(qCreator);
+        
+        if (!snapshotCreator.empty) {
+          setHasSwapped(true);
+          setUserRole("provider"); // Current user is the skill provider
+          const swapData = snapshotCreator.docs[0].data();
+          // Chat with the requester (skill seeker)
+          const requesterId = swapData.requesterId;
+          setInstructorId(requesterId);
+          setInstructorName(swapData.requesterName || "Swap Partner");
+          
+          // Fetch requester's profile picture
+          const requesterRef = doc(db, "users", requesterId);
+          const requesterSnap = await getDoc(requesterRef);
+          if (requesterSnap.exists()) {
+            const requesterData = requesterSnap.data();
+            setInstructorAvatar(getAvatarUrl(requesterData));
+          }
+        } else {
+          setHasSwapped(false);
+        }
+      } catch (err) {
+        console.error("Error checking swap status:", err);
+      }
+    };
+
+    checkSwapStatus();
+  }, [user, skillId, skill]);
+
   // Check swap request or public lesson access
   useEffect(() => {
     if (!user || !skillId || !skill) return;
@@ -104,6 +203,12 @@ export default function SkillPage({ params }) {
     const checkAccess = async () => {
       try {
         const allSections = skill.sections?.map((sec) => sec.id) || [];
+
+        // If user is the lesson owner, grant full access
+        if (skill.creatorId === user.uid) {
+          setAllowedSections(allSections);
+          return;
+        }
 
         // If public, grant access to all sections
         if (skill.visibility === "public") {
@@ -151,7 +256,7 @@ export default function SkillPage({ params }) {
       } else {
         await setDoc(ref, {
           enrolledAt: new Date(),
-          allowedSections: [skill?.sections[0]?.id], // Only first section
+          allowedSections: [skill?.sections[0]?.id],
         });
         setIsEnrolled(true);
         setAllowedSections([skill?.sections[0]?.id]);
@@ -163,12 +268,23 @@ export default function SkillPage({ params }) {
     }
   }
 
+  // Navigate to chat with the other person in the swap
+  function handleChatWithInstructor() {
+    if (!instructorId || !user) return;
+    // Navigate to messages page with the other user's ID
+    router.push(`/chat/messages?user=${instructorId}`);
+  }
+
+  // Navigate to edit lesson page
+  function handleEditLesson() {
+    router.push(`/lessons/manage/${skillId}`);
+  }
+
   // Submit Swap Request
   async function handleSwapSubmit() {
     if (!offeredSkillTitle.trim() || !agreed || !user) return;
     setSendingSwap(true);
     try {
-      // Get the author's user ID from the lesson
       const lessonDoc = await getDoc(doc(db, "lessons", skillId));
 
       if (!lessonDoc.exists()) {
@@ -178,8 +294,6 @@ export default function SkillPage({ params }) {
       }
 
       const lessonData = lessonDoc.data();
-
-      // Get the creator ID from the lesson
       const authorId = lessonData.creatorId;
 
       if (!authorId) {
@@ -188,14 +302,12 @@ export default function SkillPage({ params }) {
         return;
       }
 
-      // Don't allow swapping with yourself
       if (authorId === user.uid) {
         alert("You cannot send a swap request for your own lesson.");
         setSendingSwap(false);
         return;
       }
 
-      // Create swap request document
       const swapRequestRef = doc(collection(db, "swapRequests"));
 
       await setDoc(swapRequestRef, {
@@ -214,7 +326,6 @@ export default function SkillPage({ params }) {
 
       const chatId = [user.uid, authorId].sort().join("_");
 
-      // Add the swap message to the chat
       await addDoc(collection(db, "privateChats", chatId, "messages"), {
         senderId: user.uid,
         senderName: user.displayName || user.email || "Anonymous",
@@ -222,7 +333,6 @@ export default function SkillPage({ params }) {
         timestamp: serverTimestamp(),
       });
 
-      // Create notification for the author (FIXED!)
       const notificationRef = doc(collection(db, "notifications"));
       await setDoc(notificationRef, {
         userId: authorId,
@@ -280,8 +390,46 @@ export default function SkillPage({ params }) {
           </p>
           <p className="text-base text-blue-800">{skill.description}</p>
 
-          {/* Swap Skill Button */}
-          {user && isEnrolled && (
+          {/* Show instructor contact info if swapped */}
+          {user && hasSwapped && (
+            <div className="mt-6 bg-white rounded-lg p-6 shadow-sm max-w-md mx-auto">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {/* Profile Picture */}
+                  <div className="w-12 h-12 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    {instructorAvatar ? (
+                      <img
+                        src={instructorAvatar}
+                        alt={instructorName || "Partner"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-base font-semibold text-blue-700">
+                        {(instructorName || "?").charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  {/* Name and Label */}
+                  <div className="text-left flex-1 min-w-0">
+                    <p className="text-sm text-gray-500 mb-1">
+                      {userRole === "seeker" ? "Contact Skill Provider" : "Contact Skill Seeker"}
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900 truncate">{instructorName}</p>
+                  </div>
+                </div>
+                {/* Chat Button */}
+                <button
+                  onClick={handleChatWithInstructor}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded transition-colors flex-shrink-0"
+                >
+                  Chat
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Swap Skill Button - only show if NOT already swapped and NOT lesson owner */}
+          {user && isEnrolled && !hasSwapped && !isLessonOwner && (
             <div className="mt-4 flex justify-center">
               <button
                 className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded text-base"
@@ -293,7 +441,22 @@ export default function SkillPage({ params }) {
               </button>
             </div>
           )}
-          {user && (
+
+          {/* Edit Lesson Button - only show for lesson owner */}
+          {user && isLessonOwner && (
+            <div className="mt-4 flex justify-center">
+              <button
+                className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded text-base"
+                onClick={handleEditLesson}
+                type="button"
+              >
+                Edit Lesson
+              </button>
+            </div>
+          )}
+
+          {/* Enroll/Unenroll Button - hide for lesson owner */}
+          {user && !isLessonOwner && (
             <div className="mt-8 flex justify-center">
               <button
                 className={`px-5 py-2 rounded font-semibold transition-colors ${
