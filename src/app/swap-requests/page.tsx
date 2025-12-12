@@ -43,7 +43,6 @@ export default function SwapRequestsPage() {
           const createdAt = data.createdAt?.toDate?.() || null;
           const updatedAt = data.updatedAt?.toDate?.() || null;
 
-          // fetch requester avatar
           let requesterAvatar: string | null = null;
           if (data.requesterId) {
             const requesterRef = doc(db, "users", data.requesterId);
@@ -73,7 +72,6 @@ export default function SwapRequestsPage() {
     fetchSwapRequests();
   }, [user]);
 
-  // Only update status, don't delete document
   async function handleUpdateStatus(requestId: string, newStatus: "accepted" | "rejected") {
     try {
       const requestRef = doc(db, "swapRequests", requestId);
@@ -174,9 +172,9 @@ export default function SwapRequestsPage() {
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
         />
-        <main className="max-w-5xl mx-auto px-4 pt-24 pb-10">
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <p className="text-gray-600 text-lg">
+        <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-10">
+          <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 text-center">
+            <p className="text-gray-600 text-base sm:text-lg">
               Please log in to view swap requests.
             </p>
           </div>
@@ -195,24 +193,24 @@ export default function SwapRequestsPage() {
       {/* Chat Dialog Popup */}
       {showChatDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-gray-900 mb-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 sm:p-8 mx-4">
+            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">
               Request Accepted!
             </h3>
-            <p className="text-gray-700 mb-6">
+            <p className="text-sm sm:text-base text-gray-700 mb-6">
               Do you want to go to chat with{" "}
               {acceptedRequestData?.requesterName} now?
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleGoToChat}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded transition-colors"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded transition-colors text-sm sm:text-base"
               >
                 Yes
               </button>
               <button
                 onClick={handleChatLater}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-4 rounded transition-colors"
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-4 rounded transition-colors text-sm sm:text-base"
               >
                 Do it Later
               </button>
@@ -221,25 +219,25 @@ export default function SwapRequestsPage() {
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-4 pt-24 pb-10">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-24 pb-10">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
             Skill Swap Requests
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm sm:text-base text-gray-600">
             Manage requests from users who want to exchange skills
           </p>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <div className="flex gap-1 sm:gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
           {["all", "pending", "accepted", "rejected"].map((status) => (
             <button
               key={status}
               onClick={() =>
                 setFilter(status as "all" | "pending" | "accepted" | "rejected")
               }
-              className={`px-4 py-2 font-medium capitalize transition-colors ${
+              className={`px-3 sm:px-4 py-2 font-medium capitalize transition-colors whitespace-nowrap text-sm sm:text-base ${
                 filter === status
                   ? "text-blue-600 border-b-2 border-blue-600"
                   : "text-gray-600 hover:text-gray-900"
@@ -271,11 +269,11 @@ export default function SwapRequestsPage() {
 
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-gray-500">Loading requests...</p>
+            <p className="text-gray-500 text-sm sm:text-base">Loading requests...</p>
           </div>
         ) : filteredRequests.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-            <p className="text-gray-600 text-lg">
+          <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 text-center">
+            <p className="text-gray-600 text-base sm:text-lg">
               {filter === "all"
                 ? "No swap requests yet"
                 : `No ${filter} requests`}
@@ -292,12 +290,12 @@ export default function SwapRequestsPage() {
               return (
                 <div
                   key={request.id}
-                  className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow"
+                  className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow"
                 >
-                  <div className="flex justify-between items-start mb-4">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                     {/* Left: requester avatar + basic info */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0">
                         {request.requesterAvatar ? (
                           <img
                             src={request.requesterAvatar}
@@ -309,20 +307,22 @@ export default function SwapRequestsPage() {
                         )}
                       </div>
 
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 break-words">
                           {request.requestedLessonTitle}
                         </h3>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500">
                           {request.createdAt?.toLocaleDateString()}{" "}
-                          at{" "}
-                          {request.createdAt?.toLocaleTimeString()}
+                          <span className="hidden xs:inline">at{" "}</span>
+                          <span className="block xs:inline">
+                            {request.createdAt?.toLocaleTimeString()}
+                          </span>
                         </p>
                       </div>
                     </div>
 
                     <span
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      className={`px-3 py-1 rounded-full text-xs sm:text-sm font-semibold whitespace-nowrap self-start ${
                         statusNormalized === "pending"
                           ? "bg-yellow-100 text-yellow-800"
                           : statusNormalized === "accepted"
@@ -340,11 +340,11 @@ export default function SwapRequestsPage() {
                   </div>
 
                   <div className="space-y-2 mb-4">
-                    <p className="text-gray-700">
+                    <p className="text-sm sm:text-base text-gray-700 break-words">
                       <span className="font-semibold">From:</span>{" "}
                       {request.requesterName} ({request.requesterEmail})
                     </p>
-                    <p className="text-gray-700">
+                    <p className="text-sm sm:text-base text-gray-700 break-words">
                       <span className="font-semibold">Offering:</span>{" "}
                       {request.offeredSkillTitle}
                     </p>
@@ -354,7 +354,7 @@ export default function SwapRequestsPage() {
                       {request.offeredSkillId && (
                         <a
                           href={`/skills/${request.offeredSkillId}`}
-                          className="text-black hover:text-blue-800 transition text-lg"
+                          className="text-black hover:text-blue-800 transition text-lg sm:text-xl"
                           aria-label="Go to offered skill"
                         >
                           ➔
@@ -364,22 +364,24 @@ export default function SwapRequestsPage() {
 
                     {request.message && (
                       <div className="mt-3 p-3 bg-gray-50 rounded">
-                        <p className="text-sm font-semibold text-gray-700 mb-1">
+                        <p className="text-xs sm:text-sm font-semibold text-gray-700 mb-1">
                           Message:
                         </p>
-                        <p className="text-gray-800">{request.message}</p>
+                        <p className="text-sm sm:text-base text-gray-800 break-words">
+                          {request.message}
+                        </p>
                       </div>
                     )}
                   </div>
 
                   {/* Buttons / status blocks */}
                   {statusNormalized === "pending" && (
-                    <div className="flex gap-3 mt-4">
+                    <div className="flex flex-col sm:flex-row gap-3 mt-4">
                       <button
                         onClick={() =>
                           handleUpdateStatus(request.id, "accepted")
                         }
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded transition-colors"
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 sm:py-3 px-4 rounded transition-colors text-sm sm:text-base"
                       >
                         Accept
                       </button>
@@ -387,7 +389,7 @@ export default function SwapRequestsPage() {
                         onClick={() =>
                           handleUpdateStatus(request.id, "rejected")
                         }
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded transition-colors"
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 sm:py-3 px-4 rounded transition-colors text-sm sm:text-base"
                       >
                         Reject
                       </button>
@@ -395,8 +397,8 @@ export default function SwapRequestsPage() {
                   )}
 
                   {statusNormalized === "accepted" && (
-                    <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-green-800 text-sm">
+                    <div className="mt-4 p-3 sm:p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-green-800 text-xs sm:text-sm break-words">
                         ✓ You accepted this request. You can now contact{" "}
                         {request.requesterName} at {request.requesterEmail}
                       </p>
@@ -404,8 +406,8 @@ export default function SwapRequestsPage() {
                   )}
 
                   {statusNormalized === "rejected" && (
-                    <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-                      <p className="text-red-800 text-sm">
+                    <div className="mt-4 p-3 sm:p-4 bg-red-50 rounded-lg border border-red-200">
+                      <p className="text-red-800 text-xs sm:text-sm">
                         ✗ You rejected this request.
                       </p>
                     </div>
