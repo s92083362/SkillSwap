@@ -1,16 +1,17 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import Header from '../../../../components/shared/header/Header';
-import AccordionSection from '../../../../components/dashboard/AccordionSection';
-import { notFound } from 'next/navigation';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { auth, db } from '../../../../lib/firebase/firebaseConfig';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import React, { useState, useEffect } from "react";
+import Header from "../../../../components/shared/header/Header";
+import AccordionSection from "../../../../components/dashboard/AccordionSection";
+import { notFound } from "next/navigation";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth, db } from "../../../../lib/firebase/firebaseConfig";
+import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
 
 type SkillDetailPageProps = {
   params: {
     skillId: string;
+    sectionId: string;
   };
 };
 
@@ -32,7 +33,7 @@ type Lesson = {
 };
 
 export default function SkillDetailPage({ params }: SkillDetailPageProps) {
-  const { skillId } = params;
+  const { skillId, sectionId } = params;
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user] = useAuthState(auth);
@@ -45,7 +46,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
   useEffect(() => {
     async function fetchLessons() {
       try {
-        const lessonsSnapshot = await getDocs(collection(db, 'lessons'));
+        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
         const firebaseLessons: Lesson[] = lessonsSnapshot.docs.map((d) => {
           const data = d.data() as any;
           return {
@@ -56,10 +57,10 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
             image: data.image,
             sections: [
               {
-                id: 'skill-overview',
-                name: 'Skill overview',
-                title: 'Skill overview',
-                content: data.description || 'No description available.',
+                id: "skill-overview",
+                name: "Skill overview",
+                title: "Skill overview",
+                content: data.description || "No description available.",
               },
               ...(data.sections || []).map(
                 (section: any, idx: number): LessonSection => ({
@@ -76,7 +77,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
 
         setSkills(firebaseLessons);
       } catch (error) {
-        console.error('Error fetching lessons:', error);
+        console.error("Error fetching lessons:", error);
       } finally {
         setLoading(false);
       }
@@ -87,13 +88,18 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
 
   const skill = skills.find((s) => s.id === skillId);
 
+  // If you want to scroll/open a specific section based on sectionId,
+  // you can pass a prop like `defaultSectionId={sectionId}` into AccordionSection
+  // or use it to compute defaultOpen, e.g.:
+  // const defaultIndex = skill?.sections.findIndex(sec => sec.id === sectionId) ?? 0;
+
   // Check enrollment status
   useEffect(() => {
     if (!user || !skillId) {
       setIsEnrolled(false);
       return;
     }
-    const ref = doc(db, 'users', user.uid, 'enrolledSkills', skillId);
+    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
     getDoc(ref).then((docSnap) => {
       setIsEnrolled(docSnap.exists());
     });
@@ -104,11 +110,11 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
     if (!user) return;
     setLoadingEnroll(true);
     try {
-      const ref = doc(db, 'users', user.uid, 'enrolledSkills', skillId);
+      const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
       await setDoc(ref, { enrolledAt: new Date() });
       setIsEnrolled(true);
     } catch (error) {
-      console.error('Error enrolling:', error);
+      console.error("Error enrolling:", error);
     } finally {
       setLoadingEnroll(false);
     }
@@ -163,7 +169,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                   onClick={handleEnroll}
                   disabled={loadingEnroll}
                 >
-                  {loadingEnroll ? 'Enrolling...' : 'Enroll'}
+                  {loadingEnroll ? "Enrolling..." : "Enroll"}
                 </button>
               )}
             </div>
@@ -180,7 +186,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
                 defaultOpen={idx === 0}
               >
                 <div className="space-y-4">
-                  {typeof section.content === 'string' ? (
+                  {typeof section.content === "string" ? (
                     <div className="prose max-w-none">
                       <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
                         {section.content}
