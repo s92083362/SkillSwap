@@ -81,6 +81,9 @@ export default function VideoCall({
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
+  // NEW: remote screen‑share state
+  const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
+
   // Chat state
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -173,10 +176,7 @@ export default function VideoCall({
       });
 
       await updateDoc(doc(db, "privateChats", chatId), {
-        lastMessage:
-          status === "missed"
-            ? "Missed video call"
-            : "Video call",
+        lastMessage: status === "missed" ? "Missed video call" : "Video call",
         lastUpdated: serverTimestamp(),
       });
     } catch (e) {
@@ -349,10 +349,7 @@ export default function VideoCall({
       newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
       newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
       newRoom.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
-      newRoom.on(
-        RoomEvent.ParticipantDisconnected,
-        handleParticipantDisconnected
-      );
+      newRoom.on(RoomEvent.ParticipantDisconnected, handleParticipantDisconnected);
       newRoom.on(RoomEvent.Disconnected, handleDisconnected);
       newRoom.on(RoomEvent.Connected, () => {
         setIsConnected(true);
@@ -400,7 +397,7 @@ export default function VideoCall({
     }
   };
 
-  // ----- LiveKit Event Handlers -----
+  // ----- LiveKit Event Handlers (UPDATED) -----
 
   const handleTrackSubscribed = (
     track: RemoteTrack,
@@ -414,6 +411,7 @@ export default function VideoCall({
         } else {
           track.attach();
         }
+        setRemoteScreenSharing(true);
       } else {
         if (remoteVideoRef.current) {
           track.attach(remoteVideoRef.current);
@@ -432,6 +430,12 @@ export default function VideoCall({
     _participant: RemoteParticipant
   ) => {
     track.detach();
+    if (
+      track.kind === Track.Kind.Video &&
+      track.source === Track.Source.ScreenShare
+    ) {
+      setRemoteScreenSharing(false);
+    }
   };
 
   const handleParticipantConnected = (participant: RemoteParticipant) => {
@@ -802,15 +806,14 @@ export default function VideoCall({
     setIsReceivingCall(false);
     setIsConnected(false);
     setIsScreenSharing(false);
+    setRemoteScreenSharing(false);
   };
 
   // ----- Permission instructions -----
 
   const getBrowserInstructions = () => {
     const userAgent =
-      typeof navigator !== "undefined"
-        ? navigator.userAgent.toLowerCase()
-        : "";
+      typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
 
     if (userAgent.includes("chrome")) {
       return "Chrome: Click the camera icon in the address bar or go to Settings > Privacy and security > Site settings > Camera/Microphone";
@@ -853,9 +856,7 @@ export default function VideoCall({
               <p className="text-sm text-gray-700 font-semibold mb-2">
                 How to enable:
               </p>
-              <p className="text-sm text-gray-600">
-                {getBrowserInstructions()}
-              </p>
+              <p className="text-sm text-gray-600">{getBrowserInstructions()}</p>
             </div>
           )}
 
@@ -940,7 +941,11 @@ export default function VideoCall({
               ref={screenShareRef}
               autoPlay
               playsInline
-              className="hidden"
+              className={
+                remoteScreenSharing
+                  ? "absolute inset-0 w-full h-full object-contain bg-black"
+                  : "hidden"
+              }
             />
 
             {isScreenSharing && (
