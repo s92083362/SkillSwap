@@ -51,7 +51,6 @@ const Header: React.FC<HeaderProps> = ({
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
  
   useTrackUserActivity(60000);
- 
   // Helper function to check if a path is active
   const isActivePath = (path: string) => {
     if (path === "/dash-board") {
@@ -59,7 +58,6 @@ const Header: React.FC<HeaderProps> = ({
     }
     return pathname?.startsWith(path);
   };
- 
   // Listen for incoming audio/video calls for this user
   useEffect(() => {
     if (!userId) return;
