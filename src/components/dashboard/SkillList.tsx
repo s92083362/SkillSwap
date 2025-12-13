@@ -1,21 +1,34 @@
 "use client";
+
 import React, { useState, useEffect, useCallback } from "react";
-import SkillCard from "./ SkillCard";
+import SkillCard, { Skill } from "./SkillCard";
 import SearchBar from "./SearchBar";
-import { collection, query, where, getDocs, orderBy, startAt, endAt } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  startAt,
+  endAt,
+  DocumentData,
+  Query as FirestoreQuery,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
 
-// Simple debounce hook
+// Debounce hook
 function useDebounce(value: string, delay: number) {
   const [debounced, setDebounced] = useState(value);
+
   useEffect(() => {
     const handler = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(handler);
   }, [value, delay]);
+
   return debounced;
 }
 
-const hardcodedSkills = [
+const hardcodedSkills: Skill[] = [
   {
     id: "python-for-beginners",
     title: "Python for Beginners",
@@ -26,72 +39,94 @@ const hardcodedSkills = [
   {
     id: "js-essentials",
     title: "JavaScript Essentials",
-    description: "Master JavaScript for modern web development, including all the fundamental building blocks.",
+    description:
+      "Master JavaScript for modern web development, including all the fundamental building blocks.",
     category: "Web Development",
     instructor: "Sam Smith",
   },
 ];
 
+type LessonFromFirestore = Skill & { id: string };
+
 export default function SkillsListPage() {
-  const [skills, setSkills] = useState(hardcodedSkills);
+  const [skills, setSkills] = useState<Skill[]>(hardcodedSkills);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const debouncedSearch = useDebounce(searchQuery.trim().toLowerCase(), 400);
 
-  // Get categories from hardcoded + Firestore lessons (optional)
-  const categories = ["all", "Programming", "Web Development", "Frontend", "Backend", "DevOps"];
+  const categories: string[] = [
+    "all",
+    "Programming",
+    "Web Development",
+    "Frontend",
+    "Backend",
+    "DevOps",
+  ];
 
-  const fetchFilteredLessons = useCallback(async (category: string, search: string) => {
-    setLoading(true);
+  const fetchFilteredLessons = useCallback(
+    async (category: string, search: string) => {
+      setLoading(true);
 
-    try {
-      let collRef = collection(db, "lessons");
+      try {
+        const collRef = collection(db, "lessons");
+        let q: FirestoreQuery<DocumentData> = collRef;
 
-      // Base query
-      let q = collRef;
-
-      // Add category filter if not "all"
-      if (category && category !== "all") {
-        q = query(q, where("skillCategory", "==", category));
-      }
-
-      // Firestore prefix search for title (case insensitive workaround)
-      // Note: Firestore queries are case-sensitive; for production, consider Algolia or extensions.
-      if (search) {
-        // Because Firestore doesn’t support case-insensitive search,
-        // your data should store lowercased title to allow prefix search if needed.
-        // For simplicity, this example assumes case-sensitive prefix search.
-        const end = search.slice(0, -1) + String.fromCharCode(search.charCodeAt(search.length -1) + 1);
-
-        q = query(q, orderBy("title"), startAt(search), endAt(end));
-      }
-
-      const snapshot = await getDocs(q);
-      const lessonsFromFirestore = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      // Merge with hardcoded, optionally filter hardcoded by category/search as well
-      const merged = [...hardcodedSkills, ...lessonsFromFirestore].filter(skill => {
-        // Filter hardcoded skills by category
-        if (category !== "all" && skill.category !== category && skill.skillCategory !== category) {
-          return false;
+        if (category && category !== "all") {
+          q = query(q, where("skillCategory", "==", category));
         }
-        // Filter hardcoded skills by search keywords
+
         if (search) {
-          const s = search.toLowerCase();
-          const haystack = `${skill.title} ${skill.description} ${skill.category} ${skill.skillCategory} ${skill.instructor}`.toLowerCase();
-          return haystack.includes(s);
-        }
-        return true;
-      });
+          const end =
+            search.slice(0, -1) +
+            String.fromCharCode(
+              search.charCodeAt(search.length - 1) + 1
+            );
 
-      setSkills(merged);
-    } catch (err) {
-      console.error("Failed to fetch filtered lessons:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+          q = query(q, orderBy("title"), startAt(search), endAt(end));
+        }
+
+        const snapshot = await getDocs(q);
+        const lessonsFromFirestore: LessonFromFirestore[] = snapshot.docs.map(
+          (doc) => ({
+            id: doc.id,
+            ...(doc.data() as Omit<LessonFromFirestore, "id">),
+          })
+        );
+
+        const merged: Skill[] = [...hardcodedSkills, ...lessonsFromFirestore].filter(
+          (skill) => {
+            if (
+              category !== "all" &&
+              skill.category !== category &&
+              skill.skillCategory !== category
+            ) {
+              return false;
+            }
+
+            if (search) {
+              const s = search.toLowerCase();
+              const haystack = `${skill.title} ${skill.description} ${
+                skill.category || ""
+              } ${skill.skillCategory || ""} ${
+                skill.instructor || ""
+              }`.toLowerCase();
+              return haystack.includes(s);
+            }
+
+            return true;
+          }
+        );
+
+        setSkills(merged);
+      } catch (err) {
+        console.error("Failed to fetch filtered lessons:", err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     fetchFilteredLessons(filter, debouncedSearch);
@@ -113,14 +148,14 @@ export default function SkillsListPage() {
         {/* Search Bar */}
         <SearchBar
           value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search skills (e.g., Python, JavaScript, Beginners)..."
           onClear={() => setSearchQuery("")}
         />
 
         {/* Category Filter */}
         <div className="mb-8 flex flex-wrap gap-2 justify-center">
-          {categories.map(cat => (
+          {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setFilter(cat)}
@@ -138,17 +173,20 @@ export default function SkillsListPage() {
         {/* Search Results Info */}
         {searchQuery.trim() && !loading && (
           <div className="mb-4 text-center text-gray-600">
-            Found {skills.length} result{skills.length !== 1 ? 's' : ''} for "{searchQuery}"
+            Found {skills.length} result
+            {skills.length !== 1 ? "s" : ""} for "{searchQuery}"
           </div>
         )}
 
         {/* Skills Grid */}
         {loading ? (
-          <div className="text-center text-gray-500 text-lg">Loading skills...</div>
+          <div className="text-center text-gray-500 text-lg">
+            Loading skills...
+          </div>
         ) : skills.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {skills.map(skill => (
-              <SkillCard key={skill.id} skill={skill} />
+            {skills.map((skill) => (
+              <SkillCard key={skill.id ?? skill.title} skill={skill} />
             ))}
           </div>
         ) : (
@@ -156,8 +194,7 @@ export default function SkillsListPage() {
             <p className="text-gray-500 text-lg mb-2">
               {searchQuery.trim()
                 ? `No skills found matching "${searchQuery}"`
-                : "No skills found in this category."
-              }
+                : "No skills found in this category."}
             </p>
             {searchQuery.trim() && (
               <button
