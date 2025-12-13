@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { Home, BookOpen, Users, Layers } from "lucide-react";
 import Header from "../shared/header/Header";
 import ProfileSidebar from "./ProfileSidebar";
 import ProfileLessons from "./ProfileLessons";
@@ -34,6 +35,22 @@ export default function ProfilePage() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
 
+  // Detect URL section
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section === "skills") {
+      setActiveSection("skills");
+    } else if (section === "swap") {
+      setActiveSection("swap");
+    } else if (section === "messages") {
+      setActiveSection("messages");
+    } else if (section === "profile") {
+      setActiveSection("profile");
+    } else {
+      setActiveSection("dashboard");
+    }
+  }, [searchParams]);
+
   // Handle Accept (with notifications)
   const handleAccept = async (requestId: string) => {
     try {
@@ -44,13 +61,11 @@ export default function ProfilePage() {
 
       const requestData = requestSnap.data();
 
-      // update request
       await updateDoc(requestRef, {
         status: "accepted",
         updatedAt: new Date(),
       });
 
-      // notify requester
       await addDoc(collection(db, "notifications"), {
         userId: requestData.requesterId,
         type: "requestAccepted",
@@ -62,7 +77,6 @@ export default function ProfilePage() {
         read: false,
       });
 
-      // remove from UI
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
     } catch (err) {
       console.error("Accept error:", err);
@@ -80,13 +94,11 @@ export default function ProfilePage() {
 
       const requestData = requestSnap.data();
 
-      // update request
       await updateDoc(requestRef, {
         status: "rejected",
         updatedAt: new Date(),
       });
 
-      // notify requester
       await addDoc(collection(db, "notifications"), {
         userId: requestData.requesterId,
         type: "requestRejected",
@@ -98,29 +110,12 @@ export default function ProfilePage() {
         read: false,
       });
 
-      // remove from UI
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
     } catch (err) {
       console.error("Decline error:", err);
       alert("Failed to decline request.");
     }
   };
-
-  // Detect URL section
-  useEffect(() => {
-    const section = searchParams.get("section");
-    if (section === "skills") {
-      setActiveSection("skills");
-    } else if (section === "swap") {
-      setActiveSection("swap");
-    } else if (section === "messages") {
-      setActiveSection("messages");
-    } else if (section === "profile") {
-      setActiveSection("profile");
-    } else {
-      setActiveSection("dashboard");
-    }
-  }, [searchParams]);
 
   // Real-time Pending Requests Fetch
   useEffect(() => {
@@ -156,7 +151,9 @@ export default function ProfilePage() {
               try {
                 const userDoc = await getDoc(doc(db, "users", requesterId));
                 if (userDoc.exists()) requesterProfile = userDoc.data();
-              } catch {}
+              } catch {
+                // ignore
+              }
             }
 
             temp.push({
@@ -194,8 +191,10 @@ export default function ProfilePage() {
 
   // Pending Requests Cards
   const PendingRequestsSection = () => (
-    <div className="mt-8 mb-3">
-      <h2 className="text-xl font-semibold mb-4">Pending Swap Requests</h2>
+    <div className="mt-4 sm:mt-6 md:mt-8 mb-3">
+      <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
+        Pending Swap Requests
+      </h2>
 
       {loadingRequests && (
         <p className="text-gray-500 text-sm mb-3">Loading requests...</p>
@@ -205,24 +204,23 @@ export default function ProfilePage() {
         <p className="text-gray-500 text-sm mb-3">No pending requests</p>
       )}
 
-      {/* Responsive grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
         {pendingRequests.map((req) => (
           <div
             key={req.id}
-            className="border rounded-xl p-4 shadow-sm bg-white flex flex-col items-center text-center"
+            className="border rounded-xl p-3 sm:p-4 shadow-sm bg-white flex flex-col items-center text-center hover:shadow-md transition-shadow"
           >
             <img
               src={req.requesterPhoto}
               alt={req.requesterName}
-              className="w-12 h-12 rounded-full object-cover mb-2"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mb-2"
             />
 
-            <p className="font-semibold text-sm text-purple-700 truncate w-full">
+            <p className="font-semibold text-xs sm:text-sm text-purple-700 truncate w-full px-1">
               {req.requesterName}
             </p>
 
-            <div className="mt-1 text-xs w-full">
+            <div className="mt-1 text-xs w-full px-1">
               <p className="text-gray-600 truncate">
                 wants:{" "}
                 <span className="font-medium">
@@ -241,14 +239,14 @@ export default function ProfilePage() {
             <div className="flex gap-2 mt-3 w-full justify-center">
               <button
                 onClick={() => handleAccept(req.id)}
-                className="px-3 py-1 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700"
+                className="px-2.5 sm:px-3 py-1 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
               >
                 Accept
               </button>
 
               <button
                 onClick={() => handleDecline(req.id)}
-                className="px-3 py-1 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600"
+                className="px-2.5 sm:px-3 py-1 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
               >
                 Reject
               </button>
@@ -259,37 +257,75 @@ export default function ProfilePage() {
     </div>
   );
 
+  // Bottom Navigation with global links (old hamburger items)
+  const BottomNavigation = () => {
+    const menuItems = [
+      {
+        key: "home",
+        label: "Home",
+        path: "/dash-board",
+        icon: <Home className="w-5 h-5" />,
+      },
+      {
+        key: "skills",
+        label: "My Skills",
+        path: "/profile?section=skills",
+        icon: <Layers className="w-5 h-5" />,
+      },
+      {
+        key: "learn",
+        label: "Learn",
+        path: "/my-requests",
+        icon: <BookOpen className="w-5 h-5" />,
+      },
+      {
+        key: "teach",
+        label: "Teach",
+        path: "/swap-requests",
+        icon: <Users className="w-5 h-5" />,
+      },
+    ];
+
+    return (
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg md:hidden">
+        <div className="flex items-stretch h-16">
+          {menuItems.map((item) => (
+            <a
+              key={item.key}
+              href={item.path}
+              className="flex-1 flex flex-col items-center justify-center gap-1 text-gray-500 hover:text-gray-700"
+            >
+              {item.icon}
+              <span className="text-xs font-medium">{item.label}</span>
+            </a>
+          ))}
+        </div>
+      </nav>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Fixed Header (make sure Header root has fixed + full width classes) */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header should include the hamburger icon that toggles mobileMenuOpen */}
       <Header
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
       />
 
-      {/* Main content with top padding to account for fixed header */}
-      <div className="flex flex-1 pt-20 flex-col md:flex-row">
-        {/* Sidebar: full width on mobile, fixed width on md+; toggle with mobileMenuOpen */}
-        <div
-          className={`
-            md:block
-            ${mobileMenuOpen ? "block" : "hidden"}
-            w-full md:w-64 lg:w-72 flex-shrink-0 border-r bg-white
-          `}
-        >
-          <ProfileSidebar
-            mobileMenuOpen={mobileMenuOpen}
-            setMobileMenuOpen={setMobileMenuOpen}
-            setActiveSection={setActiveSection}
-            activeSection={activeSection}
-          />
-        </div>
+      {/* Sidebar (desktop fixed + mobile drawer via hamburger) */}
+      <ProfileSidebar
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+        setActiveSection={setActiveSection}
+        activeSection={activeSection}
+      />
 
-        {/* Main content area */}
-        <main className="flex-1 px-4 sm:px-6 lg:px-10 py-6 lg:py-8 max-w-6xl mx-auto w-full">
+      {/* Main content area */}
+      <main className="min-h-screen pt-20 sm:pt-24 md:pt-28 pb-20 md:pb-10 md:ml-64 lg:ml-72">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 max-w-7xl mx-auto w-full">
           {activeSection === "dashboard" && (
             <>
-              <h1 className="text-2xl sm:text-3xl font-bold mb-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 sm:mb-3">
                 {loading ? (
                   "Loading..."
                 ) : user && user.displayName ? (
@@ -301,20 +337,27 @@ export default function ProfilePage() {
                   "Welcome!"
                 )}
               </h1>
-              <p className="text-gray-500 mb-6 text-sm sm:text-base">
-                Here's what's happening on SkillSwap today.
+              <p className="text-gray-500 mb-6 sm:mb-8 md:mb-10 text-xs sm:text-sm md:text-base">
+                Here&apos;s what&apos;s happening on SkillSwap today.
               </p>
               <PendingRequestsSection />
-              <ProfileLessons />
-              <ProfileMessages />
+              <div className="mt-6 sm:mt-8">
+                <ProfileLessons />
+              </div>
+              <div className="mt-6 sm:mt-8">
+                <ProfileMessages />
+              </div>
             </>
           )}
           {activeSection === "skills" && <MySkills />}
           {activeSection === "messages" && <ProfileMessages />}
           {activeSection === "swap" && <AcceptedSwapRequests />}
           {activeSection === "profile" && <EditProfile />}
-        </main>
-      </div>
+        </div>
+      </main>
+
+      {/* Bottom Tab Navigation - Mobile Only */}
+      <BottomNavigation />
     </div>
   );
 }

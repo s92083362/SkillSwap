@@ -70,13 +70,13 @@ export default function AudioCall({
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
-  
+
   // Chat state
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
-  
+
   // File upload state
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -108,6 +108,56 @@ export default function AudioCall({
     const snap = await getDoc(ref);
     if (!snap.exists()) return;
     await deleteDoc(ref);
+  };
+
+  // helper: write call log message into chat history
+  const saveCallMessage = async (status: "completed" | "missed" | "rejected" | "cancelled") => {
+    try {
+      const callId = callDocIdRef.current;
+      let durationSec: number | null = null;
+
+      if (callId) {
+        const callRef = doc(db, "calls", callId);
+        const snap = await getDoc(callRef);
+        if (snap.exists()) {
+          const data: any = snap.data();
+          const started = data?.answeredAt || data?.timestamp;
+          const ended = data?.endedAt;
+          if (started?.toMillis && ended?.toMillis) {
+            durationSec = Math.max(
+              0,
+              Math.round((ended.toMillis() - started.toMillis()) / 1000)
+            );
+          }
+        }
+      }
+
+      const direction: "incoming" | "outgoing" =
+        isReceivingCall && !isCalling ? "incoming" : "outgoing";
+
+      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+        senderId: currentUserId,
+        senderName: currentUserName,
+        content: "",
+        type: "audio-call",
+        fileUrl: null,
+        fileName: null,
+        callStatus: status,
+        callDuration: durationSec,
+        callDirection: direction,
+        timestamp: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, "privateChats", chatId), {
+        lastMessage:
+          status === "missed"
+            ? "Missed audio call"
+            : "Audio call",
+        lastUpdated: serverTimestamp(),
+      });
+    } catch (e) {
+      console.error("Failed to save call message:", e);
+    }
   };
 
   useEffect(() => {
@@ -209,6 +259,8 @@ export default function AudioCall({
         if (!hasEndedRef.current) {
           hasEndedRef.current = true;
           setCallStatus("Call ended");
+          // treat as completed if it was connected, otherwise missed
+          saveCallMessage(isConnected ? "completed" : "missed");
           setTimeout(() => {
             cleanup(true);
             onClose();
@@ -278,6 +330,7 @@ export default function AudioCall({
       if (!hasEndedRef.current) {
         hasEndedRef.current = true;
         setCallStatus("Call ended");
+        saveCallMessage(isConnected ? "completed" : "missed");
         setTimeout(() => {
           cleanup(true);
           onClose();
@@ -374,6 +427,7 @@ export default function AudioCall({
         declined: true,
         declinedAt: serverTimestamp(),
       });
+      await saveCallMessage("rejected");
       setTimeout(async () => {
         if (callDocIdRef.current) await safeDeleteCall(callDocIdRef.current);
       }, 400);
@@ -396,6 +450,7 @@ export default function AudioCall({
         endedBy: currentUserId,
         endedAt: serverTimestamp(),
       });
+      await saveCallMessage(isConnected ? "completed" : "cancelled");
       setTimeout(async () => {
         if (callDocIdRef.current) await safeDeleteCall(callDocIdRef.current);
       }, 400);
@@ -554,7 +609,7 @@ export default function AudioCall({
         {/* Main call interface */}
         <div className="bg-gray-900 text-white rounded-2xl p-8 w-full max-w-sm flex flex-col items-center gap-4 shadow-2xl">
           <p className="text-sm text-gray-300">
-            {isConnected ? "Audio call in progress" : callStatus}
+            {isConnected ? "Connected" : callStatus}
           </p>
           <h2 className="text-2xl font-semibold">{otherUserName}</h2>
 

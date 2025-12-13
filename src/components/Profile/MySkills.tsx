@@ -2,14 +2,22 @@
 import React, { useEffect, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, getDocs, query, where, DocumentData } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
 
+type Lesson = {
+  id: string;
+  title: string;
+  image?: string;
+  creatorId: string;
+  // add other fields if you use them
+};
+
 export default function MyLessonsPage() {
   const router = useRouter();
-  const [user] = useAuthState(auth);
-  const [lessons, setLessons] = useState([]);
+  const [user] = useAuthState(auth as any);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -18,19 +26,24 @@ export default function MyLessonsPage() {
       setLoading(false);
       return;
     }
-    async function fetchLessons() {
+
+    async function fetchLessons(currentUserUid: string) {
       setLoading(true);
       try {
-        // Only fetch lessons created by the current user
         const lessonsQuery = query(
           collection(db, "lessons"),
-          where("creatorId", "==", user.uid)
+          where("creatorId", "==", currentUserUid)
         );
         const snapshot = await getDocs(lessonsQuery);
-        const lessonList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const lessonList: Lesson[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as DocumentData;
+          return {
+            id: docSnap.id,
+            title: data.title ?? "",
+            image: data.image,
+            creatorId: data.creatorId ?? "",
+          };
+        });
         setLessons(lessonList);
       } catch (error) {
         console.error("Could not fetch lessons:", error);
@@ -38,10 +51,11 @@ export default function MyLessonsPage() {
         setLoading(false);
       }
     }
-    fetchLessons();
+
+    fetchLessons(user.uid);
   }, [user]);
 
-  const handleManage = (lessonId) => {
+  const handleManage = (lessonId: string) => {
     router.push(`/lessons/manage/${lessonId}`);
   };
 

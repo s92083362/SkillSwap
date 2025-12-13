@@ -1,9 +1,7 @@
-// app/chat/page.tsx (or pages/chat/index.tsx)
-"use client";
+'use client';
 
-import React, { useState, useEffect, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { db } from "../../../lib/firebase/firebaseConfig";
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   collection,
   addDoc,
@@ -15,51 +13,82 @@ import {
   doc,
   where,
   getDocs,
-} from "firebase/firestore";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useTrackUserActivity } from "@/hooks/useTrackUserActivity";
-import { useAllUsers } from "@/hooks/useAllUsers";
-import { useActiveUsers } from "@/hooks/useActiveUsers";
-import MessageBubble from "../../../components/chat/MessageBubble";
-import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
-import {
-  PhotoIcon,
-  VideoCameraIcon,
-  PhoneIcon,
-} from "@heroicons/react/24/solid";
-import VideoCall from "../../../components/chat/VideoCall";
-import AudioCall from "../../../components/chat/AudioCall";
+  FirestoreDataConverter,
+  QueryDocumentSnapshot,
+  SnapshotOptions,
+} from 'firebase/firestore';
+import { db } from '../../../lib/firebase/firebaseConfig';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useTrackUserActivity } from '@/hooks/useTrackUserActivity';
+import { useAllUsers } from '@/hooks/useAllUsers';
+import { useActiveUsers } from '@/hooks/useActiveUsers';
+import MessageBubble from '../../../components/chat/MessageBubble';
+import { uploadChatFileToCloudinary } from '@/lib/cloudinary/uploadChatFile';
+import { PhotoIcon, VideoCameraIcon, PhoneIcon } from '@heroicons/react/24/solid';
+import VideoCall from '../../../components/chat/VideoCall';
+import AudioCall from '../../../components/chat/AudioCall';
+
+type ChatUser = {
+  uid: string;
+  displayName?: string | null;
+  email?: string | null;
+  photoURL?: string | null;
+  photoUrl?: string | null;
+};
+
+type ChatMessage = {
+  id?: string;
+  senderId: string;
+  senderName: string;
+  content: string;
+  type: 'text' | 'image' | 'file';
+  fileUrl: string | null;
+  fileName?: string | null;
+  timestamp: any;
+};
+
+type ConversationMeta = {
+  chatId: string;
+  otherUserId: string;
+  lastMessage: string;
+  lastUpdated: Date;
+  unreadCount: number;
+};
+
+type ActiveCallState = {
+  type: 'video' | 'audio';
+  autoAnswer: boolean;
+} | null;
 
 export default function ChatPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialUserId = searchParams.get("user");
-  const autoAnswerCallId = searchParams.get("callId");
-  const urlCallType = searchParams.get("callType"); // "audio" | "video" | null
+  const initialUserId = searchParams.get('user');
+  const autoAnswerCallId = searchParams.get('callId');
+  const urlCallType = searchParams.get('callType'); // "audio" | "video" | null
 
-  const user = useCurrentUser();
-  const { allUsers, error: usersError } = useAllUsers();
-  const activeUsers = useActiveUsers();
+  const user = useCurrentUser() as ChatUser | null;
+  const { allUsers, error: usersError } = useAllUsers() as {
+    allUsers: ChatUser[];
+    error: string | null;
+  };
+  const activeUsers = useActiveUsers() as ChatUser[];
 
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [input, setInput] = useState("");
-  const [showUserList, setShowUserList] = useState(true);
-  const [search, setSearch] = useState("");
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState<string>('');
+  const [showUserList, setShowUserList] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>('');
+  const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [fileCaption, setFileCaption] = useState("");
+  const [fileCaption, setFileCaption] = useState<string>('');
 
-  // unified call state: audio OR video, never both
-  const [activeCall, setActiveCall] = useState<{
-    type: "video" | "audio";
-    autoAnswer: boolean;
-  } | null>(null);
+  const [activeCall, setActiveCall] = useState<ActiveCallState>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -67,6 +96,7 @@ export default function ChatPage() {
 
   useTrackUserActivity(60000);
 
+  // click outside attach menu
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -76,31 +106,31 @@ export default function ChatPage() {
         setShowAttachMenu(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []); 
 
-  // Auto-select user from URL + auto-answer based on callType=audio|video
+  // Auto-select user from URL + auto-answer
   useEffect(() => {
     if (autoAnswerCallId && initialUserId && allUsers.length > 0 && user) {
       const targetUser = allUsers.find((u) => u.uid === initialUserId);
       if (targetUser) {
-        selectUser(targetUser);
+        void selectUser(targetUser);
 
         const typeFromUrl =
-          urlCallType === "audio" || urlCallType === "video"
-            ? (urlCallType as "audio" | "video")
-            : "video"; // default to video if missing
+          urlCallType === 'audio' || urlCallType === 'video'
+            ? (urlCallType as 'audio' | 'video')
+            : 'video';
 
         setActiveCall({ type: typeFromUrl, autoAnswer: true });
 
         const newUrl = window.location.pathname;
-        window.history.replaceState({}, "", newUrl);
+        window.history.replaceState({}, '', newUrl);
       }
     } else if (initialUserId && allUsers.length > 0 && user) {
       const targetUser = allUsers.find((u) => u.uid === initialUserId);
       if (targetUser) {
-        selectUser(targetUser);
+        void selectUser(targetUser);
       }
     }
   }, [initialUserId, autoAnswerCallId, urlCallType, allUsers, user]);
@@ -111,22 +141,22 @@ export default function ChatPage() {
 
     const fetchConversations = async () => {
       try {
-        const chatsSnapshot = await getDocs(collection(db, "privateChats"));
-        const userChats: any[] = [];
+        const chatsSnapshot = await getDocs(collection(db, 'privateChats'));
+        const userChats: ConversationMeta[] = [];
 
         for (const chatDoc of chatsSnapshot.docs) {
-          const chatData = chatDoc.data();
+          const chatData = chatDoc.data() as any;
           if (chatData.participants?.includes(user.uid)) {
             const chatId = chatDoc.id;
             const otherUserId = chatData.participants.find(
               (id: string) => id !== user.uid
-            );
+            ) as string;
 
             const unreadQueryRef = query(
-              collection(db, "messages"),
-              where("receiverId", "==", user.uid),
-              where("senderId", "==", otherUserId),
-              where("read", "==", false)
+              collection(db, 'messages'),
+              where('receiverId', '==', user.uid),
+              where('senderId', '==', otherUserId),
+              where('read', '==', false)
             );
             const unreadSnapshot = await getDocs(unreadQueryRef);
             const unreadCount = unreadSnapshot.size;
@@ -134,14 +164,14 @@ export default function ChatPage() {
             userChats.push({
               chatId,
               otherUserId,
-              lastMessage: chatData.lastMessage || "",
+              lastMessage: chatData.lastMessage || '',
               lastUpdated: chatData.lastUpdated?.toDate() || new Date(0),
               unreadCount,
             });
           }
         }
 
-        userChats.sort((a, b) => b.lastUpdated - a.lastUpdated);
+        userChats.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
         setConversations(userChats);
 
         const counts: Record<string, number> = {};
@@ -150,62 +180,60 @@ export default function ChatPage() {
         });
         setUnreadCounts(counts);
       } catch (error) {
-        console.error("Error fetching conversations:", error);
+        console.error('Error fetching conversations:', error);
       }
     };
 
-    fetchConversations();
+    void fetchConversations();
     const interval = setInterval(fetchConversations, 10000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user]); 
 
   const isUserOnline = (userId: string) =>
     activeUsers.some((u) => u.uid === userId);
 
   const getUserById = (userId: string) =>
-    allUsers.find((u) => u.uid === userId);
+    allUsers.find((u) => u.uid === userId) || null;
 
-  const usersWithConversations = conversations
+  const usersWithConversations: ChatUser[] = conversations
     .map((conv) => getUserById(conv.otherUserId))
-    .filter(Boolean) as any[];
+    .filter((u): u is ChatUser => !!u);
 
-  const usersWithoutConversations = allUsers
+  const usersWithoutConversations: ChatUser[] = allUsers
     .filter((u) => u.uid !== user?.uid)
     .filter((u) => !conversations.some((conv) => conv.otherUserId === u.uid));
 
-  const filterUsers = (users: any[]) => {
+  const filterUsers = (users: ChatUser[]): ChatUser[] => {
     if (!search.trim()) return users;
+    const term = search.toLowerCase();
     return users.filter((u) => {
-      const name = (u.displayName || "").toLowerCase();
-      const email = (u.email || "").toLowerCase();
-      return (
-        name.includes(search.toLowerCase()) ||
-        email.includes(search.toLowerCase())
-      );
+      const name = (u.displayName || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(term) || email.includes(term);
     });
   };
 
   const filteredUsersWithConv = filterUsers(usersWithConversations);
   const filteredUsersWithoutConv = filterUsers(usersWithoutConversations);
 
-  const selectUser = async (targetUser: any) => {
+  const selectUser = async (targetUser: ChatUser) => {
     if (!user) return;
     setSelectedUser(targetUser);
     setShowUserList(false);
-    const chatId = [user.uid, targetUser.uid].sort().join("_");
+    const chatId = [user.uid, targetUser.uid].sort().join('_');
 
     try {
       const unreadQueryRef = query(
-        collection(db, "messages"),
-        where("receiverId", "==", user.uid),
-        where("senderId", "==", targetUser.uid),
-        where("read", "==", false)
+        collection(db, 'messages'),
+        where('receiverId', '==', user.uid),
+        where('senderId', '==', targetUser.uid),
+        where('read', '==', false)
       );
       const unreadSnapshot = await getDocs(unreadQueryRef);
 
       const updatePromises = unreadSnapshot.docs.map((msgDoc) =>
         setDoc(
-          doc(db, "messages", msgDoc.id),
+          doc(db, 'messages', msgDoc.id),
           { read: true },
           { merge: true }
         )
@@ -214,11 +242,11 @@ export default function ChatPage() {
 
       setUnreadCounts((prev) => ({ ...prev, [targetUser.uid]: 0 }));
     } catch (error) {
-      console.error("Error marking messages as read:", error);
+      console.error('Error marking messages as read:', error);
     }
 
     await setDoc(
-      doc(db, "privateChats", chatId),
+      doc(db, 'privateChats', chatId),
       {
         participants: [user.uid, targetUser.uid],
         participantNames: {
@@ -231,24 +259,32 @@ export default function ChatPage() {
     );
 
     const q = query(
-      collection(db, "privateChats", chatId, "messages"),
-      orderBy("timestamp")
+      collection(db, 'privateChats', chatId, 'messages'),
+      orderBy('timestamp')
     );
     const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setMessages(
+        snapshot.docs.map(
+          (d) =>
+            ({
+              id: d.id,
+              ...(d.data() as Omit<ChatMessage, 'id'>),
+            } as ChatMessage)
+        )
+      );
     });
     return () => unsub();
   };
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]); 
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setShowAttachMenu(false);
 
-    if (file.type.startsWith("image/")) {
+    if (file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         setFilePreview(e.target?.result as string);
@@ -262,18 +298,18 @@ export default function ChatPage() {
   const cancelFileUpload = () => {
     setSelectedFile(null);
     setFilePreview(null);
-    setFileCaption("");
+    setFileCaption('');
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
   };
 
   const startVideoCall = () => {
-    setActiveCall({ type: "video", autoAnswer: false });
+    setActiveCall({ type: 'video', autoAnswer: false });
   };
 
   const startAudioCall = () => {
-    setActiveCall({ type: "audio", autoAnswer: false });
+    setActiveCall({ type: 'audio', autoAnswer: false });
   };
 
   const closeCall = () => {
@@ -282,51 +318,51 @@ export default function ChatPage() {
 
   async function sendMessage() {
     if (!user || !input.trim() || !selectedUser) return;
-    const chatId = [user.uid, selectedUser.uid].sort().join("_");
+    const chatId = [user.uid, selectedUser.uid].sort().join('_');
     const text = input.trim();
 
     try {
-      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+      await addDoc(collection(db, 'privateChats', chatId, 'messages'), {
         senderId: user.uid,
-        senderName: user.displayName || "Anonymous",
+        senderName: user.displayName || 'Anonymous',
         content: text,
-        type: "text",
+        type: 'text',
         fileUrl: null,
         fileName: null,
         timestamp: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "messages"), {
+      await addDoc(collection(db, 'messages'), {
         senderId: user.uid,
-        senderName: user.displayName || "Anonymous",
+        senderName: user.displayName || 'Anonymous',
         receiverId: selectedUser.uid,
         content: text,
-        type: "text",
+        type: 'text',
         fileUrl: null,
         conversationId: chatId,
         timestamp: serverTimestamp(),
         read: false,
       });
 
-      await addDoc(collection(db, "notifications"), {
+      await addDoc(collection(db, 'notifications'), {
         userId: selectedUser.uid,
-        type: "chat",
-        title: "New Message",
-        message: `${user.displayName || "Someone"} sent you a message: "${text.substring(
+        type: 'chat',
+        title: 'New Message',
+        message: `${user.displayName || 'Someone'} sent you a message: "${text.substring(
           0,
           50
-        )}${text.length > 50 ? "..." : ""}"`,
+        )}${text.length > 50 ? '...' : ''}"`,
         chatId,
         senderId: user.uid,
-        senderName: user.displayName || user.email || "Anonymous",
+        senderName: user.displayName || user.email || 'Anonymous',
         senderEmail: user.email,
         timestamp: serverTimestamp(),
         read: false,
-        actions: ["View"],
+        actions: ['View'],
       });
 
       await setDoc(
-        doc(db, "privateChats", chatId),
+        doc(db, 'privateChats', chatId),
         {
           lastMessage: text,
           lastUpdated: serverTimestamp(),
@@ -334,20 +370,20 @@ export default function ChatPage() {
         { merge: true }
       );
 
-      setInput("");
+      setInput('');
     } catch (error) {
-      console.error("❌ Error sending message:", error);
+      console.error('❌ Error sending message:', error);
     }
   }
 
   async function sendFileMessage() {
     if (!user || !selectedUser || !selectedFile) return;
-    const chatId = [user.uid, selectedUser.uid].sort().join("_");
+    const chatId = [user.uid, selectedUser.uid].sort().join('_');
     const file = selectedFile;
 
     const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
-      setUploadError("File size must be less than 10MB");
+      setUploadError('File size must be less than 10MB');
       setTimeout(() => setUploadError(null), 5000);
       return;
     }
@@ -358,14 +394,14 @@ export default function ChatPage() {
 
       const { url, resourceType } = await uploadChatFileToCloudinary(file);
       const isImage =
-        resourceType === "image" && file.type.startsWith("image/");
+        resourceType === 'image' && file.type.startsWith('image/');
 
-      const displayContent = fileCaption || (isImage ? "" : file.name);
-      const type = isImage ? "image" : "file";
+      const displayContent = fileCaption || (isImage ? '' : file.name);
+      const type: 'image' | 'file' = isImage ? 'image' : 'file';
 
-      await addDoc(collection(db, "privateChats", chatId, "messages"), {
+      await addDoc(collection(db, 'privateChats', chatId, 'messages'), {
         senderId: user.uid,
-        senderName: user.displayName || "Anonymous",
+        senderName: user.displayName || 'Anonymous',
         content: displayContent,
         type,
         fileUrl: url,
@@ -373,9 +409,9 @@ export default function ChatPage() {
         timestamp: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "messages"), {
+      await addDoc(collection(db, 'messages'), {
         senderId: user.uid,
-        senderName: user.displayName || "Anonymous",
+        senderName: user.displayName || 'Anonymous',
         receiverId: selectedUser.uid,
         content: displayContent,
         type,
@@ -385,26 +421,26 @@ export default function ChatPage() {
         read: false,
       });
 
-      await addDoc(collection(db, "notifications"), {
+      await addDoc(collection(db, 'notifications'), {
         userId: selectedUser.uid,
-        type: "chat",
-        title: isImage ? "New Photo" : "New File",
-        message: `${user.displayName || "Someone"} sent you a ${
-          isImage ? "photo" : "file"
+        type: 'chat',
+        title: isImage ? 'New Photo' : 'New File',
+        message: `${user.displayName || 'Someone'} sent you a ${
+          isImage ? 'photo' : 'file'
         }.`,
         chatId,
         senderId: user.uid,
-        senderName: user.displayName || user.email || "Anonymous",
+        senderName: user.displayName || user.email || 'Anonymous',
         senderEmail: user.email,
         timestamp: serverTimestamp(),
         read: false,
-        actions: ["View"],
+        actions: ['View'],
       });
 
       await setDoc(
-        doc(db, "privateChats", chatId),
+        doc(db, 'privateChats', chatId),
         {
-          lastMessage: isImage ? "📷 Photo" : `📎 ${file.name}`,
+          lastMessage: isImage ? '📷 Photo' : `📎 ${file.name}`,
           lastUpdated: serverTimestamp(),
         },
         { merge: true }
@@ -412,9 +448,9 @@ export default function ChatPage() {
 
       cancelFileUpload();
     } catch (error) {
-      console.error("❌ Error sending file message:", error);
+      console.error('❌ Error sending file message:', error);
       setUploadError(
-        error instanceof Error ? error.message : "Failed to upload file"
+        error instanceof Error ? error.message : 'Failed to upload file'
       );
       setTimeout(() => setUploadError(null), 5000);
     } finally {
@@ -429,29 +465,32 @@ export default function ChatPage() {
     0
   );
 
+  const getAvatarUrl = (u: ChatUser | null) =>
+    u?.photoURL || u?.photoUrl || '/default-avatar.png';
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
       {/* Call overlays */}
-      {activeCall?.type === "video" && selectedUser && (
+      {activeCall?.type === 'video' && selectedUser && (
         <VideoCall
           currentUserId={user.uid}
-          currentUserName={user.displayName || user.email || "Anonymous"}
+          currentUserName={user.displayName || user.email || 'Anonymous'}
           otherUserId={selectedUser.uid}
           otherUserName={
-            selectedUser.displayName || selectedUser.email || "Unknown"
+            selectedUser.displayName || selectedUser.email || 'Unknown'
           }
           onClose={closeCall}
           autoAnswer={activeCall.autoAnswer}
         />
       )}
 
-      {activeCall?.type === "audio" && selectedUser && (
+      {activeCall?.type === 'audio' && selectedUser && (
         <AudioCall
           currentUserId={user.uid}
-          currentUserName={user.displayName || user.email || "Anonymous"}
+          currentUserName={user.displayName || user.email || 'Anonymous'}
           otherUserId={selectedUser.uid}
           otherUserName={
-            selectedUser.displayName || selectedUser.email || "Unknown"
+            selectedUser.displayName || selectedUser.email || 'Unknown'
           }
           onClose={closeCall}
           autoAnswer={activeCall.autoAnswer}
@@ -473,23 +512,32 @@ export default function ChatPage() {
               ← Back
             </button>
           )}
-          <div className="min-w-0 flex-1">
+
+          {selectedUser && (
+            <img
+              src={getAvatarUrl(selectedUser)}
+              alt={selectedUser.displayName || 'User avatar'}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover flex-shrink-0"
+            />
+          )}
+
+          <div className="min-w-0">
             <h1 className="text-base sm:text-xl font-bold text-blue-900 truncate">
               {selectedUser
-                ? `${selectedUser.displayName || selectedUser.email}`
-                : "Messages"}
+                ? selectedUser.displayName || selectedUser.email
+                : 'Messages'}
             </h1>
             {selectedUser && (
               <div className="flex items-center gap-2 mt-1">
                 <span
                   className={`w-2 h-2 rounded-full ${
                     isUserOnline(selectedUser.uid)
-                      ? "bg-green-500"
-                      : "bg-gray-400"
+                      ? 'bg-green-500'
+                      : 'bg-gray-400'
                   }`}
                 ></span>
                 <span className="text-xs sm:text-sm text-gray-600">
-                  {isUserOnline(selectedUser.uid) ? "Online" : "Offline"}
+                  {isUserOnline(selectedUser.uid) ? 'Online' : 'Offline'}
                 </span>
               </div>
             )}
@@ -541,7 +589,7 @@ export default function ChatPage() {
         {/* Left: user list */}
         <div
           className={`${
-            selectedUser ? "hidden" : "flex"
+            selectedUser ? 'hidden' : 'flex'
           } md:flex w-full md:w-80 lg:w-96 bg-white md:border-r shadow-sm overflow-y-auto flex-shrink-0`}
         >
           <div className="p-3 sm:p-4 w-full">
@@ -557,6 +605,7 @@ export default function ChatPage() {
               <div className="text-red-500 mb-3 text-sm">{usersError}</div>
             )}
 
+            {/* Recent chats with avatar */}
             {filteredUsersWithConv.length > 0 && (
               <div className="mb-4">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
@@ -568,58 +617,129 @@ export default function ChatPage() {
                       (c) => c.otherUserId === u.uid
                     );
                     const unreadCount = unreadCounts[u.uid] || 0;
+                    const avatarUrl = getAvatarUrl(u);
 
                     return (
                       <li
                         key={u.uid}
-                        onClick={() => selectUser(u)}
+                        onClick={() => void selectUser(u)}
                         className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
                           selectedUser?.uid === u.uid
-                            ? "bg-blue-500 text-white"
+                            ? 'bg-blue-500 text-white'
                             : unreadCount > 0
-                            ? "bg-blue-50 hover:bg-blue-100"
-                            : "hover:bg-gray-100"
+                            ? 'bg-blue-50 hover:bg-blue-100'
+                            : 'hover:bg-gray-100'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={avatarUrl}
+                              alt={u.displayName || 'User avatar'}
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+                            />
+                            <span
+                              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                                isUserOnline(u.uid)
+                                  ? 'bg-green-500'
+                                  : 'bg-gray-400'
+                              }`}
+                            ></span>
+                          </div>
+
                           <div className="flex-1 min-w-0">
                             <div
                               className={`font-medium truncate text-sm sm:text-base ${
                                 selectedUser?.uid === u.uid
-                                  ? "text-white"
-                                  : "text-black"
+                                  ? 'text-white'
+                                  : 'text-black'
                               } ${
                                 unreadCount > 0 &&
                                 selectedUser?.uid !== u.uid
-                                  ? "font-bold"
-                                  : ""
+                                  ? 'font-bold'
+                                  : ''
                               }`}
                             >
-                              {u.displayName || "Anonymous"}
+                              {u.displayName || 'Anonymous'}
                             </div>
                             <div
                               className={`text-xs sm:text-sm truncate ${
                                 selectedUser?.uid === u.uid
-                                  ? "text-blue-100"
-                                  : "text-gray-500"
+                                  ? 'text-blue-100'
+                                  : 'text-gray-500'
                               }`}
                             >
                               {conv?.lastMessage || u.email}
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {unreadCount > 0 && (
-                              <div className="bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold">
-                                {unreadCount}
-                              </div>
-                            )}
+
+                          {unreadCount > 0 && (
+                            <div className="bg-green-500 text-white rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                              {unreadCount}
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {/* All users with avatar */}
+            {filteredUsersWithoutConv.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
+                  All Users
+                </div>
+                <ul className="flex flex-col gap-1">
+                  {filteredUsersWithoutConv.map((u) => {
+                    const avatarUrl = getAvatarUrl(u);
+                    return (
+                      <li
+                        key={u.uid}
+                        onClick={() => void selectUser(u)}
+                        className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
+                          selectedUser?.uid === u.uid
+                            ? 'bg-blue-500 text-white'
+                            : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={avatarUrl}
+                              alt={u.displayName || 'User avatar'}
+                              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+                            />
                             <span
-                              className={`w-2 h-2 rounded-full ${
+                              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${
                                 isUserOnline(u.uid)
-                                  ? "bg-green-500"
-                                  : "bg-gray-400"
+                                  ? 'bg-green-500'
+                                  : 'bg-gray-400'
                               }`}
                             ></span>
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className={`font-medium truncate text-sm sm:text-base ${
+                                selectedUser?.uid === u.uid
+                                  ? 'text-white'
+                                  : 'text-black'
+                              }`}
+                            >
+                              {u.displayName || 'Anonymous'}
+                            </div>
+                            <div
+                              className={`text-xs sm:text-sm truncate ${
+                                selectedUser?.uid === u.uid
+                                  ? 'text-blue-100'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              {u.email || 'No email'}
+                            </div>
                           </div>
                         </div>
                       </li>
@@ -629,61 +749,10 @@ export default function ChatPage() {
               </div>
             )}
 
-            {filteredUsersWithoutConv.length > 0 && (
-              <div>
-                <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
-                  All Users
-                </div>
-                <ul className="flex flex-col gap-1">
-                  {filteredUsersWithoutConv.map((u) => (
-                    <li
-                      key={u.uid}
-                      onClick={() => selectUser(u)}
-                      className={`px-3 py-2 sm:py-3 rounded-lg cursor-pointer transition-all ${
-                        selectedUser?.uid === u.uid
-                          ? "bg-blue-500 text-white"
-                          : "hover:bg-gray-100"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div
-                            className={`font-medium truncate text-sm sm:text-base ${
-                              selectedUser?.uid === u.uid
-                                ? "text-white"
-                                : "text-black"
-                            }`}
-                          >
-                            {u.displayName || "Anonymous"}
-                          </div>
-                          <div
-                            className={`text-xs sm:text-sm truncate ${
-                              selectedUser?.uid === u.uid
-                                ? "text-blue-100"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            {u.email || "No email"}
-                          </div>
-                        </div>
-                        <span
-                          className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                            isUserOnline(u.uid)
-                              ? "bg-green-500"
-                              : "bg-gray-400"
-                          }`}
-                        ></span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {filteredUsersWithConv.length === 0 &&
               filteredUsersWithoutConv.length === 0 && (
                 <div className="text-center text-gray-400 py-8 text-sm">
-                  {search ? "No users found" : "No users available"}
+                  {search ? 'No users found' : 'No users available'}
                 </div>
               )}
           </div>
@@ -692,7 +761,7 @@ export default function ChatPage() {
         {/* Right: chat area */}
         <div
           className={`${
-            selectedUser ? "flex" : "hidden md:flex"
+            selectedUser ? 'flex' : 'hidden md:flex'
           } flex-1 flex-col min-w-0`}
         >
           {selectedUser ? (
@@ -705,12 +774,12 @@ export default function ChatPage() {
                         No messages yet
                       </p>
                       <p className="text-xs sm:text-sm">
-                        Start the conversation with{" "}
+                        Start the conversation with{' '}
                         {selectedUser.displayName || selectedUser.email}!
                       </p>
                     </div>
                   ) : (
-                    messages.map((msg: any) => (
+                    messages.map((msg) => (
                       <MessageBubble
                         key={msg.id}
                         content={msg.content}
@@ -718,8 +787,8 @@ export default function ChatPage() {
                         timestamp={msg.timestamp
                           ?.toDate?.()
                           ?.toLocaleTimeString?.([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
+                            hour: '2-digit',
+                            minute: '2-digit',
                           })}
                         senderName={msg.senderName}
                         type={msg.type}
@@ -776,7 +845,7 @@ export default function ChatPage() {
                           disabled={uploading}
                           className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                         >
-                          {uploading ? "Sending..." : "Send"}
+                          {uploading ? 'Sending...' : 'Send'}
                         </button>
                         <button
                           onClick={cancelFileUpload}
@@ -793,7 +862,7 @@ export default function ChatPage() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  sendMessage();
+                  void sendMessage();
                 }}
                 className="bg-white border-t p-2 sm:p-4 flex-shrink-0"
               >
@@ -813,6 +882,9 @@ export default function ChatPage() {
                         <button
                           type="button"
                           onClick={() => {
+                            if (fileInputRef.current) {
+                              fileInputRef.current.removeAttribute('accept');
+                            }
                             fileInputRef.current?.click();
                             setShowAttachMenu(false);
                           }}
@@ -827,8 +899,8 @@ export default function ChatPage() {
                           type="button"
                           onClick={() => {
                             fileInputRef.current?.setAttribute(
-                              "accept",
-                              "image/*,video/*"
+                              'accept',
+                              'image/*,video/*'
                             );
                             fileInputRef.current?.click();
                             setShowAttachMenu(false);
@@ -853,7 +925,7 @@ export default function ChatPage() {
                         const file = e.target.files?.[0];
                         if (file) {
                           handleFileSelect(file);
-                          e.target.value = "";
+                          e.target.value = '';
                         }
                       }}
                     />
@@ -901,7 +973,7 @@ export default function ChatPage() {
                 {totalUnread > 0 && (
                   <p className="text-xs sm:text-sm text-blue-600 mt-2">
                     You have {totalUnread} unread message
-                    {totalUnread > 1 ? "s" : ""}
+                    {totalUnread > 1 ? 's' : ''}
                   </p>
                 )}
               </div>

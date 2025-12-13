@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { login, register, googleLogin, facebookLogin } from "../../lib/firebase/auth";
 
 export default function LoginAndSignup() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("signup");
+  const searchParams = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<"login" | "signup">("signup");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -13,6 +15,14 @@ export default function LoginAndSignup() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // Initialize tab from URL (?tab=login or ?tab=signup)
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab === "login" || tab === "signup") {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // Google
   const handleGoogleLogin = async () => {
@@ -29,7 +39,7 @@ export default function LoginAndSignup() {
     }
   };
 
-  // Facebook (real!)
+  // Facebook
   const handleFacebookLogin = async () => {
     setError("");
     try {
@@ -95,7 +105,6 @@ export default function LoginAndSignup() {
     router.push("/auth/forgot-password");
   };
 
-  // SVG icon for the password field
   const EyeIcon = (
     <svg className="w-5 h-5 text-blue-900" fill="currentColor" viewBox="0 0 24 24">
       <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
@@ -183,7 +192,7 @@ export default function LoginAndSignup() {
                   className="w-4 h-4 lg:w-5 lg:h-5 rounded border-2 border-gray-300 mt-1"
                 />
                 <label className="text-gray-700 text-xs lg:text-sm">
-                  I agree to the <span className="text-blue-900 font-semibold">Terms of use</span> and{' '}
+                  I agree to the <span className="text-blue-900 font-semibold">Terms of use</span> and{" "}
                   <span className="text-blue-900 font-semibold">Privacy Policy</span>
                 </label>
               </div>
@@ -194,10 +203,10 @@ export default function LoginAndSignup() {
                 SignUp
               </button>
               <p className="text-center text-gray-700 text-sm lg:text-base">
-                Already got an account?{' '}
+                Already got an account?{" "}
                 <button
                   type="button"
-                  onClick={() => { setActiveTab('login'); setError(''); setSuccess(''); }}
+                  onClick={() => { setActiveTab("login"); setError(""); setSuccess(""); }}
                   className="text-blue-900 font-semibold hover:underline"
                 >
                   Login
@@ -216,7 +225,7 @@ export default function LoginAndSignup() {
                     <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
                     <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
                     <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l-.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
                   </svg>
                 </button>
                 <button className="hover:scale-110 transition-transform" type="button" onClick={handleFacebookLogin}>
@@ -246,7 +255,8 @@ export default function LoginAndSignup() {
                   placeholder="Password"
                   value={loginData.password}
                   onChange={e => setLoginData({ ...loginData, password: e.target.value })}
-                  className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900" />
+                  className="w-full px-5 py-3 lg:py-4 bg-gray-100 rounded-full text-sm lg:text-base placeholder-gray-400 focus:outline-none text-black focus:ring-2 focus:ring-blue-900"
+                />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 transform -translate-y-1/2">
                   {EyeIcon}
                 </button>
@@ -274,7 +284,7 @@ export default function LoginAndSignup() {
                     <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
                     <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
                     <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l-.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
                   </svg>
                 </button>
                 <button className="hover:scale-110 transition-transform" type="button" onClick={handleFacebookLogin}>
@@ -286,8 +296,12 @@ export default function LoginAndSignup() {
                 </button>
               </div>
               <p className="text-center text-gray-700 text-sm lg:text-base">
-                Don't have an account?{' '}
-                <button type="button" onClick={() => { setActiveTab('signup'); setError(''); setSuccess(''); }} className="text-blue-900 font-semibold hover:underline">
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab("signup"); setError(""); setSuccess(""); }}
+                  className="text-blue-900 font-semibold hover:underline"
+                >
                   SignUp
                 </button>
               </p>

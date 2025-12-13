@@ -1,49 +1,57 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useState, useEffect, useRef, ChangeEvent, FormEvent } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { useRouter } from "next/navigation";
 import { auth, db } from "../../lib/firebase/firebaseConfig";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { updateProfile } from "firebase/auth";
-import { Upload } from "lucide-react";
+import { updateProfile, User } from "firebase/auth";
+
+type UserProfile = {
+  name?: string | null;
+  username?: string | null;
+  bio?: string | null;
+  skills?: string | null;
+  availability?: string | null;
+  photoUrl?: string | null;
+};
 
 export default function ProfilePage() {
-  const [user] = useAuthState(auth);
-  const [profile, setProfile] = useState(null);
+  const [user] = useAuthState(auth as any);
+  const router = useRouter();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
 
-  // Form states
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [skills, setSkills] = useState("");
   const [availability, setAvailability] = useState("Available for new swaps");
-  const [photoUrl, setPhotoUrl] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const IMGBB_API_KEY = process.env.NEXT_PUBLIC_IMGBB_API_KEY;
+  const IMGBB_API_KEY = process.env.NEXT_PUBLIC_IMGBB_API_KEY as string | undefined;
 
   useEffect(() => {
-    async function fetchProfile() {
-      if (!user) return;
+    async function fetchProfile(currentUser: User) {
       setLoading(true);
-      const snap = await getDoc(doc(db, "users", user.uid));
+      const snap = await getDoc(doc(db, "users", currentUser.uid));
       if (snap.exists()) {
-        const d = snap.data();
+        const d = snap.data() as UserProfile;
         setProfile(d);
-        setName(user.displayName || d.name || "");
-        setPhotoUrl(user.photoURL || d.photoUrl || null);
+        setName(currentUser.displayName || d.name || "");
+        setPhotoUrl(currentUser.photoURL || d.photoUrl || null);
         setUsername(d.username || "");
         setBio(d.bio || "");
         setSkills(d.skills || "");
         setAvailability(d.availability || "Available for new swaps");
       } else {
         setProfile(null);
-        setName(user.displayName || "");
-        setPhotoUrl(user.photoURL || null);
+        setName(currentUser.displayName || "");
+        setPhotoUrl(currentUser.photoURL || null);
         setUsername("");
         setBio("");
         setSkills("");
@@ -51,12 +59,15 @@ export default function ProfilePage() {
       }
       setLoading(false);
     }
-    fetchProfile();
+
+    if (user) {
+      fetchProfile(user);
+    }
   }, [user, editMode]);
 
-  const handlePhotoChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handlePhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !IMGBB_API_KEY) return;
     setUploading(true);
     try {
       const formData = new FormData();
@@ -65,19 +76,26 @@ export default function ProfilePage() {
         `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
         {
           method: "POST",
-          body: formData
+          body: formData,
         }
       );
       const data = await response.json();
-      if (data.success) {
-        setPhotoUrl(data.data.url);
-        if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: data.data.url });
-        if (user) await setDoc(doc(db, "users", user.uid), { photoUrl: data.data.url }, { merge: true });
+      if (data && data.success && data.data?.url) {
+        const url: string = data.data.url;
+        setPhotoUrl(url);
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { photoURL: url });
+          await setDoc(
+            doc(db, "users", auth.currentUser.uid),
+            { photoUrl: url },
+            { merge: true }
+          );
+        }
       } else {
-        alert("Failed to upload photo.");
+        window.alert("Failed to upload photo.");
       }
     } catch {
-      alert("Failed to upload photo.");
+      window.alert("Failed to upload photo.");
     }
     setUploading(false);
   };
@@ -85,8 +103,14 @@ export default function ProfilePage() {
   const handleRemovePhoto = async () => {
     setPhotoUrl(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (auth.currentUser) await updateProfile(auth.currentUser, { photoURL: "" });
-    if (user) await setDoc(doc(db, "users", user.uid), { photoUrl: "" }, { merge: true });
+    if (auth.currentUser) {
+      await updateProfile(auth.currentUser, { photoURL: "" });
+      await setDoc(
+        doc(db, "users", auth.currentUser.uid),
+        { photoUrl: "" },
+        { merge: true }
+      );
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -95,26 +119,30 @@ export default function ProfilePage() {
     try {
       await updateProfile(auth.currentUser, {
         displayName: name,
-        photoURL: photoUrl || undefined
+        photoURL: photoUrl || undefined,
       });
-      await setDoc(doc(db, "users", auth.currentUser.uid), {
-        username,
-        bio,
-        skills,
-        availability,
-        photoUrl: photoUrl || undefined
-      }, { merge: true });
-      alert("Profile updated!");
+      await setDoc(
+        doc(db, "users", auth.currentUser.uid),
+        {
+          username,
+          bio,
+          skills,
+          availability,
+          photoUrl: photoUrl || undefined,
+        },
+        { merge: true }
+      );
+      window.alert("Profile updated!");
       setEditMode(false);
-    } catch (e) {
-      alert("Failed to update profile.");
+    } catch {
+      window.alert("Failed to update profile.");
     }
     setSaving(false);
   };
 
   const handleCancelEdit = () => {
     setEditMode(false);
-    if (profile) {
+    if (profile && user) {
       setName(user.displayName || profile.name || "");
       setPhotoUrl(user.photoURL || profile.photoUrl || null);
       setUsername(profile.username || "");
@@ -124,7 +152,18 @@ export default function ProfilePage() {
     }
   };
 
-  if (!user) return <div className="text-center py-16">Please log in</div>;
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    handleSaveProfile();
+  };
+
+  if (!user) {
+    return (
+      <div className="text-center py-16">
+        Please log in
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-2 py-8">
@@ -138,25 +177,43 @@ export default function ProfilePage() {
                 <>
                   <div className="flex gap-6 items-center mb-7">
                     <img
-                      src={user.photoURL || profile?.photoUrl || "https://ui-avatars.com/api/?background=F8D5CB&color=555"}
+                      src={
+                        user.photoURL ||
+                        profile?.photoUrl ||
+                        "https://ui-avatars.com/api/?background=F8D5CB&color=555"
+                      }
                       alt="Profile"
                       className="w-24 h-24 rounded-full object-cover border shadow"
                     />
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900">{name || "No Name"}</h2>
-                      <div className="text-gray-500 text-base mb-1">{profile?.username || "No username"}</div>
-                      <div className="text-blue-500 text-xs mb-1">{profile?.availability}</div>
-                      <div className="text-gray-700 text-base">{profile?.bio || "No bio yet."}</div>
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        {name || "No Name"}
+                      </h2>
+                      <div className="text-gray-500 text-base mb-1">
+                        {profile?.username || "No username"}
+                      </div>
+                      <div className="text-blue-500 text-xs mb-1">
+                        {profile?.availability}
+                      </div>
+                      <div className="text-gray-700 text-base">
+                        {profile?.bio || "No bio yet."}
+                      </div>
                     </div>
                   </div>
                   <div className="mb-4">
                     <div className="font-semibold text-gray-700 mb-2">Skills</div>
                     <div className="flex flex-wrap gap-2">
                       {(profile?.skills || "")
-                        .split(',')
-                        .map((skill) =>
-                          <span key={skill} className="px-3 py-1 bg-blue-50 rounded text-sm text-blue-700">{skill.trim()}</span>
-                        )}
+                        .split(",")
+                        .filter((skill) => skill.trim().length > 0)
+                        .map((skill) => (
+                          <span
+                            key={skill}
+                            className="px-3 py-1 bg-blue-50 rounded text-sm text-blue-700"
+                          >
+                            {skill.trim()}
+                          </span>
+                        ))}
                     </div>
                   </div>
                   <button
@@ -169,28 +226,40 @@ export default function ProfilePage() {
               )}
             </div>
           ) : (
-            <form
-              onSubmit={e => {
-                e.preventDefault();
-                handleSaveProfile();
-              }}
-            >
+            <form onSubmit={handleSubmit}>
               <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-900 mb-4">Profile Photo</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-4">
+                  Profile Photo
+                </label>
                 <div className="flex items-center gap-4 flex-col sm:flex-row">
                   <div className="w-24 h-24 rounded-full bg-gradient-to-br from-amber-200 to-amber-300 flex items-center justify-center overflow-hidden">
                     {photoUrl ? (
-                      <img src={photoUrl} alt="Profile" className="object-cover w-full h-full" />
+                      <img
+                        src={photoUrl}
+                        alt="Profile"
+                        className="object-cover w-full h-full"
+                      />
                     ) : (
                       <div className="w-full h-full flex items-end justify-center">
                         <svg viewBox="0 0 100 100" className="w-full h-full">
-                          <circle cx="50" cy="45" r="18" fill="#8B7355"/>
-                          <path d="M 30 100 Q 30 65 50 65 Q 70 65 70 100" fill="#D4A574"/>
-                          <circle cx="50" cy="35" r="15" fill="#F4D4A8"/>
-                          <path d="M 35 30 Q 35 20 50 22 Q 65 20 65 30" fill="#3B3B3B"/>
-                          <circle cx="45" cy="35" r="2" fill="#2C2C2C"/>
-                          <circle cx="55" cy="35" r="2" fill="#2C2C2C"/>
-                          <path d="M 46 42 Q 50 44 54 42" stroke="#D4A574" strokeWidth="1.5" fill="none"/>
+                          <circle cx="50" cy="45" r="18" fill="#8B7355" />
+                          <path
+                            d="M 30 100 Q 30 65 50 65 Q 70 65 70 100"
+                            fill="#D4A574"
+                          />
+                          <circle cx="50" cy="35" r="15" fill="#F4D4A8" />
+                          <path
+                            d="M 35 30 Q 35 20 50 22 Q 65 20 65 30"
+                            fill="#3B3B3B"
+                          />
+                          <circle cx="45" cy="35" r="2" fill="#2C2C2C" />
+                          <circle cx="55" cy="35" r="2" fill="#2C2C2C" />
+                          <path
+                            d="M 46 42 Q 50 44 54 42"
+                            stroke="#D4A574"
+                            strokeWidth="1.5"
+                            fill="none"
+                          />
                         </svg>
                       </div>
                     )}
@@ -226,7 +295,9 @@ export default function ProfilePage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Name</label>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Name
+                  </label>
                   <input
                     type="text"
                     value={name}
@@ -235,7 +306,9 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">Username</label>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Username
+                  </label>
                   <input
                     type="text"
                     value={username}
@@ -245,7 +318,9 @@ export default function ProfilePage() {
                 </div>
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Bio</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Bio
+                </label>
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
@@ -254,17 +329,23 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Skills</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Skills
+                </label>
                 <input
                   type="text"
                   value={skills}
                   onChange={(e) => setSkills(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
                 />
-                <p className="text-sm text-gray-500 mt-2">Separate skills with commas.</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  Separate skills with commas.
+                </p>
               </div>
               <div className="mb-8">
-                <label className="block text-sm font-semibold text-gray-900 mb-2">Availability</label>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Availability
+                </label>
                 <select
                   value={availability}
                   onChange={(e) => setAvailability(e.target.value)}
