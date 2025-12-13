@@ -2,7 +2,13 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 
-const members = [
+interface Member {
+  name: string;
+  role: string;
+  img: string;
+}
+
+const members: Member[] = [
   { name: "R.M.B.P.B. Weerakoon", role: "Lead Engineer / Fullstack", img: "https://ik.imagekit.io/gopichakradhar/luffy/o1.jpeg?updatedAt=1754289569411" },
   { name: "R.M.Y.C.K. Rathnayake", role: "UI/UX Designer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o2.jpeg?updatedAt=1754289569307" },
   { name: "D.M.S. Eswarage", role: "Backend Developer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o4.jpeg?updatedAt=1754289569398" },
@@ -10,7 +16,9 @@ const members = [
   { name: "W.K. Amila Sandaruwan", role: "QA Engineer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o5.jpeg?updatedAt=1754289569406" }
 ];
 
-function getPosition(idx, current, length) {
+type Position = "center" | "down-1" | "down-2" | "up-1" | "up-2" | "hidden";
+
+function getPosition(idx: number, current: number, length: number): Position {
   const offset = (idx - current + length) % length;
   if (offset === 0) return "center";
   if (offset === 1) return "down-1";
@@ -26,7 +34,7 @@ export default function TeamCarousel() {
   const [nameOpacity, setNameOpacity] = useState(1);
   const length = members.length;
 
-  const goTo = useCallback((idx) => {
+  const goTo = useCallback((idx: number) => {
     if (isAnimating) return;
     setIsAnimating(true);
     setNameOpacity(0);
@@ -46,7 +54,7 @@ export default function TeamCarousel() {
 
   // Keyboard navigation
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowUp") prev();
       if (e.key === "ArrowDown") next();
     };
@@ -56,11 +64,11 @@ export default function TeamCarousel() {
 
   // Swipe navigation for mobile
   useEffect(() => {
-    let touchStart = null;
-    const onTouchStart = (e) => {
+    let touchStart: number | null = null;
+    const onTouchStart = (e: TouchEvent) => {
       touchStart = e.changedTouches[0].screenY;
     };
-    const onTouchEnd = (e) => {
+    const onTouchEnd = (e: TouchEvent) => {
       if (touchStart !== null) {
         const diff = touchStart - e.changedTouches[0].screenY;
         if (Math.abs(diff) > 50) diff > 0 ? next() : prev();

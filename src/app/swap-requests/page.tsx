@@ -15,23 +15,44 @@ import {
 import Header from "../../components/shared/header/Header";
 import { useRouter } from "next/navigation";
 
+interface SwapRequest {
+  id: string;
+  creatorId: string;
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  requestedLessonTitle: string;
+  offeredSkillTitle: string;
+  offeredSkillId?: string;
+  message?: string;
+  status: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  requesterAvatar: string | null;
+}
+
 export default function SwapRequestsPage() {
   const [user] = useAuthState(auth);
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<SwapRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "accepted" | "rejected">("all");
   const [showChatDialog, setShowChatDialog] = useState(false);
-  const [acceptedRequestData, setAcceptedRequestData] = useState<any>(null);
+  const [acceptedRequestData, setAcceptedRequestData] = useState<SwapRequest | null>(null);
 
   const getAvatarUrl = (u: any) =>
     u?.photoURL || u?.photoUrl || "/default-avatar.png";
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     async function fetchSwapRequests() {
+      if (!user) return;
+      
       try {
         const qRef = query(
           collection(db, "swapRequests"),
@@ -39,7 +60,7 @@ export default function SwapRequestsPage() {
         );
         const snapshot = await getDocs(qRef);
 
-        const swapRequests: any[] = [];
+        const swapRequests: SwapRequest[] = [];
         for (const d of snapshot.docs) {
           const data = d.data();
           const createdAt = data.createdAt?.toDate?.() || null;
@@ -55,17 +76,29 @@ export default function SwapRequestsPage() {
 
           swapRequests.push({
             id: d.id,
-            ...data,
+            creatorId: data.creatorId,
+            requesterId: data.requesterId,
+            requesterName: data.requesterName,
+            requesterEmail: data.requesterEmail,
+            requestedLessonTitle: data.requestedLessonTitle,
+            offeredSkillTitle: data.offeredSkillTitle,
+            offeredSkillId: data.offeredSkillId,
+            message: data.message,
+            status: data.status,
             createdAt,
             updatedAt,
             requesterAvatar,
           });
         }
 
-        swapRequests.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        swapRequests.sort((a, b) => {
+          const timeA = a.createdAt?.getTime() || 0;
+          const timeB = b.createdAt?.getTime() || 0;
+          return timeB - timeA;
+        });
         setRequests(swapRequests);
-      } catch (error) {
-        console.error("Error fetching swap requests:", error);
+      } catch (err) {
+        console.error("Error fetching swap requests:", err);
       } finally {
         setLoading(false);
       }
@@ -75,6 +108,8 @@ export default function SwapRequestsPage() {
   }, [user]);
 
   async function handleUpdateStatus(requestId: string, newStatus: "accepted" | "rejected") {
+    if (!user) return;
+    
     try {
       const requestRef = doc(db, "swapRequests", requestId);
       const requestSnap = await getDoc(requestRef);
@@ -85,9 +120,9 @@ export default function SwapRequestsPage() {
         setRequests((prev) => prev.filter((req) => req.id !== requestId));
         return;
       }
-      const requestData = requestSnap.data() as any;
+      const requestData = requestSnap.data();
 
-      if (requestData.creatorId !== user?.uid) {
+      if (requestData.creatorId !== user.uid) {
         alert("You don't have permission to update this request.");
         return;
       }
@@ -132,28 +167,25 @@ export default function SwapRequestsPage() {
       );
 
       if (newStatus === "accepted") {
-        const currentRequest =
-          requests.find((req) => req.id === requestId) || {
-            id: requestId,
-            ...requestData,
-          };
-        setAcceptedRequestData(currentRequest);
-        setShowChatDialog(true);
+        const currentRequest = requests.find((req) => req.id === requestId);
+        if (currentRequest) {
+          setAcceptedRequestData(currentRequest);
+          setShowChatDialog(true);
+        }
       } else {
         alert(`Request ${newStatus} successfully!`);
       }
-    } catch (error: any) {
-      console.error("Error updating request:", error);
-      alert(`Failed to update request: ${error.message}`);
+    } catch (err) {
+      console.error("Error updating request:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      alert(`Failed to update request: ${errorMessage}`);
     }
   }
 
   function handleGoToChat() {
     if (acceptedRequestData?.requesterId) {
-      // Navigate to chat with the specific requester
       router.push(`/chat/messages?user=${acceptedRequestData.requesterId}`);
     } else {
-      // Fallback to general chat page
       router.push("/chat/messages");
     }
   }

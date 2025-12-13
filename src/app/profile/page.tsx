@@ -1,9 +1,14 @@
-// src/app/profile/page.tsx
-import ProfilePage from "../../components/Profile/ProfilePage";
+"use client";
+
+import { Suspense } from "react";
+import ProfilePageInner from "../../components/Profile/ProfilePageInner";
+
 export default function ProfileRoute() {
   return (
-    <main>
-      <ProfilePage />
-    </main>
+    <Suspense fallback={null}>
+      <main>
+        <ProfilePageInner />
+      </main>
+    </Suspense>
   );
 }
