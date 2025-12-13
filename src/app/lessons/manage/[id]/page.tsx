@@ -1,11 +1,28 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  ChangeEvent,
+  MutableRefObject,
+} from 'react';
 import { Trash2, Plus, X, ArrowLeft, Eye, Edit } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebaseConfig';
 
-function initialSection() {
+type Section = {
+  title: string;
+  content: string;
+  videoUrl: string;
+  videoFileName: string;
+  isUploading: boolean;
+  progress: number;
+  error: string | null;
+};
+
+function initialSection(): Section {
   return {
     title: '',
     content: '',
@@ -19,36 +36,36 @@ function initialSection() {
 
 export default function ManageLessonPage() {
   const router = useRouter();
-  const params = useParams();
-  const lessonId = params.id;
+  const params = useParams<{ id: string }>();
+  const lessonId = params?.id;
 
   // Mode: 'preview' or 'edit'
-  const [mode, setMode] = useState('preview');
-  
+  const [mode, setMode] = useState<'preview' | 'edit'>('preview');
+
   // Meta fields
-  const [lessonTitle, setLessonTitle] = useState('');
-  const [lessonDesc, setLessonDesc] = useState('');
-  const [skillCategory, setSkillCategory] = useState('');
-  const [instructor, setInstructor] = useState('');
-  const [lessonImage, setLessonImage] = useState('');
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [imageProgress, setImageProgress] = useState(0);
-  const imageInputRef = useRef(null);
+  const [lessonTitle, setLessonTitle] = useState<string>('');
+  const [lessonDesc, setLessonDesc] = useState<string>('');
+  const [skillCategory, setSkillCategory] = useState<string>('');
+  const [instructor, setInstructor] = useState<string>('');
+  const [lessonImage, setLessonImage] = useState<string>('');
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
+  const [imageProgress, setImageProgress] = useState<number>(0);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sections array
-  const [sections, setSections] = useState([initialSection()]);
-  const fileInputRefs = useRef([]);
-  
+  const [sections, setSections] = useState<Section[]>([initialSection()]);
+  const fileInputRefs = useRef<HTMLInputElement[]>([]);
+
   // Loading states
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Fetch lesson data
   useEffect(() => {
     async function fetchLesson() {
       console.log('Fetching lesson with ID:', lessonId);
-      
+
       if (!lessonId) {
         console.error('No lesson ID provided');
         alert('No lesson ID provided');
@@ -60,56 +77,61 @@ export default function ManageLessonPage() {
       try {
         const docRef = doc(db, 'lessons', lessonId);
         const docSnap = await getDoc(docRef);
-        
+
         console.log('Lesson exists:', docSnap.exists());
-        
+
         if (docSnap.exists()) {
-          const data = docSnap.data();
+          const data = docSnap.data() as any;
+
           console.log('Lesson data:', data);
-          
+
           setLessonTitle(data.title || '');
           setLessonDesc(data.description || '');
           setSkillCategory(data.skillCategory || '');
           setInstructor(data.instructor || '');
           setLessonImage(data.image || '');
-          setSections(data.sections?.map(s => ({
-            ...s,
-            videoFileName: '',
-            isUploading: false,
-            progress: 0,
-            error: null,
-          })) || [initialSection()]);
+          setSections(
+            (data.sections || []).map((s: any): Section => ({
+              title: s.title || '',
+              content: s.content || '',
+              videoUrl: s.videoUrl || '',
+              videoFileName: '',
+              isUploading: false,
+              progress: 0,
+              error: null,
+            })) || [initialSection()]
+          );
         } else {
           console.error('Lesson not found in database');
           alert('Lesson not found');
-          router.push('/profile'); // Update this to your My Skills route
+          router.push('/profile');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching lesson:', error);
         alert('Failed to load lesson: ' + error.message);
-        router.push('/profile'); // Update this to your My Skills route;
+        router.push('/profile');
       } finally {
         setIsLoading(false);
       }
     }
-    
+
     fetchLesson();
   }, [lessonId, router]);
 
   // Add a new section
   const handleAddSection = () => {
-    setSections(secs => [...secs, initialSection()]);
+    setSections((secs) => [...secs, initialSection()]);
   };
 
   // Remove a section
-  const handleRemoveSection = idx => {
-    setSections(secs => secs.filter((_, i) => i !== idx));
+  const handleRemoveSection = (idx: number) => {
+    setSections((secs) => secs.filter((_, i) => i !== idx));
   };
 
   // Handle video upload for a section
-  const handleVideoUpload = async (file, idx) => {
+  const handleVideoUpload = async (file: File | undefined, idx: number) => {
     if (!file) return;
-    setSections(secs =>
+    setSections((secs) =>
       secs.map((s, i) =>
         i === idx
           ? {
@@ -126,18 +148,20 @@ export default function ManageLessonPage() {
     formData.append('file', file);
     try {
       const xhr = new XMLHttpRequest();
-      xhr.upload.addEventListener('progress', e => {
+      xhr.upload.addEventListener('progress', (e: ProgressEvent<EventTarget>) => {
         if (e.lengthComputable) {
           const percent = Math.round((e.loaded / e.total) * 100);
-          setSections(secs =>
-            secs.map((s, i) => i === idx ? { ...s, progress: percent } : s)
+          setSections((secs) =>
+            secs.map((s, i) =>
+              i === idx ? { ...s, progress: percent } : s
+            )
           );
         }
       });
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
-          const res = JSON.parse(xhr.responseText);
-          setSections(secs =>
+          const res = JSON.parse(xhr.responseText) as { url: string };
+          setSections((secs) =>
             secs.map((s, i) =>
               i === idx
                 ? {
@@ -150,7 +174,7 @@ export default function ManageLessonPage() {
             )
           );
         } else {
-          setSections(secs =>
+          setSections((secs) =>
             secs.map((s, i) =>
               i === idx
                 ? {
@@ -164,7 +188,7 @@ export default function ManageLessonPage() {
         }
       });
       xhr.addEventListener('error', () => {
-        setSections(secs =>
+        setSections((secs) =>
           secs.map((s, i) =>
             i === idx
               ? {
@@ -178,8 +202,8 @@ export default function ManageLessonPage() {
       });
       xhr.open('POST', '/api/upload-video');
       xhr.send(formData);
-    } catch (error) {
-      setSections(secs =>
+    } catch {
+      setSections((secs) =>
         secs.map((s, i) =>
           i === idx
             ? {
@@ -193,8 +217,8 @@ export default function ManageLessonPage() {
     }
   };
 
-  const handleRemoveVideo = idx => {
-    setSections(secs =>
+  const handleRemoveVideo = (idx: number) => {
+    setSections((secs) =>
       secs.map((s, i) =>
         i === idx
           ? {
@@ -207,13 +231,15 @@ export default function ManageLessonPage() {
           : s
       )
     );
-    if (fileInputRefs.current[idx]) fileInputRefs.current[idx].value = '';
+    if (fileInputRefs.current[idx]) {
+      fileInputRefs.current[idx].value = '';
+    }
   };
 
   // Handle lesson image upload
-  const handleImageUpload = async (file) => {
+  const handleImageUpload = async (file: File | undefined | null) => {
     if (!file) return;
-    
+
     if (!file.type.startsWith('image/')) {
       alert('Please upload an image file');
       return;
@@ -224,20 +250,20 @@ export default function ManageLessonPage() {
 
     const formData = new FormData();
     formData.append('file', file);
-    
+
     try {
       const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', e => {
+
+      xhr.upload.addEventListener('progress', (e: ProgressEvent<EventTarget>) => {
         if (e.lengthComputable) {
           const percent = Math.round((e.loaded / e.total) * 100);
           setImageProgress(percent);
         }
       });
-      
+
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
-          const res = JSON.parse(xhr.responseText);
+          const res = JSON.parse(xhr.responseText) as { url: string };
           setLessonImage(res.url);
           setIsUploadingImage(false);
         } else {
@@ -245,12 +271,12 @@ export default function ManageLessonPage() {
           setIsUploadingImage(false);
         }
       });
-      
+
       xhr.addEventListener('error', () => {
         alert('Network error during image upload');
         setIsUploadingImage(false);
       });
-      
+
       xhr.open('POST', '/api/upload-image');
       xhr.send(formData);
     } catch (error) {
@@ -268,24 +294,25 @@ export default function ManageLessonPage() {
 
   // Save changes
   const handleBackToLessons = () => {
-    router.push('/profile'); // or wherever your My Skills page is
+    router.push('/profile');
   };
 
   const handleDeleteLesson = async () => {
     const confirmDelete = window.confirm(
       'Are you sure you want to permanently delete this lesson? This action cannot be undone.'
     );
-    
+
     if (!confirmDelete) return;
 
     setIsDeleting(true);
 
     try {
+      if (!lessonId) throw new Error('No lesson ID');
       const docRef = doc(db, 'lessons', lessonId);
       await deleteDoc(docRef);
-      
+
       alert('Lesson deleted successfully!');
-      router.push('/profile'); // Redirect to My Skills page
+      router.push('/profile');
     } catch (error) {
       console.error('Error deleting lesson:', error);
       alert('Failed to delete lesson. Please try again.');
@@ -295,7 +322,6 @@ export default function ManageLessonPage() {
   };
 
   const handleSaveChanges = async () => {
-    // Validate required fields
     if (!lessonTitle.trim()) {
       alert('Please enter a lesson title');
       return;
@@ -312,12 +338,12 @@ export default function ManageLessonPage() {
       alert('Please enter an instructor name');
       return;
     }
-    if (sections.some(s => !s.title.trim())) {
+    if (sections.some((s) => !s.title.trim())) {
       alert('Please fill in all section titles');
       return;
     }
-    
-    if (sections.some(s => s.isUploading)) {
+
+    if (sections.some((s) => s.isUploading)) {
       alert('Please wait for all videos to finish uploading');
       return;
     }
@@ -331,7 +357,7 @@ export default function ManageLessonPage() {
         skillCategory,
         instructor,
         image: lessonImage,
-        sections: sections.map(s => ({
+        sections: sections.map((s) => ({
           title: s.title,
           content: s.content,
           videoUrl: s.videoUrl,
@@ -339,12 +365,12 @@ export default function ManageLessonPage() {
         updatedAt: new Date().toISOString(),
       };
 
+      if (!lessonId) throw new Error('No lesson ID');
       const docRef = doc(db, 'lessons', lessonId);
       await updateDoc(docRef, payload);
-      
+
       alert('Lesson updated successfully!');
       setMode('preview');
-      
     } catch (error) {
       console.error('Error updating lesson:', error);
       alert('Failed to update lesson. Please try again.');
@@ -367,27 +393,29 @@ export default function ManageLessonPage() {
         {/* Header */}
         <div className="mb-8 relative">
           <button
-            onClick={() => router.push('/profile')} // Update to your My Skills route
+            onClick={() => router.push('/profile')}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />
             Back to My Lessons
           </button>
-          
+
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">
                 {mode === 'preview' ? 'Lesson Preview' : 'Edit Lesson'}
               </h1>
               <p className="text-gray-500 text-sm sm:text-base">
-                {mode === 'preview' 
-                  ? 'Review your lesson details' 
+                {mode === 'preview'
+                  ? 'Review your lesson details'
                   : 'Make changes to your lesson'}
               </p>
             </div>
-            
+
             <button
-              onClick={() => setMode(mode === 'preview' ? 'edit' : 'preview')}
+              onClick={() =>
+                setMode((prev) => (prev === 'preview' ? 'edit' : 'preview'))
+              }
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
             >
               {mode === 'preview' ? (
@@ -403,7 +431,7 @@ export default function ManageLessonPage() {
               )}
             </button>
           </div>
-          
+
           {/* Delete Button */}
           <div className="mt-4 sm:mt-0 sm:absolute sm:top-0 sm:right-0">
             <button
@@ -422,11 +450,15 @@ export default function ManageLessonPage() {
           <>
             {/* Lesson Details Card */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 md:p-8 mb-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-6">Lesson Details</h2>
-              
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-6">
+                Lesson Details
+              </h2>
+
               {lessonImage && (
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Lesson Thumbnail</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lesson Thumbnail
+                  </label>
                   <img
                     src={lessonImage}
                     alt={lessonTitle}
@@ -434,24 +466,36 @@ export default function ManageLessonPage() {
                   />
                 </div>
               )}
-              
+
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lesson Title</label>
-                <div className="text-gray-900 text-base md:text-lg">{lessonTitle}</div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Title
+                </label>
+                <div className="text-gray-900 text-base md:text-lg">
+                  {lessonTitle}
+                </div>
               </div>
-              
+
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lesson Description</label>
-                <div className="text-gray-700 text-sm md:text-base whitespace-pre-wrap">{lessonDesc}</div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Description
+                </label>
+                <div className="text-gray-700 text-sm md:text-base whitespace-pre-wrap">
+                  {lessonDesc}
+                </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Skill Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Skill Category
+                  </label>
                   <div className="text-gray-900">{skillCategory}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Instructor Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Instructor Name
+                  </label>
                   <div className="text-gray-900">{instructor}</div>
                 </div>
               </div>
@@ -459,26 +503,35 @@ export default function ManageLessonPage() {
 
             {/* Lesson Sections */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 md:p-8 mb-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-6">Lesson Sections</h2>
-              
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-6">
+                Lesson Sections
+              </h2>
+
               {sections.map((section, idx) => (
-                <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6" key={idx}>
+                <div
+                  className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-6"
+                  key={idx}
+                >
                   <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-4">
                     Section {idx + 1}: {section.title}
                   </h3>
-                  
+
                   {section.content && (
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Content
+                      </label>
                       <div className="text-gray-700 text-sm md:text-base whitespace-pre-wrap">
                         {section.content}
                       </div>
                     </div>
                   )}
-                  
+
                   {section.videoUrl && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Video</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Video
+                      </label>
                       <video
                         src={section.videoUrl}
                         controls
@@ -497,22 +550,28 @@ export default function ManageLessonPage() {
           <>
             {/* Lesson Details Card */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 md:p-8 mb-6">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-6">Lesson Details</h2>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-6">
+                Lesson Details
+              </h2>
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lesson Title</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Title
+                </label>
                 <input
                   type="text"
                   value={lessonTitle}
-                  onChange={e => setLessonTitle(e.target.value)}
+                  onChange={(e) => setLessonTitle(e.target.value)}
                   placeholder="e.g. Introduction to React Hooks"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm md:text-base"
                 />
               </div>
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lesson Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Description
+                </label>
                 <textarea
                   value={lessonDesc}
-                  onChange={e => setLessonDesc(e.target.value)}
+                  onChange={(e) => setLessonDesc(e.target.value)}
                   placeholder="Describe what your lesson is about..."
                   rows={5}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none text-sm md:text-base"
@@ -520,10 +579,12 @@ export default function ManageLessonPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Skill Category</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Skill Category
+                  </label>
                   <select
                     value={skillCategory}
-                    onChange={e => setSkillCategory(e.target.value)}
+                    onChange={(e) => setSkillCategory(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none appearance-none bg-white text-sm md:text-base"
                   >
                     <option value="">Select a category</option>
@@ -533,26 +594,32 @@ export default function ManageLessonPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Instructor Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Instructor Name
+                  </label>
                   <input
                     type="text"
                     value={instructor}
-                    onChange={e => setInstructor(e.target.value)}
+                    onChange={(e) => setInstructor(e.target.value)}
                     placeholder="Your name"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm md:text-base"
                   />
                 </div>
               </div>
-              
+
               {/* Lesson Image Upload in Edit Mode */}
               <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Lesson Thumbnail Image</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Lesson Thumbnail Image
+                </label>
                 <div className="flex flex-col gap-4">
                   <input
                     type="file"
                     ref={imageInputRef}
                     accept="image/*"
-                    onChange={e => handleImageUpload(e.target.files?.[0])}
+                    onChange={(e) =>
+                      handleImageUpload(e.target.files?.[0] ?? null)
+                    }
                     className="hidden"
                   />
                   <button
@@ -563,12 +630,16 @@ export default function ManageLessonPage() {
                   >
                     {isUploadingImage ? 'Uploading...' : 'Upload Thumbnail'}
                   </button>
-                  
+
                   {isUploadingImage && (
                     <div className="w-full">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-600">Uploading image...</span>
-                        <span className="text-sm text-gray-600">{imageProgress}%</span>
+                        <span className="text-sm text-gray-600">
+                          Uploading image...
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {imageProgress}%
+                        </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
@@ -578,7 +649,7 @@ export default function ManageLessonPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {lessonImage && !isUploadingImage && (
                     <div className="relative w-full max-w-xs">
                       <img
@@ -602,7 +673,9 @@ export default function ManageLessonPage() {
             {/* Lesson Content Card */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 md:p-8 mb-6">
               <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Lesson Sections</h2>
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                  Lesson Sections
+                </h2>
                 <button
                   type="button"
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
@@ -612,7 +685,10 @@ export default function ManageLessonPage() {
                 </button>
               </div>
               {sections.map((section, idx) => (
-                <div className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-8" key={idx}>
+                <div
+                  className="border border-gray-200 rounded-lg p-4 sm:p-6 mb-8"
+                  key={idx}
+                >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
                     <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                       Section {idx + 1}
@@ -628,13 +704,17 @@ export default function ManageLessonPage() {
                     </div>
                   </div>
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Section Title</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Section Title
+                    </label>
                     <input
                       type="text"
                       value={section.title}
-                      onChange={e =>
-                        setSections(secs =>
-                          secs.map((s, i) => i === idx ? { ...s, title: e.target.value } : s)
+                      onChange={(e) =>
+                        setSections((secs) =>
+                          secs.map((s, i) =>
+                            i === idx ? { ...s, title: e.target.value } : s
+                          )
                         )
                       }
                       placeholder="e.g. What are React Hooks?"
@@ -642,12 +722,16 @@ export default function ManageLessonPage() {
                     />
                   </div>
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Section Content</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Section Content
+                    </label>
                     <textarea
                       value={section.content}
-                      onChange={e =>
-                        setSections(secs =>
-                          secs.map((s, i) => i === idx ? { ...s, content: e.target.value } : s)
+                      onChange={(e) =>
+                        setSections((secs) =>
+                          secs.map((s, i) =>
+                            i === idx ? { ...s, content: e.target.value } : s
+                          )
                         )
                       }
                       placeholder="Add your detailed section content here..."
@@ -656,15 +740,21 @@ export default function ManageLessonPage() {
                     />
                   </div>
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Section Video</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Section Video
+                    </label>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                       <input
                         type="text"
                         placeholder="Or paste a video URL"
                         value={section.videoUrl}
-                        onChange={e =>
-                          setSections(secs =>
-                            secs.map((s, i) => i === idx ? { ...s, videoUrl: e.target.value } : s)
+                        onChange={(e) =>
+                          setSections((secs) =>
+                            secs.map((s, i) =>
+                              i === idx
+                                ? { ...s, videoUrl: e.target.value }
+                                : s
+                            )
                           )
                         }
                         className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm md:text-base"
@@ -673,9 +763,15 @@ export default function ManageLessonPage() {
                       <span className="text-gray-500 text-center">or</span>
                       <input
                         type="file"
-                        ref={el => fileInputRefs.current[idx] = el}
+                        ref={(el) => {
+                          if (el) {
+                            fileInputRefs.current[idx] = el;
+                          }
+                        }}
                         accept="video/*"
-                        onChange={e => handleVideoUpload(e.target.files?.[0], idx)}
+                        onChange={(e) =>
+                          handleVideoUpload(e.target.files?.[0], idx)
+                        }
                         className="hidden"
                       />
                       <button
@@ -690,8 +786,12 @@ export default function ManageLessonPage() {
                     {section.videoFileName && section.isUploading && (
                       <div className="mt-3">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-gray-600">{section.videoFileName}</span>
-                          <span className="text-sm text-gray-600">{section.progress}%</span>
+                          <span className="text-sm text-gray-600">
+                            {section.videoFileName}
+                          </span>
+                          <span className="text-sm text-gray-600">
+                            {section.progress}%
+                          </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
@@ -703,28 +803,35 @@ export default function ManageLessonPage() {
                     )}
                     {section.error && (
                       <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-600">✗ {section.error}</p>
+                        <p className="text-sm text-red-600">
+                          ✗ {section.error}
+                        </p>
                       </div>
                     )}
-                    {section.videoUrl && !section.isUploading && !section.error && section.videoUrl.startsWith('http') && (
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm text-green-600">✓ Video uploaded successfully</p>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveVideo(idx)}
-                            className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
-                          >
-                            <X size={18} />
-                          </button>
+                    {section.videoUrl &&
+                      !section.isUploading &&
+                      !section.error &&
+                      section.videoUrl.startsWith('http') && (
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm text-green-600">
+                              ✓ Video uploaded successfully
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveVideo(idx)}
+                              className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                          <video
+                            src={section.videoUrl}
+                            controls
+                            className="w-full max-w-xs sm:max-w-md md:max-w-lg rounded-lg border border-gray-200 mx-auto"
+                          />
                         </div>
-                        <video
-                          src={section.videoUrl}
-                          controls
-                          className="w-full max-w-xs sm:max-w-md md:max-w-lg rounded-lg border border-gray-200 mx-auto"
-                        />
-                      </div>
-                    )}
+                      )}
                   </div>
                 </div>
               ))}
@@ -732,8 +839,8 @@ export default function ManageLessonPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-4">
-              <button 
-                type="button" 
+              <button
+                type="button"
                 className="w-full sm:w-auto px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
                 onClick={() => setMode('preview')}
                 disabled={isSaving}

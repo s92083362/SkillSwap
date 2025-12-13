@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Bell, Menu, X, Phone, PhoneOff, Video } from "lucide-react";
 import {
   useNotifications,
@@ -41,6 +41,7 @@ const Header: React.FC<HeaderProps> = ({
   setMobileMenuOpen,
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
   const [user] = useAuthState(auth);
   const userId = user?.uid;
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -50,6 +51,14 @@ const Header: React.FC<HeaderProps> = ({
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
 
   useTrackUserActivity(60000);
+
+  // Helper function to check if a path is active
+  const isActivePath = (path: string) => {
+    if (path === "/dash-board") {
+      return pathname === "/dash-board" || pathname === "/";
+    }
+    return pathname?.startsWith(path);
+  };
 
   // Listen for incoming audio/video calls for this user
   useEffect(() => {
@@ -366,27 +375,47 @@ const Header: React.FC<HeaderProps> = ({
             <nav className="hidden lg:flex items-center gap-8">
               <a
                 href="/dash-board"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
+                  isActivePath("/dash-board") ? "text-cyan-500" : ""
+                }`}
               >
                 Home
+                {isActivePath("/dash-board") && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                )}
               </a>
               <a
                 href="/profile?section=skills"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
+                  isActivePath("/profile") ? "text-cyan-500" : ""
+                }`}
               >
                 My Skills
+                {isActivePath("/profile") && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                )}
               </a>
               <a
                 href="/my-requests"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
+                  isActivePath("/my-requests") ? "text-cyan-500" : ""
+                }`}
               >
                 Learn
+                {isActivePath("/my-requests") && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                )}
               </a>
               <a
                 href="/swap-requests"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
+                  isActivePath("/swap-requests") ? "text-cyan-500" : ""
+                }`}
               >
                 Teach
+                {isActivePath("/swap-requests") && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                )}
               </a>
             </nav>
 
@@ -463,27 +492,47 @@ const Header: React.FC<HeaderProps> = ({
             <nav className="lg:hidden flex flex-col gap-4 mt-4 pb-4 border-t border-gray-200 pt-4">
               <a
                 href="/dash-board"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
+                  isActivePath("/dash-board") ? "text-cyan-500" : ""
+                }`}
               >
                 Home
+                {isActivePath("/dash-board") && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                )}
               </a>
               <a
                 href="/profile?section=skills"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
+                  isActivePath("/profile") ? "text-cyan-500" : ""
+                }`}
               >
                 My Skills
+                {isActivePath("/profile") && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                )}
               </a>
               <a
                 href="/my-requests"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
+                  isActivePath("/my-requests") ? "text-cyan-500" : ""
+                }`}
               >
                 Learn
+                {isActivePath("/my-requests") && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                )}
               </a>
               <a
                 href="/swap-requests"
-                className="text-gray-700 hover:text-gray-900 font-medium"
+                className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
+                  isActivePath("/swap-requests") ? "text-cyan-500" : ""
+                }`}
               >
                 Teach
+                {isActivePath("/swap-requests") && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                )}
               </a>
             </nav>
           )}

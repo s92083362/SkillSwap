@@ -13,9 +13,11 @@ import {
   addDoc,
 } from "firebase/firestore";
 import Header from "../../components/shared/header/Header";
+import { useRouter } from "next/navigation";
 
 export default function SwapRequestsPage() {
   const [user] = useAuthState(auth);
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -147,7 +149,13 @@ export default function SwapRequestsPage() {
   }
 
   function handleGoToChat() {
-    window.location.href = "/chat";
+    if (acceptedRequestData?.requesterId) {
+      // Navigate to chat with the specific requester
+      router.push(`/chat/messages?user=${acceptedRequestData.requesterId}`);
+    } else {
+      // Fallback to general chat page
+      router.push("/chat/messages");
+    }
   }
 
   function handleChatLater() {
@@ -206,7 +214,7 @@ export default function SwapRequestsPage() {
                 onClick={handleGoToChat}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded transition-colors text-sm sm:text-base"
               >
-                Yes
+                Yes, Go to Chat
               </button>
               <button
                 onClick={handleChatLater}

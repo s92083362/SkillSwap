@@ -1,66 +1,88 @@
-"use client";
-import React, { useState, useEffect } from "react";
-import Header from "../../../../components/shared/header/Header";
-import AccordionSection from "../../../../components/dashboard/AccordionSection";
-import Link from "next/link";
-import { notFound } from "next/navigation";
-import { useAuthState } from "react-firebase-hooks/auth";
-import { auth, db } from "../../../../lib/firebase/firebaseConfig";
-import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
+'use client';
 
-export default function SkillDetailPage({ params }) {
-  const { skillId } = React.use(params);
+import React, { useState, useEffect } from 'react';
+import Header from '../../../../components/shared/header/Header';
+import AccordionSection from '../../../../components/dashboard/AccordionSection';
+import { notFound } from 'next/navigation';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { auth, db } from '../../../../lib/firebase/firebaseConfig';
+import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+
+type SkillDetailPageProps = {
+  params: {
+    skillId: string;
+  };
+};
+
+type LessonSection = {
+  id: string;
+  name: string;
+  title: string;
+  content: string;
+  videoUrl?: string;
+};
+
+type Lesson = {
+  id: string;
+  title: string;
+  description?: string;
+  instructor?: string;
+  image?: string;
+  sections: LessonSection[];
+};
+
+export default function SkillDetailPage({ params }: SkillDetailPageProps) {
+  const { skillId } = params;
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
-  const [skills, setSkills] = useState([]);
+  const [skills, setSkills] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch Firebase lessons
   useEffect(() => {
     async function fetchLessons() {
       try {
-        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
-        const firebaseLessons = lessonsSnapshot.docs.map(doc => {
-          const data = doc.data();
-          console.log('Firebase lesson data:', data);
-          
+        const lessonsSnapshot = await getDocs(collection(db, 'lessons'));
+        const firebaseLessons: Lesson[] = lessonsSnapshot.docs.map((d) => {
+          const data = d.data() as any;
           return {
-            id: doc.id,
+            id: d.id,
             title: data.title,
             description: data.description,
             instructor: data.instructor,
             image: data.image,
             sections: [
               {
-                id: "skill-overview",
-                name: "Skill overview",
-                title: "Skill overview",
-                content: data.description || "No description available.",
+                id: 'skill-overview',
+                name: 'Skill overview',
+                title: 'Skill overview',
+                content: data.description || 'No description available.',
               },
-              ...(data.sections || []).map((section, idx) => ({
-                id: `section-${idx}`,
-                name: section.title,
-                title: section.title,
-                content: section.content,
-                videoUrl: section.videoUrl,
-              })),
+              ...(data.sections || []).map(
+                (section: any, idx: number): LessonSection => ({
+                  id: `section-${idx}`,
+                  name: section.title,
+                  title: section.title,
+                  content: section.content,
+                  videoUrl: section.videoUrl,
+                })
+              ),
             ],
           };
         });
 
-        console.log('All skills:', firebaseLessons);
         setSkills(firebaseLessons);
       } catch (error) {
-        console.error("Error fetching lessons:", error);
+        console.error('Error fetching lessons:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLessons();
+    void fetchLessons();
   }, []);
 
   const skill = skills.find((s) => s.id === skillId);
@@ -71,7 +93,7 @@ export default function SkillDetailPage({ params }) {
       setIsEnrolled(false);
       return;
     }
-    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
+    const ref = doc(db, 'users', user.uid, 'enrolledSkills', skillId);
     getDoc(ref).then((docSnap) => {
       setIsEnrolled(docSnap.exists());
     });
@@ -81,10 +103,15 @@ export default function SkillDetailPage({ params }) {
   async function handleEnroll() {
     if (!user) return;
     setLoadingEnroll(true);
-    const ref = doc(db, "users", user.uid, "enrolledSkills", skillId);
-    await setDoc(ref, { enrolledAt: new Date() });
-    setIsEnrolled(true);
-    setLoadingEnroll(false);
+    try {
+      const ref = doc(db, 'users', user.uid, 'enrolledSkills', skillId);
+      await setDoc(ref, { enrolledAt: new Date() });
+      setIsEnrolled(true);
+    } catch (error) {
+      console.error('Error enrolling:', error);
+    } finally {
+      setLoadingEnroll(false);
+    }
   }
 
   if (loading) {
@@ -99,23 +126,28 @@ export default function SkillDetailPage({ params }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+      <Header
+        mobileMenuOpen={mobileMenuOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+      />
 
       <main className="max-w-5xl mx-auto px-4 py-10">
         <div className="bg-gradient-to-r from-blue-100 to-blue-50 rounded-xl py-14 px-8 text-center mb-8">
           {skill.image && (
-            <img 
-              src={skill.image} 
+            <img
+              src={skill.image}
               alt={skill.title}
               className="w-32 h-32 object-cover rounded-lg mx-auto mb-6"
             />
           )}
-          <h1 className="text-5xl font-bold text-gray-900 mb-2">{skill.title}</h1>
+          <h1 className="text-5xl font-bold text-gray-900 mb-2">
+            {skill.title}
+          </h1>
           <p className="text-lg font-medium text-blue-900 mb-2">
             Instructor: {skill.instructor}
           </p>
           <p className="text-base text-blue-800">{skill.description}</p>
-          
+
           {user && (
             <div className="mt-8 flex justify-center">
               {isEnrolled ? (
@@ -131,7 +163,7 @@ export default function SkillDetailPage({ params }) {
                   onClick={handleEnroll}
                   disabled={loadingEnroll}
                 >
-                  {loadingEnroll ? "Enrolling..." : "Enroll"}
+                  {loadingEnroll ? 'Enrolling...' : 'Enroll'}
                 </button>
               )}
             </div>
@@ -143,12 +175,11 @@ export default function SkillDetailPage({ params }) {
           <>
             {skill.sections.map((section, idx) => (
               <AccordionSection
-                key={idx}
+                key={section.id || idx}
                 title={section.name}
                 defaultOpen={idx === 0}
               >
                 <div className="space-y-4">
-                  {/* Text Content */}
                   {typeof section.content === 'string' ? (
                     <div className="prose max-w-none">
                       <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
@@ -158,11 +189,12 @@ export default function SkillDetailPage({ params }) {
                   ) : (
                     <div>{section.content}</div>
                   )}
-                  
-                  {/* Video Player - Shows directly in accordion */}
+
                   {section.videoUrl && (
                     <div className="mt-6">
-                      <h4 className="text-base font-semibold text-gray-900 mb-3">📹 Video Lesson</h4>
+                      <h4 className="text-base font-semibold text-gray-900 mb-3">
+                        📹 Video Lesson
+                      </h4>
                       <div className="bg-black rounded-lg overflow-hidden shadow-lg">
                         <video
                           src={section.videoUrl}
