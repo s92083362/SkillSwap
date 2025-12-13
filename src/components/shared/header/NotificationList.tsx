@@ -1,28 +1,19 @@
 "use client";
+
 import React from "react";
 import { X } from "lucide-react";
+import type { Notification } from "../../../hooks/useNotifications";
 
-// Notification object interface
-export interface Notification {
-  id: string | number;
-  type?: string;
-  title?: string;
-  message: string;
-  actions?: string[];
-  senderId?: string;
-  swapRequestId?: string;
-  chatId?: string;
-  timestamp?: any;
-  read?: boolean;
-}
-
-// Component props
 interface NotificationListProps {
   notifications: Notification[];
   onClose: () => void;
-  onActionClick?: (notifId: string | number, action: string, notif: Notification) => void;
+  onActionClick?: (
+    notifId: string | number,
+    action: string,
+    notif: Notification
+  ) => void;
   onDismiss?: (notifId: string | number, notif?: Notification) => void;
-  onClearAll?: () => void;
+  onClearAll?: () => void | Promise<void>;
 }
 
 const NotificationList: React.FC<NotificationListProps> = ({
@@ -41,6 +32,7 @@ const NotificationList: React.FC<NotificationListProps> = ({
         </span>
       )}
     </div>
+
     <ul className="space-y-3">
       {notifications.length === 0 && (
         <li className="text-gray-500 text-sm sm:text-base text-center py-8">
@@ -48,12 +40,12 @@ const NotificationList: React.FC<NotificationListProps> = ({
           <div>No new notifications</div>
         </li>
       )}
+
       {notifications.map((notif) => (
         <li
           key={notif.id}
           className="bg-gray-50 hover:bg-gray-100 rounded-lg p-3 sm:p-4 text-gray-700 relative transition-colors"
         >
-          {/* Dismiss button (calls parent's handler, which should update Firestore safely!) */}
           {onDismiss && (
             <button
               onClick={() => onDismiss(notif.id, notif)}
@@ -64,17 +56,22 @@ const NotificationList: React.FC<NotificationListProps> = ({
             </button>
           )}
 
-          {/* Notification title (for swap, etc) */}
           {notif.title && (
-            <div className="font-medium text-blue-800 mb-1 text-sm sm:text-base">{notif.title}</div>
+            <div className="font-medium text-blue-800 mb-1 text-sm sm:text-base">
+              {notif.title}
+            </div>
           )}
-          {/* Message content */}
-          <div className="text-sm sm:text-base leading-relaxed pr-6">{notif.message}</div>
-          {/* Timestamp */}
+
+          <div className="text-sm sm:text-base leading-relaxed pr-6">
+            {notif.message}
+          </div>
+
           {notif.timestamp && (
-            <div className="text-xs text-gray-400 mt-1">{formatTimestamp(notif.timestamp)}</div>
+            <div className="text-xs text-gray-400 mt-1">
+              {formatTimestamp(notif.timestamp)}
+            </div>
           )}
-          {/* Action buttons */}
+
           {notif.actions && notif.actions.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {notif.actions.map((action) => (
@@ -99,7 +96,7 @@ const NotificationList: React.FC<NotificationListProps> = ({
         </li>
       ))}
     </ul>
-    {/* Bottom actions */}
+
     <div className="mt-4 flex flex-col sm:flex-row gap-2">
       {notifications.length > 0 && onClearAll && (
         <button
@@ -119,7 +116,6 @@ const NotificationList: React.FC<NotificationListProps> = ({
   </div>
 );
 
-// Helper to format timestamps
 function formatTimestamp(timestamp: any): string {
   if (!timestamp) return "";
   try {
@@ -129,6 +125,7 @@ function formatTimestamp(timestamp: any): string {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
+
     if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
