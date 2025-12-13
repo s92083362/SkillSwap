@@ -9,10 +9,10 @@ import { auth, db } from "../../../../lib/firebase/firebaseConfig";
 import { doc, setDoc, getDoc, collection, getDocs } from "firebase/firestore";
 
 type SkillDetailPageProps = {
-  params: {
+  params: Promise<{
     skillId: string;
     sectionId: string;
-  };
+  }>;
 };
 
 type LessonSection = {
@@ -33,14 +33,22 @@ type Lesson = {
 };
 
 export default function SkillDetailPage({ params }: SkillDetailPageProps) {
-  const { skillId, sectionId } = params;
-
+  const [skillId, setSkillId] = useState<string>("");
+  const [sectionId, setSectionId] = useState<string>("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user] = useAuthState(auth);
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
   const [skills, setSkills] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Unwrap params Promise
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setSkillId(resolvedParams.skillId);
+      setSectionId(resolvedParams.sectionId);
+    });
+  }, [params]);
 
   // Fetch Firebase lessons
   useEffect(() => {
@@ -88,11 +96,6 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
 
   const skill = skills.find((s) => s.id === skillId);
 
-  // If you want to scroll/open a specific section based on sectionId,
-  // you can pass a prop like `defaultSectionId={sectionId}` into AccordionSection
-  // or use it to compute defaultOpen, e.g.:
-  // const defaultIndex = skill?.sections.findIndex(sec => sec.id === sectionId) ?? 0;
-
   // Check enrollment status
   useEffect(() => {
     if (!user || !skillId) {
@@ -120,7 +123,7 @@ export default function SkillDetailPage({ params }: SkillDetailPageProps) {
     }
   }
 
-  if (loading) {
+  if (loading || !skillId) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-gray-500 text-lg">Loading lesson...</div>
