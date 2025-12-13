@@ -1,32 +1,103 @@
 "use client";
-import React, { useState } from 'react';
-import { Users, RefreshCw, Video } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+
+import React, { useState, useEffect } from "react";
+import { Users, RefreshCw, Video } from "lucide-react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+
+// Snowflake Component
+const Snowflake = ({ style }: { style: React.CSSProperties }) => (
+  <div
+    className="absolute text-white opacity-80 pointer-events-none"
+    style={style}
+  >
+    ❄
+  </div>
+);
+
+// Snow Effect Component
+const SnowEffect = () => {
+  const [snowflakes, setSnowflakes] = useState<
+    Array<{
+      id: number;
+      left: string;
+      animationDuration: string;
+      animationDelay: string;
+      fontSize: string;
+      opacity: number;
+    }>
+  >([]);
+
+  useEffect(() => {
+    const currentMonth = new Date().getMonth();
+    if (currentMonth !== 11) return; // 11 = December
+
+    const flakes = Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      animationDuration: `${Math.random() * 3 + 2}s`,
+      animationDelay: `${Math.random() * 2}s`,
+      fontSize: `${Math.random() * 15 + 15}px`,
+      opacity: Math.random() * 0.6 + 0.4,
+    }));
+    setSnowflakes(flakes);
+  }, []);
+
+  if (snowflakes.length === 0) return null;
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      <style>{`
+        @keyframes fall {
+          0% {
+            transform: translateY(-10vh) rotate(0deg);
+          }
+          100% {
+            transform: translateY(110vh) rotate(360deg);
+          }
+        }
+      `}</style>
+      {snowflakes.map((flake) => (
+        <Snowflake
+          key={flake.id}
+          style={{
+            left: flake.left,
+            fontSize: flake.fontSize,
+            opacity: flake.opacity,
+            animation: `fall ${flake.animationDuration} linear ${flake.animationDelay} infinite`,
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 export default function SkillSwapLanding() {
   const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState<'signup' | 'login'>('signup');
+  const [selectedTab, setSelectedTab] = useState<"signup" | "login">("signup");
 
   const handleSignUp = () => {
-    setSelectedTab('signup');
-    router.push('/auth/login-and-signup?tab=signup');
+    setSelectedTab("signup");
+    router.push("/auth/login-and-signup?tab=signup");
   };
   const handleLogin = () => {
-    setSelectedTab('login');
-    router.push('/auth/login-and-signup?tab=login');
+    setSelectedTab("login");
+    router.push("/auth/login-and-signup?tab=login");
   };
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Snow Effect - Only shows in December */}
+      <SnowEffect />
+
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between px-4 sm:px-8 py-3 sm:py-4 bg-white">
         <div className="flex items-center gap-2 min-w-0">
-          <img 
-            src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png" 
-            alt="SkillSwap Logo" 
-            className="w-30 h-10 " 
-            style={{ background: 'transparent' }}
+          <img
+            src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png"
+            alt="SkillSwap Logo"
+            className="w-30 h-10 "
+            style={{ background: "transparent" }}
           />
         </div>
         {/* Tab buttons including About */}
@@ -34,9 +105,9 @@ export default function SkillSwapLanding() {
           <button
             onClick={handleSignUp}
             className={
-              selectedTab === 'signup'
-                ? 'px-4 sm:px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200'
-                : 'px-4 sm:px-6 py-2 bg-white text-blue-500 rounded-lg font-medium hover:bg-blue-50 border border-blue-500 transition-all duration-200'
+              selectedTab === "signup"
+                ? "px-4 sm:px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
+                : "px-4 sm:px-6 py-2 bg-white text-blue-500 rounded-lg font-medium hover:bg-blue-50 border border-blue-500 transition-all duration-200"
             }
           >
             Sign Up
@@ -44,9 +115,9 @@ export default function SkillSwapLanding() {
           <button
             onClick={handleLogin}
             className={
-              selectedTab === 'login'
-                ? 'px-4 sm:px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200'
-                : 'px-4 sm:px-6 py-2 bg-white text-blue-500 rounded-lg font-medium hover:bg-blue-50 border border-blue-500 transition-all duration-200'
+              selectedTab === "login"
+                ? "px-4 sm:px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
+                : "px-4 sm:px-6 py-2 bg-white text-blue-500 rounded-lg font-medium hover:bg-blue-50 border border-blue-500 transition-all duration-200"
             }
           >
             Log In
@@ -75,11 +146,14 @@ export default function SkillSwapLanding() {
             Trade Skills, Master Code
           </h1>
           <p className="text-base sm:text-lg text-gray-300 mb-6 sm:mb-8 max-w-2xl mx-auto">
-            A peer-to-peer learning platform for developers.<br className="hidden sm:block" />
+            A peer-to-peer learning platform for developers.
+            <br className="hidden sm:block" />
             Exchange your expertise, learn new technologies, and grow together.
           </p>
-          <button 
-            onClick={() => router.push('/auth/login-and-signup?tab=signup')}
+          <button
+            onClick={() =>
+              router.push("/auth/login-and-signup?tab=signup")
+            }
             className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
           >
             Start Swapping Skills
@@ -90,17 +164,24 @@ export default function SkillSwapLanding() {
       {/* How It Works Section */}
       <section className="py-12 sm:py-20 px-4 sm:px-8 bg-gray-50">
         <div className="max-w-4xl sm:max-w-6xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">How It Works</h2>
-          <p className="text-gray-600 mb-8 sm:mb-16">A seamless path to collaborative learning.</p>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            How It Works
+          </h2>
+          <p className="text-gray-600 mb-8 sm:mb-16">
+            A seamless path to collaborative learning.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
             {/* Step 1 */}
             <div className="text-center">
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
                 <Users className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">1. Build Your Profile</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">
+                1. Build Your Profile
+              </h3>
               <p className="text-gray-600 text-sm sm:text-base">
-                Record a short intro video showcasing your programming skill. Let others know what you can teach.
+                Record a short intro video showcasing your programming skill. Let
+                others know what you can teach.
               </p>
             </div>
             {/* Step 2 */}
@@ -108,9 +189,12 @@ export default function SkillSwapLanding() {
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
                 <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">2. Propose a Swap</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">
+                2. Propose a Swap
+              </h3>
               <p className="text-gray-600 text-sm sm:text-base">
-                Browse developer profiles, find a skill you want to learn, and propose an exchange of video lessons.
+                Browse developer profiles, find a skill you want to learn, and
+                propose an exchange of video lessons.
               </p>
             </div>
             {/* Step 3 */}
@@ -118,9 +202,12 @@ export default function SkillSwapLanding() {
               <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
                 <Video className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">3. Learn & Collaborate</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">
+                3. Learn &amp; Collaborate
+              </h3>
               <p className="text-gray-600 text-sm sm:text-base">
-                Once accepted, unlock full video lessons and use the chat to deepen your understanding together.
+                Once accepted, unlock full video lessons and use the chat to
+                deepen your understanding together.
               </p>
             </div>
           </div>
@@ -143,15 +230,21 @@ export default function SkillSwapLanding() {
             <div className="absolute -bottom-4 sm:-bottom-6 right-4 sm:right-6 bg-white rounded-lg shadow-lg p-3 sm:p-4 flex items-center gap-3">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-300 rounded-full"></div>
               <div>
-                <p className="font-bold text-xs sm:text-sm text-gray-900">Sophia Clark</p>
+                <p className="font-bold text-xs sm:text-sm text-gray-900">
+                  Sophia Clark
+                </p>
                 <p className="text-xs text-gray-600">Learned: Python Backend</p>
               </div>
             </div>
           </div>
           <div className="order-1 lg:order-2">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 sm:mb-6">Learn from Your Peers</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 sm:mb-6">
+              Learn from Your Peers
+            </h2>
             <p className="text-gray-700 mb-4 text-sm sm:text-base">
-              "SkillSwap transformed my career. I learned Python in just a few weeks from an expert and landed a new job! The one-on-one interaction is something you can't get anywhere else."
+              &quot;SkillSwap transformed my career. I learned Python in just a
+              few weeks from an expert and landed a new job! The one-on-one
+              interaction is something you can&apos;t get anywhere else.&quot;
             </p>
             <p className="text-xs sm:text-sm text-gray-600">
               <strong>Sophia Clark</strong>, Software Engineer
@@ -163,15 +256,20 @@ export default function SkillSwapLanding() {
       {/* CTA Section */}
       <section className="py-12 sm:py-20 px-4 sm:px-8 bg-white">
         <div className="max-w-xl sm:max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">Ready to Elevate Your Dev Skills?</h2>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            Ready to Elevate Your Dev Skills?
+          </h2>
           <p className="text-gray-600 mb-6 sm:mb-8 text-sm sm:text-base">
-            Join a vibrant community of developers and IT professionals dedicated to mutual growth.
+            Join a vibrant community of developers and IT professionals
+            dedicated to mutual growth.
           </p>
-          <button 
-            onClick={() => router.push('/auth/login-and-signup?tab=signup')}
+          <button
+            onClick={() =>
+              router.push("/auth/login-and-signup?tab=signup")
+            }
             className="px-6 sm:px-8 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-all duration-200"
           >
-            Sign Up Now & Start Learning
+            Sign Up Now &amp; Start Learning
           </button>
         </div>
       </section>
@@ -182,10 +280,10 @@ export default function SkillSwapLanding() {
           <div className="flex flex-col sm:flex-row justify-between items-start mb-6 sm:mb-8 gap-8 sm:gap-0">
             <div className="mb-4 sm:mb-0">
               <div className="flex items-center gap-2 mb-4">
-                <img 
-                  src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png" 
-                  alt="SkillSwap Logo" 
-                  className="w-30 h-10 " 
+                <img
+                  src="https://i.ibb.co/FkBjK1WD/logo-removebg-preview.png"
+                  alt="SkillSwap Logo"
+                  className="w-30 h-10 "
                 />
               </div>
             </div>
@@ -193,23 +291,72 @@ export default function SkillSwapLanding() {
               <div>
                 <h3 className="text-white font-bold mb-4">Platform</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="hover:text-white transition-colors">How It Works</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">Login</a></li>
+                  <li>
+                    <a
+                      href="#"
+                      className="hover:text-white transition-colors"
+                    >
+                      How It Works
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="hover:text-white transition-colors"
+                    >
+                      Login
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h3 className="text-white font-bold mb-4">Company</h3>
                 <ul className="space-y-2">
-                  <li><a href="/about" className="hover:text-white transition-colors">About Us</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+                  <li>
+                    <a
+                      href="/about"
+                      className="hover:text-white transition-colors"
+                    >
+                      About Us
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="hover:text-white transition-colors"
+                    >
+                      Contact
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="hover:text-white transition-colors"
+                    >
+                      Careers
+                    </a>
+                  </li>
                 </ul>
               </div>
               <div>
                 <h3 className="text-white font-bold mb-4">Legal</h3>
                 <ul className="space-y-2">
-                  <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+                  <li>
+                    <a
+                      href="#"
+                      className="hover:text-white transition-colors"
+                    >
+                      Terms of Service
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      href="#"
+                      className="hover:text-white transition-colors"
+                    >
+                      Privacy Policy
+                    </a>
+                  </li>
                 </ul>
               </div>
             </div>

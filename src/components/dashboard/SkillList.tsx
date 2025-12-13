@@ -79,9 +79,7 @@ export default function SkillsListPage() {
         if (search) {
           const end =
             search.slice(0, -1) +
-            String.fromCharCode(
-              search.charCodeAt(search.length - 1) + 1
-            );
+            String.fromCharCode(search.charCodeAt(search.length - 1) + 1);
 
           q = query(q, orderBy("title"), startAt(search), endAt(end));
         }
@@ -94,29 +92,30 @@ export default function SkillsListPage() {
           })
         );
 
-        const merged: Skill[] = [...hardcodedSkills, ...lessonsFromFirestore].filter(
-          (skill) => {
-            if (
-              category !== "all" &&
-              skill.category !== category &&
-              skill.skillCategory !== category
-            ) {
-              return false;
-            }
-
-            if (search) {
-              const s = search.toLowerCase();
-              const haystack = `${skill.title} ${skill.description} ${
-                skill.category || ""
-              } ${skill.skillCategory || ""} ${
-                skill.instructor || ""
-              }`.toLowerCase();
-              return haystack.includes(s);
-            }
-
-            return true;
+        const merged: Skill[] = [
+          ...hardcodedSkills,
+          ...lessonsFromFirestore,
+        ].filter((skill) => {
+          if (
+            category !== "all" &&
+            skill.category !== category &&
+            (skill as any).skillCategory !== category
+          ) {
+            return false;
           }
-        );
+
+          if (search) {
+            const s = search.toLowerCase();
+            const haystack = `${skill.title} ${skill.description} ${
+              skill.category || ""
+            } ${(skill as any).skillCategory || ""} ${
+              skill.instructor || ""
+            }`.toLowerCase();
+            return haystack.includes(s);
+          }
+
+          return true;
+        });
 
         setSkills(merged);
       } catch (err) {
@@ -174,7 +173,9 @@ export default function SkillsListPage() {
         {searchQuery.trim() && !loading && (
           <div className="mb-4 text-center text-gray-600">
             Found {skills.length} result
-            {skills.length !== 1 ? "s" : ""} for "{searchQuery}"
+            {skills.length !== 1 ? "s" : ""} for &quot;
+            {searchQuery}
+            &quot;
           </div>
         )}
 
