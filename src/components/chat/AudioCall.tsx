@@ -53,6 +53,9 @@ interface ChatMessage {
   timestamp: any;
   fileUrl?: string | null;
   fileName?: string | null;
+  callStatus?: "completed" | "missed" | "rejected" | "cancelled";
+  callDuration?: number | null;
+  callDirection?: "incoming" | "outgoing";
 }
 
 export default function AudioCall({
@@ -111,7 +114,9 @@ export default function AudioCall({
   };
 
   // helper: write call log message into chat history
-  const saveCallMessage = async (status: "completed" | "missed" | "rejected" | "cancelled") => {
+  const saveCallMessage = async (
+    status: "completed" | "missed" | "rejected" | "cancelled"
+  ) => {
     try {
       const callId = callDocIdRef.current;
       let durationSec: number | null = null;
@@ -150,9 +155,7 @@ export default function AudioCall({
 
       await updateDoc(doc(db, "privateChats", chatId), {
         lastMessage:
-          status === "missed"
-            ? "Missed audio call"
-            : "Audio call",
+          status === "missed" ? "Missed audio call" : "Audio call",
         lastUpdated: serverTimestamp(),
       });
     } catch (e) {
@@ -168,12 +171,14 @@ export default function AudioCall({
       unsubDisconnect?.();
       cleanup(true);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (autoAnswer && isReceivingCall && callDocIdRef.current) {
       answerCall();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnswer, isReceivingCall]);
 
   // Listen for chat messages
@@ -251,24 +256,54 @@ export default function AudioCall({
   };
 
   const listenForCallDisconnect = () => {
-    if (!callDocIdRef.current) return;
-    const ref = doc(db, "calls", callDocIdRef.current);
-    const unsub = onSnapshot(ref, (snap) => {
-      const data = snap.data();
-      if (!snap.exists() || data?.ended) {
-        if (!hasEndedRef.current) {
+    // attach per-call listener once call id is known
+    let unsub: (() => void) | undefined;
+    const attach = (callId: string) => {
+      const ref = doc(db, "calls", callId);
+      unsub = onSnapshot(ref, (snap) => {
+        if (!snap.exists()) {
+          if (!hasEndedRef.current) {
+            hasEndedRef.current = true;
+            setCallStatus("Call ended");
+            saveCallMessage(isConnected ? "completed" : "missed");
+            setTimeout(() => {
+              cleanup(true);
+              onClose();
+            }, 1200);
+          }
+          return;
+        }
+        const data = snap.data();
+        if (data?.ended && !hasEndedRef.current) {
           hasEndedRef.current = true;
-          setCallStatus("Call ended");
-          // treat as completed if it was connected, otherwise missed
+          const endedByOther =
+            data.endedBy && data.endedBy !== currentUserId;
+          setCallStatus(
+            endedByOther ? "Call ended by other user" : "Call ended"
+          );
           saveCallMessage(isConnected ? "completed" : "missed");
           setTimeout(() => {
             cleanup(true);
             onClose();
           }, 1200);
         }
-      }
-    });
-    return unsub;
+      });
+    };
+
+    // if already have id, attach now; otherwise wait until it is set
+    if (callDocIdRef.current) {
+      attach(callDocIdRef.current);
+    } else {
+      const interval = setInterval(() => {
+        if (callDocIdRef.current) {
+          attach(callDocIdRef.current);
+          clearInterval(interval);
+        }
+      }, 200);
+    }
+    return () => {
+      if (unsub) unsub();
+    };
   };
 
   const playIncoming = () => {
@@ -426,6 +461,7 @@ export default function AudioCall({
         ended: true,
         declined: true,
         declinedAt: serverTimestamp(),
+        endedBy: currentUserId,
       });
       await saveCallMessage("rejected");
       setTimeout(async () => {
@@ -559,7 +595,8 @@ export default function AudioCall({
       setUploading(true);
       setUploadError(null);
       const { url, resourceType } = await uploadChatFileToCloudinary(file);
-      const isImage = resourceType === "image" && file.type.startsWith("image/");
+      const isImage =
+        resourceType === "image" && file.type.startsWith("image/");
       const displayContent = fileCaption || (isImage ? "" : file.name);
       const type = isImage ? "image" : "file";
 
@@ -600,18 +637,20 @@ export default function AudioCall({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-2 sm:p-4">
       <audio ref={incomingAudioRef} src="/sounds/incoming-call.mp3" loop />
       <audio ref={outgoingAudioRef} src="/sounds/outgoing-call.mp3" loop />
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
-      <div className="relative flex gap-4 items-start">
+      <div className="relative flex flex-col lg:flex-row gap-2 sm:gap-4 items-stretch lg:items-start w-full max-w-6xl h-full lg:h-auto">
         {/* Main call interface */}
-        <div className="bg-gray-900 text-white rounded-2xl p-8 w-full max-w-sm flex flex-col items-center gap-4 shadow-2xl">
-          <p className="text-sm text-gray-300">
+        <div className="bg-gray-900 text-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 w-full lg:max-w-sm flex flex-col items-center gap-3 sm:gap-4 shadow-2xl flex-shrink-0">
+          <p className="text-xs sm:text-sm text-gray-300 text-center">
             {isConnected ? "Connected" : callStatus}
           </p>
-          <h2 className="text-2xl font-semibold">{otherUserName}</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold text-center">
+            {otherUserName}
+          </h2>
 
           {!isConnected && isCalling && (
             <p className="text-xs text-gray-400">Ringing...</p>
@@ -621,41 +660,41 @@ export default function AudioCall({
           )}
 
           {uploadError && (
-            <div className="bg-red-500 text-white px-3 py-2 rounded text-xs max-w-xs">
+            <div className="bg-red-500 text-white px-3 py-2 rounded text-xs max-w-xs text-center">
               {uploadError}
             </div>
           )}
 
-          <div className="mt-6 flex items-center justify-center gap-6">
+          <div className="mt-4 sm:mt-6 flex items-center justify-center gap-3 sm:gap-4 lg:gap-6 flex-wrap">
             <button
               onClick={toggleMute}
               disabled={!isConnected}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors ${
                 isMuted ? "bg-red-600" : "bg-gray-700"
               } ${!isConnected ? "opacity-50 cursor-not-allowed" : ""}`}
             >
-              <MicrophoneIcon className="w-6 h-6" />
+              <MicrophoneIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
 
             <button
               onClick={toggleSpeaker}
               disabled={!isConnected}
-              className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+              className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-colors ${
                 isSpeakerOff ? "bg-red-600" : "bg-gray-700"
               } ${!isConnected ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               {isSpeakerOff ? (
-                <SpeakerXMarkIcon className="w-6 h-6" />
+                <SpeakerXMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               ) : (
-                <SpeakerWaveIcon className="w-6 h-6" />
+                <SpeakerWaveIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               )}
             </button>
 
             <button
               onClick={() => setShowChat((v) => !v)}
-              className="relative w-12 h-12 rounded-full flex items-center justify-center bg-gray-700 transition-colors"
+              className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-gray-700 transition-colors"
             >
-              <ChatBubbleLeftIcon className="w-6 h-6" />
+              <ChatBubbleLeftIcon className="w-5 h-5 sm:w-6 sm:h-6" />
               {unreadCount > 0 && !showChat && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-[10px] text-white rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
                   {unreadCount}
@@ -665,25 +704,25 @@ export default function AudioCall({
 
             <button
               onClick={endCall}
-              className="w-12 h-12 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center bg-red-600 hover:bg-red-700 transition-colors"
             >
-              <PhoneXMarkIcon className="w-6 h-6" />
+              <PhoneXMarkIcon className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
           </div>
 
           {isReceivingCall && !isConnected && (
-            <div className="mt-6 flex gap-8">
+            <div className="mt-4 sm:mt-6 flex gap-6 sm:gap-8">
               <button
                 onClick={declineCall}
-                className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
               >
-                <PhoneXMarkIcon className="w-7 h-7" />
+                <PhoneXMarkIcon className="w-6 h-6 sm:w-7 sm:h-7" />
               </button>
               <button
                 onClick={answerCall}
-                className="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
               >
-                <PhoneIcon className="w-7 h-7" />
+                <PhoneIcon className="w-6 h-6 sm:w-7 sm:h-7" />
               </button>
             </div>
           )}
@@ -691,7 +730,7 @@ export default function AudioCall({
           {!isCalling && !isReceivingCall && !isConnected && (
             <button
               onClick={startCall}
-              className="mt-4 px-6 py-2 rounded-full bg-green-600 hover:bg-green-700 flex items-center gap-2 text-sm font-semibold transition-colors"
+              className="mt-4 px-4 sm:px-6 py-2 rounded-full bg-green-600 hover:bg-green-700 flex items-center gap-2 text-xs sm:text-sm font-semibold transition-colors"
             >
               <PhoneIcon className="w-4 h-4" />
               Start Audio Call
@@ -699,24 +738,24 @@ export default function AudioCall({
           )}
         </div>
 
-        {/* Chat Panel */}
+        {/* Chat Panel - Responsive */}
         {showChat && (
-          <div className="bg-white rounded-2xl shadow-2xl w-96 flex flex-col h-[600px]">
-            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
-              <h3 className="font-semibold text-gray-800">
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full lg:w-96 flex flex-col flex-1 lg:flex-initial lg:h-[600px] min-h-0">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b flex-shrink-0">
+              <h3 className="font-semibold text-gray-800 text-sm sm:text-base truncate">
                 Chat with {otherUserName}
               </h3>
               <button
                 onClick={() => setShowChat(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-gray-500 hover:text-gray-700 flex-shrink-0 ml-2"
               >
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 min-h-0">
               {chatMessages.length === 0 ? (
-                <p className="text-center text-gray-500 text-sm">
+                <p className="text-center text-gray-500 text-xs sm:text-sm">
                   No messages yet
                 </p>
               ) : (
@@ -730,7 +769,7 @@ export default function AudioCall({
                     }`}
                   >
                     <div
-                      className={`max-w-[70%] rounded-lg px-3 py-2 ${
+                      className={`max-w-[85%] sm:max-w-[70%] rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 ${
                         msg.senderId === currentUserId
                           ? "bg-blue-500 text-white"
                           : "bg-gray-200 text-gray-800"
@@ -753,8 +792,24 @@ export default function AudioCall({
                           {msg.fileName || "Download file"}
                         </a>
                       )}
-                      {msg.content && (
-                        <p className="text-sm whitespace-pre-wrap break-words">
+                      {msg.type === "audio-call" && (
+                        <p className="text-xs sm:text-sm italic">
+                          {msg.callStatus === "completed" && "Audio call"}
+                          {msg.callStatus === "missed" &&
+                            "Missed audio call"}
+                          {msg.callStatus === "rejected" &&
+                            "Rejected audio call"}
+                          {msg.callStatus === "cancelled" &&
+                            "Cancelled audio call"}
+                          {typeof msg.callDuration === "number" &&
+                            msg.callDuration > 0 &&
+                            ` • ${Math.floor(
+                              msg.callDuration / 60
+                            )}m ${msg.callDuration % 60}s`}
+                        </p>
+                      )}
+                      {msg.content && msg.type !== "audio-call" && (
+                        <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">
                           {msg.content}
                         </p>
                       )}
@@ -767,14 +822,14 @@ export default function AudioCall({
 
             {/* File preview */}
             {selectedFile && (
-              <div className="border-t p-3 bg-gray-50 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-gray-600 truncate">
+              <div className="border-t p-2 sm:p-3 bg-gray-50 flex flex-col gap-2 flex-shrink-0">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-gray-600 truncate flex-1">
                     Selected: {selectedFile.name}
                   </p>
                   <button
                     onClick={cancelFileUpload}
-                    className="text-xs text-red-500"
+                    className="text-xs text-red-500 flex-shrink-0"
                   >
                     Remove
                   </button>
@@ -783,7 +838,7 @@ export default function AudioCall({
                   <img
                     src={filePreview}
                     alt="Preview"
-                    className="max-h-32 rounded object-cover"
+                    className="max-h-24 sm:max-h-32 rounded object-cover"
                   />
                 )}
                 <input
@@ -796,57 +851,69 @@ export default function AudioCall({
                 <button
                   disabled={uploading}
                   onClick={sendFileMessage}
-                  className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-60"
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded px-3 py-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {uploading ? "Uploading..." : "Send"}
+                  {uploading ? "Sending..." : "Send file"}
                 </button>
               </div>
             )}
 
             {/* Chat input */}
-            <div className="border-t p-3 flex items-center gap-2 flex-shrink-0">
+            <div className="border-t p-2 sm:p-3 flex items-center gap-2 flex-shrink-0">
+              {/* Hidden file input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileSelect(file);
+                }}
+              />
+
+              {/* Attach button */}
               <div className="relative">
                 <button
-                  onClick={() => setShowAttachMenu((v) => !v)}
-                  className="p-1.5 rounded-full hover:bg-gray-100 text-gray-600"
+                  onClick={() =>
+                    setShowAttachMenu((prev) => !prev)
+                  }
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200"
                 >
-                  <PhotoIcon className="w-5 h-5" />
+                  <PhotoIcon className="w-4 h-4 text-gray-600" />
                 </button>
+
                 {showAttachMenu && (
-                  <div className="absolute bottom-9 left-0 bg-white rounded shadow-lg border text-xs z-10">
+                  <div className="absolute bottom-10 left-0 bg-white border rounded shadow-lg text-xs sm:text-sm z-10">
                     <button
-                      className="px-3 py-2 hover:bg-gray-100 w-full text-left whitespace-nowrap"
                       onClick={() => {
+                        setShowAttachMenu(false);
                         fileInputRef.current?.click();
                       }}
+                      className="px-3 py-2 hover:bg-gray-100 w-full text-left"
                     >
-                      Upload from device
+                      Upload photo or file
                     </button>
                   </div>
                 )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileSelect(file);
-                  }}
-                />
               </div>
+
               <input
                 type="text"
-                className="flex-1 border rounded-full px-3 py-1.5 text-sm"
-                placeholder="Type a message..."
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Type a message"
+                className="flex-1 text-xs sm:text-sm border rounded-full px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") sendChatMessage();
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendChatMessage();
+                  }
                 }}
               />
+
               <button
                 onClick={sendChatMessage}
-                className="bg-blue-500 hover:bg-blue-600 text-white rounded-full p-1.5"
+                className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <PaperAirplaneIcon className="w-4 h-4" />
               </button>
