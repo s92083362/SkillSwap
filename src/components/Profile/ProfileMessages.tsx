@@ -66,9 +66,9 @@ function formatTime(timestamp: Message["timestamp"]): string {
   const diffDays = Math.floor(diffMs / 86400000);
 
   if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return ${diffMins}m ago;
-  if (diffHours < 24) return ${diffHours}h ago;
-  if (diffDays < 7) return ${diffDays}d ago;
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
 }
 
@@ -166,7 +166,7 @@ export default function ProfileMessages() {
 
   const handleMessageClick = (msg: Message) => {
     if (msg.senderId) {
-      router.push(/chat/messages?user=${msg.senderId});
+      router.push(`/chat/messages?user=${msg.senderId}`);
     } else {
       router.push("/chat/messages");
     }
@@ -343,4 +343,3 @@ export default function ProfileMessages() {
     </section>
   );
 }
-
