@@ -111,9 +111,11 @@ export default function ProfileMessages() {
 
     setLoading(true);
 
+    // Query for UNREAD messages only
     const q = query(
       collection(db, "messages"),
       where("receiverId", "==", user.uid),
+      where("read", "==", false), // Only fetch unread messages
       orderBy("timestamp", "desc"),
       limit(5)
     );
@@ -151,9 +153,7 @@ export default function ProfileMessages() {
       }
 
       setMessages(msgs);
-
-      const unreadCount = msgs.filter((msg) => msg.read === false).length;
-      setTotalUnreadCount(unreadCount);
+      setTotalUnreadCount(msgs.length); // All messages are unread now
       setLoading(false);
     });
 
@@ -274,17 +274,13 @@ export default function ProfileMessages() {
             </div>
           </li>
         ) : messages.length === 0 ? (
-          <li className="text-gray-500 text-center py-8">No messages yet.</li>
+          <li className="text-gray-500 text-center py-8">No unread messages.</li>
         ) : (
           messages.map((msg) => (
             <li
               key={msg.id}
               onClick={() => handleMessageClick(msg)}
-              className={`bg-white p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 cursor-pointer hover:bg-blue-50 hover:shadow-md transition-all duration-200 ${
-                msg.read === false
-                  ? "border-l-4 border-blue-500 bg-blue-50/30"
-                  : ""
-              }`}
+              className="bg-white p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 cursor-pointer hover:bg-blue-50 hover:shadow-md transition-all duration-200 border-l-4 border-blue-500"
             >
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center flex-shrink-0">
                 {msg.senderAvatar ? (
@@ -311,18 +307,10 @@ export default function ProfileMessages() {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p
-                  className={`font-semibold text-gray-800 text-base sm:text-lg truncate ${
-                    msg.read === false ? "font-bold" : ""
-                  }`}
-                >
+                <p className="font-bold text-gray-800 text-base sm:text-lg truncate">
                   {msg.senderName || "Unknown"}
                 </p>
-                <p
-                  className={`text-gray-500 text-sm sm:text-base truncate ${
-                    msg.read === false ? "font-semibold text-gray-700" : ""
-                  }`}
-                >
+                <p className="font-semibold text-gray-700 text-sm sm:text-base truncate">
                   {msg.content || msg.text || ""}
                 </p>
               </div>
@@ -330,9 +318,7 @@ export default function ProfileMessages() {
                 <span className="text-xs text-gray-400 whitespace-nowrap">
                   {formatTime(msg.timestamp)}
                 </span>
-                {msg.read === false && (
-                  <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                )}
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
               </div>
             </li>
           ))
