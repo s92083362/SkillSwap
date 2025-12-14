@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import {
   collection,
   addDoc,
@@ -13,10 +13,15 @@ import {
   doc,
   where,
   getDocs,
-  FirestoreDataConverter,
-  QueryDocumentSnapshot,
-  SnapshotOptions,
 } from 'firebase/firestore';
+import {
+  collection as fsCollection,
+  query as fsQuery,
+  where as fsWhere,
+  onSnapshot as fsOnSnapshot,
+  updateDoc,
+} from 'firebase/firestore';
+import { Phone, PhoneOff, Video } from 'lucide-react';
 import { db } from '../../../lib/firebase/firebaseConfig';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useTrackUserActivity } from '@/hooks/useTrackUserActivity';
@@ -60,8 +65,19 @@ type ActiveCallState = {
   autoAnswer: boolean;
 } | null;
 
+type CallType = 'audio' | 'video';
+
+interface IncomingCall {
+  callId: string;
+  callerName: string;
+  callerId: string;
+  callerPhoto?: string;
+  callType: CallType;
+}
+
 export default function ChatPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialUserId = searchParams.get('user');
   const autoAnswerCallId = searchParams.get('callId');
@@ -90,9 +106,14 @@ export default function ChatPage() {
 
   const [activeCall, setActiveCall] = useState<ActiveCallState>(null);
 
+  const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
+  const ringtoneRef = useRef<HTMLAudioElement | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
+
+  const isAudio = incomingCall?.callType === 'audio';
 
   useTrackUserActivity(60000);
 
@@ -108,7 +129,7 @@ export default function ChatPage() {
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []); 
+  }, []);
 
   // Auto-select user from URL + auto-answer
   useEffect(() => {
@@ -187,7 +208,7 @@ export default function ChatPage() {
     void fetchConversations();
     const interval = setInterval(fetchConversations, 10000);
     return () => clearInterval(interval);
-  }, [user]); 
+  }, [user]);
 
   const isUserOnline = (userId: string) =>
     activeUsers.some((u) => u.uid === userId);
@@ -278,7 +299,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]); 
+  }, [messages]);
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -458,6 +479,109 @@ export default function ChatPage() {
     }
   }
 
+  // Ringtone helpers and incoming call handlers
+  const playRingtone = () => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.loop = true;
+      ringtoneRef.current.play().catch(() => {});
+    }
+  };
+
+  const stopRingtone = () => {
+    if (ringtoneRef.current) {
+      ringtoneRef.current.pause();
+      ringtoneRef.current.currentTime = 0;
+    }
+  };
+
+  const handleAnswerIncomingCall = () => {
+    if (!incomingCall || !user) return;
+
+    stopRingtone();
+
+    const chatId = [user.uid, incomingCall.callerId].sort().join('_');
+
+    const url =
+      `/chat/${chatId}` +
+      `?user=${incomingCall.callerId}` +
+      `&callId=${encodeURIComponent(incomingCall.callId)}` +
+      `&callType=${incomingCall.callType}`;
+
+    router.push(url);
+    setIncomingCall(null);
+  };
+
+  const handleDeclineIncomingCall = async () => {
+    if (!incomingCall) return;
+
+    stopRingtone();
+
+    try {
+      const callRef = doc(db, 'calls', incomingCall.callId);
+      await updateDoc(callRef, {
+        ended: true,
+        declined: true,
+        declinedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error declining call:', error);
+    }
+
+    setIncomingCall(null);
+  };
+
+  // Listen for incoming calls (same logic as Header, scoped to /chat)
+  useEffect(() => {
+    if (!user) return;
+    if (!pathname?.startsWith('/chat')) return;
+
+    const callsRef = fsCollection(db, 'calls');
+    const q = fsQuery(
+      callsRef,
+      fsWhere('to', '==', user.uid),
+      fsWhere('answered', '==', false),
+      fsWhere('ended', '==', false)
+    );
+
+    const unsub = fsOnSnapshot(q, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        const callData = change.doc.data() as any;
+
+        if (change.type === 'added') {
+          const callType = (callData.callType || 'video') as CallType;
+
+          const callerUser =
+            allUsers.find((u) => u.uid === callData.from) || null;
+          if (callerUser) {
+            setSelectedUser(callerUser);
+          }
+
+          setIncomingCall({
+            callId: change.doc.id,
+            callerName: callData.fromName || 'Unknown',
+            callerId: callData.from,
+            callerPhoto: callData.fromPhoto,
+            callType,
+          });
+          playRingtone();
+        } else if (change.type === 'modified') {
+          if (callData.answered || callData.ended) {
+            setIncomingCall(null);
+            stopRingtone();
+          }
+        } else if (change.type === 'removed') {
+          setIncomingCall(null);
+          stopRingtone();
+        }
+      });
+    });
+
+    return () => {
+      unsub();
+      stopRingtone();
+    };
+  }, [user, pathname, allUsers]);
+
   if (!user) return null;
 
   const totalUnread = Object.values(unreadCounts).reduce(
@@ -470,6 +594,77 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+      {/* Ringtone Audio */}
+      <audio ref={ringtoneRef} src="/sounds/incoming-call.mp3" />
+
+      {/* Incoming Call Full Screen Overlay */}
+      {incomingCall && (
+        <div className="fixed inset-0 bg-gradient-to-b from-blue-600 to-blue-800 z-[9999] flex flex-col items-center justify-center animate-pulse-slow">
+          <div className="text-center px-4">
+            <div className="mb-6">
+              {incomingCall.callerPhoto ? (
+                <img
+                  src={incomingCall.callerPhoto}
+                  alt={incomingCall.callerName}
+                  className="w-32 h-32 rounded-full mx-auto border-4 border-white shadow-2xl object-cover"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full mx-auto border-4 border-white shadow-2xl bg-white flex items-center justify-center">
+                  <span className="text-5xl font-bold text-blue-600">
+                    {incomingCall.callerName[0]?.toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2">
+              {incomingCall.callerName}
+            </h2>
+
+            <p className="text-xl text-blue-100 mb-2">
+              {isAudio ? 'Incoming audio call...' : 'Incoming video call...'}
+            </p>
+
+            <div className="relative w-20 h-20 mx-auto mb-12">
+              <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping" />
+              <div className="absolute inset-0 rounded-full bg-white opacity-40 animate-pulse" />
+              {isAudio ? (
+                <Phone className="absolute inset-0 m-auto w-10 h-10 text-white" />
+              ) : (
+                <Video className="absolute inset-0 m-auto w-10 h-10 text-white" />
+              )}
+            </div>
+
+            <div className="flex gap-8 justify-center items-center mt-8">
+              <button
+                onClick={handleDeclineIncomingCall}
+                className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95"
+                aria-label="Decline call"
+              >
+                <PhoneOff className="w-10 h-10 text-white" />
+              </button>
+
+              <button
+                onClick={handleAnswerIncomingCall}
+                className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95 animate-bounce"
+                aria-label="Answer call"
+              >
+                <Phone className="w-10 h-10 text-white" />
+              </button>
+            </div>
+
+            <div className="flex gap-8 justify-center items-center mt-4">
+              <span className="text-white font-semibold w-20 text-center">
+                Decline
+              </span>
+              <span className="text-white font-semibold w-20 text-center">
+                Answer
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Call overlays */}
       {activeCall?.type === 'video' && selectedUser && (
         <VideoCall
@@ -981,6 +1176,21 @@ export default function ChatPage() {
           )}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-slow {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.95;
+          }
+        }
+        .animate-pulse-slow {
+          animation: pulse-slow 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }
