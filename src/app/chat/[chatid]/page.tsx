@@ -1,6 +1,3 @@
-// ============================================
-// FILE: src/app/chat/[chatid]/page.tsx (REFACTORED MAIN PAGE)
-// ============================================
 
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
@@ -18,12 +15,13 @@ import { useConversations } from '@/hooks/chat/useConversations';
 import { useIncomingCalls } from '@/hooks/chat/useIncomingCalls';
 
 // Components
-import ChatHeader from '../../../components/chat/ChatHeader';
-import UserList from '../../../components/chat/UserList';
-import FileUploadPreview from '../../../components/chat/messages/FileUploadPreview';
-import IncomingCallOverlay from '../../../components/chat/calls/IncomingCallOverlay';
-import MessageBubble from '../../../components/chat/messages/MessageBubble';
-import VideoCall from '../../../components/chat/VideoCall';
+import ChatHeader from '@/components/chat/ChatHeader';
+import UserList from '@/components/chat/UserList';
+import FileUploadPreview from '@/components/chat/messages/FileUploadPreview';
+import IncomingCallOverlay from '@/components/chat/calls/IncomingCallOverlay';
+import MessageInput from '@/components/chat/messages/MessageInput';
+import MessageBubble from '@/components/chat/messages/MessageBubble';
+import VideoCall from '../../../components/chat/calls/VideoCall';
 import AudioCall from '../../../components/chat/AudioCall';
 
 // Utils
@@ -311,6 +309,7 @@ export default function ChatPage() {
           onSelectUser={selectUser}
           usersError={usersError}
           isUserOnline={isUserOnlineCheck}
+          currentUserId={user.uid}
         />
 
         <div className={`${selectedUser ? 'flex' : 'hidden md:flex'} flex-1 flex-col min-w-0`}>
@@ -361,91 +360,22 @@ export default function ChatPage() {
                 />
               )}
 
-              <form
+              <MessageInput
+                input={input}
+                uploading={uploading}
+                selectedFile={selectedFile}
+                selectedUser={selectedUser}
+                showAttachMenu={showAttachMenu}
+                attachMenuRef={attachMenuRef as React.RefObject<HTMLDivElement>}
+                fileInputRef={fileInputRef as React.RefObject<HTMLInputElement>}
+                onInputChange={setInput}
                 onSubmit={(e) => {
                   e.preventDefault();
                   void handleSendMessage();
                 }}
-                className="bg-white border-t p-2 sm:p-4 flex-shrink-0"
-              >
-                <div className="max-w-4xl mx-auto flex items-center gap-1.5 sm:gap-2">
-                  <div className="relative" ref={attachMenuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowAttachMenu(!showAttachMenu)}
-                      disabled={uploading || !!selectedFile}
-                      className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                    >
-                      <span className="text-xl sm:text-2xl">+</span>
-                    </button>
-                    {showAttachMenu && (
-                      <div className="absolute bottom-full left-0 mb-2 bg-white rounded-lg shadow-lg border py-2 w-48 sm:w-56 z-10">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (fileInputRef.current) {
-                              fileInputRef.current.removeAttribute('accept');
-                            }
-                            fileInputRef.current?.click();
-                            setShowAttachMenu(false);
-                          }}
-                          className="w-full px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 flex items-center gap-2 sm:gap-3 text-left"
-                        >
-                          <span className="text-xl sm:text-2xl">📁</span>
-                          <span className="font-medium text-black text-sm sm:text-base">
-                            File
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            fileInputRef.current?.setAttribute('accept', 'image/*,video/*');
-                            fileInputRef.current?.click();
-                            setShowAttachMenu(false);
-                          }}
-                          className="w-full px-3 sm:px-4 py-2 sm:py-3 hover:bg-gray-50 flex items-center gap-2 sm:gap-3 text-left"
-                        >
-                          <span className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400">
-                            <PhotoIcon />
-                          </span>
-                          <span className="font-medium text-black text-sm sm:text-base">
-                            Photos & Videos
-                          </span>
-                        </button>
-                      </div>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleFileSelect(file);
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    className="flex-1 min-w-0 border rounded-lg px-2 sm:px-4 py-1.5 sm:py-2 focus:outline-none focus:border-blue-500 text-sm sm:text-base"
-                    placeholder={`Message ${
-                      selectedUser.displayName || selectedUser.email
-                    }...`}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={uploading || !!selectedFile}
-                  />
-                  <button
-                    type="submit"
-                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-3 sm:px-6 py-1.5 sm:py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base flex-shrink-0"
-                    disabled={uploading || !input.trim() || !!selectedFile}
-                  >
-                    Send
-                  </button>
-                </div>
-              </form>
+                onToggleAttachMenu={() => setShowAttachMenu(!showAttachMenu)}
+                onFileSelect={handleFileSelect}
+              />
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-gray-500 p-4">
