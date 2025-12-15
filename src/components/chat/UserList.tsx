@@ -14,7 +14,7 @@ interface UserListProps {
   onSelectUser: (user: ChatUser) => void;
   usersError: string | null;
   isUserOnline: (userId: string) => boolean;
-  currentUserId: string; // Add this prop
+  currentUserId: string;
 }
 
 export default function UserList({
@@ -35,7 +35,7 @@ export default function UserList({
     .filter((u): u is ChatUser => !!u);
 
   const usersWithoutConversations: ChatUser[] = allUsers
-    .filter((u) => u.uid !== currentUserId) // Exclude current user
+    .filter((u) => u.uid !== currentUserId)
     .filter((u) => !conversations.some((conv) => conv.otherUserId === u.uid));
 
   const filteredUsersWithConv = filterUsers(usersWithConversations, search);
@@ -45,20 +45,24 @@ export default function UserList({
     <div
       className={`${
         selectedUser ? 'hidden' : 'flex'
-      } md:flex w-full md:w-80 lg:w-96 bg-white md:border-r shadow-sm overflow-y-auto flex-shrink-0`}
+      } md:flex w-full md:w-80 lg:w-96 bg-white md:border-r shadow-sm flex-shrink-0 flex-col`}
     >
-      <div className="p-3 sm:p-4 w-full">
+      {/* Fixed Search Bar Section */}
+      <div className="p-3 sm:p-4 border-b bg-white">
         <input
           type="text"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="border px-3 py-2 rounded-lg w-full mb-3 sm:mb-4 focus:outline-none focus:border-blue-500 text-sm sm:text-base"
+          className="border px-3 py-2 rounded-lg w-full focus:outline-none focus:border-blue-500 text-sm sm:text-base"
           placeholder="Search users..."
         />
         {usersError && (
-          <div className="text-red-500 mb-3 text-sm">{usersError}</div>
+          <div className="text-red-500 mt-2 text-sm">{usersError}</div>
         )}
-        
+      </div>
+
+      {/* Scrollable User Lists Section */}
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4">
         {/* Recent chats */}
         {filteredUsersWithConv.length > 0 && (
           <div className="mb-4">
