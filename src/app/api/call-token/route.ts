@@ -1,12 +1,8 @@
-<<<<<<< HEAD
 // app/api/livekit-token/route.ts
-=======
-
->>>>>>> dev
 import { NextRequest, NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 
-export const revalidate = 0; // do not cache [web:33]
+export const revalidate = 0; 
 
 export async function POST(req: NextRequest) {
   try {
