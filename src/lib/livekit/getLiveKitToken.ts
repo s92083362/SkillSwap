@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 "use server"
+=======
+"use server";
+
+>>>>>>> dev
 import { AccessToken } from "livekit-server-sdk";
 
 export async function getLiveKitToken(
@@ -28,4 +33,8 @@ export async function getLiveKitToken(
   });
 
   return await at.toJwt();
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> dev

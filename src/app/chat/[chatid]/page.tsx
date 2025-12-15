@@ -21,8 +21,8 @@ import FileUploadPreview from '@/components/chat/messages/FileUploadPreview';
 import IncomingCallOverlay from '@/components/chat/calls/IncomingCallOverlay';
 import MessageInput from '@/components/chat/messages/MessageInput';
 import MessageBubble from '@/components/chat/messages/MessageBubble';
-import VideoCall from '../../../components/chat/calls/VideoCall';
-import AudioCall from '../../../components/chat/AudioCall';
+import VideoCall from '@/components/chat/calls/VideoCall';
+import AudioCall from '@/components/chat/calls/AudioCall';
 
 // Utils
 import { createChatId, isUserOnline as checkUserOnline } from '@/utils/chat/chatUtils';
@@ -30,6 +30,8 @@ import { sendTextMessage, sendFileMessage, markMessagesAsRead } from '@/utils/ch
 
 // Types
 import type { ChatUser, ChatMessage, ActiveCallState, CallType } from '@/utils/types/chat.types';
+
+
 
 export default function ChatPage() {
   const router = useRouter();
