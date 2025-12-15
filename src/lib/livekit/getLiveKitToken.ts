@@ -1,3 +1,4 @@
+"use server"
 import { AccessToken } from "livekit-server-sdk";
 
 export async function getLiveKitToken(
