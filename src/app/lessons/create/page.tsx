@@ -125,7 +125,7 @@ export default function CreateLessonPage() {
           )
         );
       });
-      xhr.open('POST', '/api/video');
+      xhr.open('POST', '/api/upload/video');
       xhr.send(formData);
     } catch {
       setSections((secs) =>
@@ -194,7 +194,7 @@ export default function CreateLessonPage() {
         setIsUploadingImage(false);
       });
 
-      xhr.open('POST', '/api/upload-image');
+      xhr.open('POST', '/api/upload/image');
       xhr.send(formData);
     } catch (error) {
       console.error('Image upload error:', error);
