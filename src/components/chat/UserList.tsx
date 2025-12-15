@@ -1,5 +1,4 @@
 "use client";
-
 import React from 'react';
 import { getAvatarUrl, filterUsers, getUserById } from '@/utils/chat/chatUtils';
 import type { ChatUser, ConversationMeta } from '@/utils/types/chat.types';
@@ -15,6 +14,7 @@ interface UserListProps {
   onSelectUser: (user: ChatUser) => void;
   usersError: string | null;
   isUserOnline: (userId: string) => boolean;
+  currentUserId: string; // Add this prop
 }
 
 export default function UserList({
@@ -28,12 +28,14 @@ export default function UserList({
   onSelectUser,
   usersError,
   isUserOnline,
+  currentUserId,
 }: UserListProps) {
   const usersWithConversations: ChatUser[] = conversations
     .map((conv) => getUserById(conv.otherUserId, allUsers))
     .filter((u): u is ChatUser => !!u);
 
   const usersWithoutConversations: ChatUser[] = allUsers
+    .filter((u) => u.uid !== currentUserId) // Exclude current user
     .filter((u) => !conversations.some((conv) => conv.otherUserId === u.uid));
 
   const filteredUsersWithConv = filterUsers(usersWithConversations, search);
