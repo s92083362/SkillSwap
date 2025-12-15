@@ -125,7 +125,7 @@ export default function CreateLessonPage() {
           )
         );
       });
-      xhr.open('POST', '/api/upload-video');
+      xhr.open('POST', '/api/video');
       xhr.send(formData);
     } catch {
       setSections((secs) =>
