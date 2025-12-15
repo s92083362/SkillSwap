@@ -12,7 +12,7 @@ import {
   PaperAirplaneIcon,
   PhotoIcon,
 } from "@heroicons/react/24/solid";
-import { useAudioCall, AudioCallProps } from "@/hooks/audio/ useAudioCall";
+import { useAudioCall, AudioCallProps } from "@/hooks/audio/useAudioCall";
 
 export default function AudioCall(props: AudioCallProps) {
   const {
