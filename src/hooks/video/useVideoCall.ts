@@ -15,7 +15,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
-import { getLiveKitToken } from "@/app/actions/getLiveKitToken";
+import { getLiveKitToken } from "@/lib/livekit/getLiveKitToken";
 import {
   Room,
   RoomEvent,

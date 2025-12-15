@@ -14,7 +14,7 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import { getLiveKitToken } from "@/app/actions/getLiveKitToken";
+import { getLiveKitToken } from "@/lib/livekit/getLiveKitToken";
 import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
 import {
   Room,
