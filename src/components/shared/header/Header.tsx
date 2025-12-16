@@ -21,7 +21,7 @@ import {
   onSnapshot as fsOnSnapshot,
 } from "firebase/firestore";
 import NotificationList from "./NotificationList";
-import { useTrackUserActivity } from "@/hooks/useTrackUserActivity";
+import { useTrackUserActivity } from "@/hooks/users/useTrackUserActivity";
  
 interface HeaderProps {
   mobileMenuOpen: boolean;

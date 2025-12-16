@@ -2,8 +2,8 @@
 
 import { useEffect, useRef } from "react";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase/firebaseConfig";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { db } from "@/lib/firebase/firebaseConfig";
+import { useCurrentUser } from "@/hooks/users/useCurrentUser";
 
 // If you have a specific user type from useCurrentUser, use that instead
 type CurrentUser = {
