@@ -7,10 +7,10 @@ import { PhotoIcon } from '@heroicons/react/24/solid';
 import { db } from '../../../lib/firebase/firebaseConfig';
 
 // Hooks
-import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { useTrackUserActivity } from '@/hooks/useTrackUserActivity';
-import { useAllUsers } from '@/hooks/useAllUsers';
-import { useActiveUsers } from '@/hooks/useActiveUsers';
+import { useCurrentUser } from '@/hooks/users/useCurrentUser';
+import { useTrackUserActivity } from '@/hooks/users/useTrackUserActivity';
+import { useAllUsers } from '@/hooks/users/useAllUsers';
+import { useActiveUsers } from '@/hooks/users/useActiveUsers';
 import { useConversations } from '@/hooks/chat/useConversations';
 import { useIncomingCalls } from '@/hooks/chat/useIncomingCalls';
 
