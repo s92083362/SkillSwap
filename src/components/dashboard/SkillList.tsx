@@ -3,17 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import SkillCard, { Skill } from "./SkillCard";
 import SearchBar from "./SearchBar";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  orderBy,
-  startAt,
-  endAt,
-  DocumentData,
-  Query as FirestoreQuery,
-} from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
 
 // Debounce hook
@@ -71,29 +61,9 @@ export default function SkillsListPage() {
       try {
         const search = searchRaw.toLowerCase();
         const collRef = collection(db, "lessons");
-        let q: FirestoreQuery<DocumentData> = collRef;
 
-        // Filter by category for lessons in Firestore (skillCategory field)
-        if (category && category !== "all") {
-          q = query(q, where("skillCategory", "==", category));
-        }
-
-        // Optional: simple prefix search on a lowercased title field (recommended)
-        if (search) {
-          // This assumes you store a "titleLower" field in Firestore for efficient search.
-          const end =
-            search.slice(0, -1) +
-            String.fromCharCode(search.charCodeAt(search.length - 1) + 1);
-
-          q = query(
-            q,
-            orderBy("titleLower" as any),
-            startAt(search),
-            endAt(end)
-          );
-        }
-
-        const snapshot = await getDocs(q);
+        // 1) Load all lessons (no Firestore-level filters)
+        const snapshot = await getDocs(collRef);
         const lessonsFromFirestore: LessonFromFirestore[] = snapshot.docs.map(
           (doc) => ({
             id: doc.id,
@@ -101,9 +71,10 @@ export default function SkillsListPage() {
           })
         );
 
+        // 2) Merge and filter on client
         const merged: Skill[] = [...hardcodedSkills, ...lessonsFromFirestore].filter(
           (skill) => {
-            // 1) Category tab filter
+            // Category tab filter
             if (
               category !== "all" &&
               skill.category !== category &&
@@ -112,28 +83,26 @@ export default function SkillsListPage() {
               return false;
             }
 
-            // 2) No search text -> keep after category filter
             if (!search) return true;
 
             const s = search.toLowerCase();
 
-            // Actual stored category value in DB
+            // Actual stored category value
             const rawSkillCategory = ((skill as any).skillCategory ||
               skill.category ||
               "") as string;
 
-            // Normalize to allow "Machine Learning" → "MachineLearning"
+            // Normalize: "Machine Learning" → "machinelearning"
             const normalizedSkillCategory = rawSkillCategory
               .toLowerCase()
               .replace(/[\s/-]+/g, "");
-
             const normalizedSearch = s.replace(/[\s/-]+/g, "");
 
             const categoryMatches = normalizedSkillCategory.includes(
               normalizedSearch
             );
 
-            // Text search across title/description/instructor/category text
+            // Text search over title/description/instructor/category
             const haystack = `${skill.title} ${skill.description} ${
               skill.category || ""
             } ${rawSkillCategory} ${skill.instructor || ""}`.toLowerCase();
