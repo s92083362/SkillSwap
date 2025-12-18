@@ -1,3 +1,14 @@
+<<<<<<< HEAD
+import { useEffect, useState } from "react";
+import { db } from "@/lib/firebase/firebaseConfig";
+import { collection, onSnapshot } from "firebase/firestore";
+
+/**
+ * Returns an array of users who have been active within the last 2 minutes.
+ * Each user object includes uid, displayName, email, lastActive, isOnline.
+ * Updates in real-time as users come online/offline.
+ */
+=======
  
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase/firebaseConfig";
@@ -8,13 +19,18 @@ import { collection, onSnapshot } from "firebase/firestore";
 * Each user object includes uid, displayName, email, lastActive, isOnline.
 * Updates in real-time as users come online/offline.
 */
+>>>>>>> 49f58089d4eaee327a87a2ddb59ae694b1a53978
 export function useActiveUsers() {
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
  
   useEffect(() => {
     console.log("🔄 Setting up active users listener...");
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> 49f58089d4eaee327a87a2ddb59ae694b1a53978
     const usersRef = collection(db, "users");
     
     // Subscribe to ALL users
@@ -60,7 +76,11 @@ export function useActiveUsers() {
             
             return isActive;
           });
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> 49f58089d4eaee327a87a2ddb59ae694b1a53978
         console.log(`✅ Found ${users.length} active users out of ${snapshot.size} total`);
         setActiveUsers(users);
       },
@@ -69,7 +89,11 @@ export function useActiveUsers() {
         setError(err.message || "Error fetching users");
       }
     );
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> 49f58089d4eaee327a87a2ddb59ae694b1a53978
     // Re-filter every 10 seconds to remove users who've become inactive
     const intervalId = setInterval(() => {
       console.log("🔄 Re-filtering active users...");
@@ -85,14 +109,26 @@ export function useActiveUsers() {
           return isRecentlyActive || isExplicitlyOnline;
         });
         
+<<<<<<< HEAD
+        const prevLength = prev?.length || 0;
+        const filteredLength = filtered?.length || 0;
+        
+        if (filteredLength !== prevLength) {
+          console.log(`⚠️ Removed ${prevLength - filteredLength} inactive users`);
+=======
         if (filtered.length !== prev.length) {
           console.log(`⚠️ Removed ${prev.length - filtered.length} inactive users`);
+>>>>>>> 49f58089d4eaee327a87a2ddb59ae694b1a53978
         }
         
         return filtered;
       });
     }, 10000); // Check every 10 seconds
+<<<<<<< HEAD
+
+=======
  
+>>>>>>> 49f58089d4eaee327a87a2ddb59ae694b1a53978
     return () => {
       console.log("🛑 Cleaning up active users listener");
       unsub();
