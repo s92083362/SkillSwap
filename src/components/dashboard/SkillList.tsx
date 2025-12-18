@@ -53,7 +53,7 @@ export default function SkillsListPage() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const debouncedSearch = useDebounce(searchQuery.trim().toLowerCase(), 400);
+  const debouncedSearch = useDebounce(searchQuery.trim(), 400);
 
   const categories: string[] = [
     "all",
@@ -65,23 +65,32 @@ export default function SkillsListPage() {
   ];
 
   const fetchFilteredLessons = useCallback(
-    async (category: string, search: string) => {
+    async (category: string, searchRaw: string) => {
       setLoading(true);
 
       try {
+        const search = searchRaw.toLowerCase();
         const collRef = collection(db, "lessons");
         let q: FirestoreQuery<DocumentData> = collRef;
 
+        // Filter by category for lessons in Firestore (skillCategory field)
         if (category && category !== "all") {
           q = query(q, where("skillCategory", "==", category));
         }
 
+        // Optional: simple prefix search on a lowercased title field (recommended)
         if (search) {
+          // This assumes you store a "titleLower" field in Firestore for efficient search.
           const end =
             search.slice(0, -1) +
             String.fromCharCode(search.charCodeAt(search.length - 1) + 1);
 
-          q = query(q, orderBy("title"), startAt(search), endAt(end));
+          q = query(
+            q,
+            orderBy("titleLower" as any),
+            startAt(search),
+            endAt(end)
+          );
         }
 
         const snapshot = await getDocs(q);
@@ -92,30 +101,48 @@ export default function SkillsListPage() {
           })
         );
 
-        const merged: Skill[] = [
-          ...hardcodedSkills,
-          ...lessonsFromFirestore,
-        ].filter((skill) => {
-          if (
-            category !== "all" &&
-            skill.category !== category &&
-            (skill as any).skillCategory !== category
-          ) {
-            return false;
-          }
+        const merged: Skill[] = [...hardcodedSkills, ...lessonsFromFirestore].filter(
+          (skill) => {
+            // 1) Category tab filter
+            if (
+              category !== "all" &&
+              skill.category !== category &&
+              (skill as any).skillCategory !== category
+            ) {
+              return false;
+            }
 
-          if (search) {
+            // 2) No search text -> keep after category filter
+            if (!search) return true;
+
             const s = search.toLowerCase();
+
+            // Actual stored category value in DB
+            const rawSkillCategory = ((skill as any).skillCategory ||
+              skill.category ||
+              "") as string;
+
+            // Normalize to allow "Machine Learning" → "MachineLearning"
+            const normalizedSkillCategory = rawSkillCategory
+              .toLowerCase()
+              .replace(/[\s/-]+/g, "");
+
+            const normalizedSearch = s.replace(/[\s/-]+/g, "");
+
+            const categoryMatches = normalizedSkillCategory.includes(
+              normalizedSearch
+            );
+
+            // Text search across title/description/instructor/category text
             const haystack = `${skill.title} ${skill.description} ${
               skill.category || ""
-            } ${(skill as any).skillCategory || ""} ${
-              skill.instructor || ""
-            }`.toLowerCase();
-            return haystack.includes(s);
-          }
+            } ${rawSkillCategory} ${skill.instructor || ""}`.toLowerCase();
 
-          return true;
-        });
+            const textMatches = haystack.includes(s);
+
+            return textMatches || categoryMatches;
+          }
+        );
 
         setSkills(merged);
       } catch (err) {
@@ -148,7 +175,7 @@ export default function SkillsListPage() {
         <SearchBar
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search skills (e.g., Python, JavaScript, Beginners)..."
+          placeholder="Search skills (e.g., Python, Backend, Machine Learning)..."
           onClear={() => setSearchQuery("")}
         />
 
