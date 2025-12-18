@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, type RefObject } from "react";
 import { useRouter } from "next/navigation";
 import { collection, addDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
 import type { User } from "firebase/auth";
-import type { RefObject, MutableRefObject } from "react";
 import LessonDetailsForm from "./LessonDetailsForm";
 import LessonSectionsForm from "./LessonSectionsForm";
 
@@ -44,7 +43,7 @@ export default function CreateLessonPage() {
   const [lessonImage, setLessonImage] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageProgress, setImageProgress] = useState(0);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef: RefObject<HTMLInputElement> = useRef<HTMLInputElement>(null) as RefObject<HTMLInputElement>;
 
   // content
   const [sections, setSections] = useState<Section[]>([initialSection()]);
