@@ -1,14 +1,21 @@
+import SkillDetailPage from '@/components/skills/sections/SkillDetailPage';
 
-import SkillDetailPage from "@/components/skills/sections/SkillDetailPage";
-
-type PageProps = {
-  params: {
-    skillId: string;
-    sectionId: string;
-  };
+type PageParams = {
+  skillId: string;
+  sectionId: string;
 };
 
-export default function Page({ params }: PageProps) {
-  // Pass plain params into the client component
-  return <SkillDetailPage initialSkillId={params.skillId} initialSectionId={params.sectionId} />;
+type PageProps = {
+  params: Promise<PageParams>;
+};
+
+export default async function Page({ params }: PageProps) {
+  const { skillId, sectionId } = await params;
+
+  return (
+    <SkillDetailPage
+      initialSkillId={skillId}
+      initialSectionId={sectionId}
+    />
+  );
 }
