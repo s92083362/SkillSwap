@@ -42,6 +42,8 @@ export default function ManageLessonPage() {
   // Mode: 'preview' or 'edit'
   const [mode, setMode] = useState<'preview' | 'edit'>('preview');
 
+   const [isPublic, setIsPublic] = useState<boolean>(false);
+
   // Meta fields
   const [lessonTitle, setLessonTitle] = useState<string>('');
   const [lessonDesc, setLessonDesc] = useState<string>('');
@@ -200,7 +202,7 @@ export default function ManageLessonPage() {
           )
         );
       });
-      xhr.open('POST', '/api/upload-video');
+      xhr.open('POST', '/api/upload/video');
       xhr.send(formData);
     } catch {
       setSections((secs) =>
@@ -836,6 +838,34 @@ export default function ManageLessonPage() {
                 </div>
               ))}
             </div>
+            {/* Lesson Visibility Toggle */}
+        <div className="mb-10 mt-8">
+          <label className="block text-sm font-medium text-black mb-2">
+            Lesson Visibility
+          </label>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center text-black gap-2">
+              <input
+                type="radio"
+                name="visibility"
+                checked={isPublic}
+                onChange={() => setIsPublic(true)}
+                className="accent-blue-600"
+              />
+              Public (anyone can view)
+            </label>
+            <label className="flex items-center text-black gap-2">
+              <input
+                type="radio"
+                name="visibility"
+                checked={!isPublic}
+                onChange={() => setIsPublic(false)}
+                className="accent-blue-600"
+              />
+              Swap-only (requires accepted swap)
+            </label>
+          </div>
+        </div>
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-4">
