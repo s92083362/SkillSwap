@@ -12,6 +12,8 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  query,
+  where,
 } from 'firebase/firestore';
 
 type SkillDetailPageProps = {
@@ -33,6 +35,7 @@ type Lesson = {
   description?: string;
   instructor?: string;
   image?: string;
+  visibility?: 'public' | 'swap-only';
   sections: LessonSection[];
 };
 
@@ -51,6 +54,7 @@ export default function SkillDetailPage({
 
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [loadingEnroll, setLoadingEnroll] = useState(false);
+  const [swapAccepted, setSwapAccepted] = useState(false);
 
   // Fetch lessons once
   useEffect(() => {
@@ -65,6 +69,7 @@ export default function SkillDetailPage({
             description: data.description,
             instructor: data.instructor,
             image: data.image,
+            visibility: (data.visibility as 'public' | 'swap-only') ?? 'public',
             sections: [
               {
                 id: 'skill-overview',
@@ -114,15 +119,70 @@ export default function SkillDetailPage({
     });
   }, [user, skillId]);
 
+  // Check swap status: check if swap request exists and is accepted
+  useEffect(() => {
+    if (!user || !skillId || !skill) {
+      setSwapAccepted(false);
+      return;
+    }
+
+    async function checkSwapStatus() {
+      try {
+        // Check as requester
+        const requesterQuery = query(
+          collection(db, 'swapRequests'),
+          where('requesterId', '==', user!.uid),
+          where('requestedSkillId', '==', skillId),
+          where('status', '==', 'accepted')
+        );
+        const requesterSnapshot = await getDocs(requesterQuery);
+
+        if (!requesterSnapshot.empty) {
+          setSwapAccepted(true);
+          return;
+        }
+
+        // Check as creator
+        const creatorQuery = query(
+          collection(db, 'swapRequests'),
+          where('creatorId', '==', user!.uid),
+          where('requestedSkillId', '==', skillId),
+          where('status', '==', 'accepted')
+        );
+        const creatorSnapshot = await getDocs(creatorQuery);
+
+        if (!creatorSnapshot.empty) {
+          setSwapAccepted(true);
+          return;
+        }
+
+        setSwapAccepted(false);
+      } catch (error) {
+        console.error('Error checking swap status:', error);
+        setSwapAccepted(false);
+      }
+    }
+
+    void checkSwapStatus();
+  }, [user, skillId, skill]);
+
   // Enroll handler
   async function handleEnroll() {
-    if (!user) return;
+    if (!user || !skill) return;
     setLoadingEnroll(true);
     try {
       const ref = doc(db, 'users', user.uid, 'enrolledSkills', skillId);
+      
+      // For public lessons, store all section IDs as allowed
+      // For private lessons, store empty array (sections unlock after swap)
+      const allSectionIds = skill.sections.map((s) => s.id);
+      const allowedSections = skill.visibility === 'public' ? allSectionIds : [];
+
       await setDoc(ref, {
         enrolledAt: new Date(),
+        allowedSections: allowedSections,
       });
+      
       setIsEnrolled(true);
     } catch (error) {
       console.error('Error enrolling:', error);
@@ -151,6 +211,12 @@ export default function SkillDetailPage({
     sectionId && skill.sections.some((s) => s.id === sectionId)
       ? sectionId
       : skill.sections[0]?.id;
+
+  const isPublic = skill.visibility === 'public';
+  
+  // For public lessons: enrolled = see all sections
+  // For private lessons: enrolled + swap accepted = see all sections
+  const canSeeSections = isEnrolled && (isPublic || swapAccepted);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -181,7 +247,6 @@ export default function SkillDetailPage({
             <p className="text-base text-blue-800">{skill.description}</p>
           )}
 
-          {/* Only enroll button before access; no swap or other actions */}
           {user && !isEnrolled && (
             <div className="mt-6 flex justify-center">
               <button
@@ -196,10 +261,16 @@ export default function SkillDetailPage({
               </button>
             </div>
           )}
+
+          {!isPublic && isEnrolled && !swapAccepted && (
+            <p className="mt-4 text-sm text-red-700">
+              This is a private lesson. Complete a skill swap to unlock all sections.
+            </p>
+          )}
         </div>
 
-        {/* Sections: only visible after enroll */}
-        {isEnrolled ? (
+        {/* Sections */}
+        {canSeeSections ? (
           <>
             {skill.sections.map((section, idx) => {
               const currentId = section.id || `section-${idx}`;
@@ -251,7 +322,9 @@ export default function SkillDetailPage({
         ) : (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
             <p className="text-gray-600 text-lg">
-              Please enroll in this course to access the lesson content.
+              {isEnrolled
+                ? 'This private lesson content will be visible after you complete a skill swap.'
+                : 'Please enroll in this course to access the lesson content.'}
             </p>
           </div>
         )}

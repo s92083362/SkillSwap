@@ -82,11 +82,12 @@ export default function SkillPage({ skillId }: SkillPageProps) {
     setIsLessonOwner(skill.creatorId === user.uid);
   }, [user, skill]);
 
-  // enrollment + allowed sections
+  // enrollment + allowed sections (from Firestore)
   useEffect(() => {
     if (!user || !skillId || !skill) return;
 
     const fetchEnrollment = async () => {
+      // owner: always treated as enrolled with full access
       if (skill.creatorId === user.uid) {
         setIsEnrolled(true);
         const allSections = skill.sections?.map((sec) => sec.id) || [];
@@ -99,9 +100,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
       if (snap.exists()) {
         setIsEnrolled(true);
         const data = snap.data() as { allowedSections?: string[] };
-        setAllowedSections(
-          data.allowedSections || (skill.sections[0] ? [skill.sections[0].id] : [])
-        );
+        setAllowedSections(data.allowedSections || []);
       } else {
         setIsEnrolled(false);
         setAllowedSections([]);
@@ -172,7 +171,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
     void checkSwapStatus();
   }, [user, skillId, skill]);
 
-  // access (public / swap)
+  // access upgrades (swap → full access)
   useEffect(() => {
     if (!user || !skillId || !skill) return;
 
@@ -180,21 +179,31 @@ export default function SkillPage({ skillId }: SkillPageProps) {
       try {
         const allSections = skill.sections?.map((sec) => sec.id) || [];
 
+        // owner: full access already handled above
         if (skill.creatorId === user.uid) {
           setAllowedSections(allSections);
           return;
         }
 
+        // public lessons: enrollment already unlocks all
         if (skill.visibility === 'public') {
-          setAllowedSections(allSections);
-          await setEnrollment(user.uid, skillId, allSections);
           return;
         }
 
-        const snapshotRequester = await fetchSwapForRequester(user.uid, skillId);
-        if (!snapshotRequester.empty) {
+        // private (swap-only) lessons: only accepted swap unlocks all
+        const [snapshotRequester, snapshotCreator] = await Promise.all([
+          fetchSwapForRequester(user.uid, skillId),
+          fetchSwapForCreator(user.uid, skillId),
+        ]);
+
+        const hasAcceptedSwap =
+          !snapshotRequester.empty || !snapshotCreator.empty;
+
+        if (hasAcceptedSwap) {
           setAllowedSections(allSections);
-          await setEnrollment(user.uid, skillId, allSections);
+          if (isEnrolled) {
+            await setEnrollment(user.uid, skillId, allSections);
+          }
         }
       } catch (err) {
         console.error('Error checking access:', err);
@@ -202,7 +211,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
     };
 
     void checkAccess();
-  }, [user, skillId, skill]);
+  }, [user, skillId, skill, isEnrolled]);
 
   // enroll / unenroll
   async function handleEnrollToggle() {
@@ -210,12 +219,24 @@ export default function SkillPage({ skillId }: SkillPageProps) {
     setLoadingEnroll(true);
     try {
       if (isEnrolled) {
+        // Unenroll
         await deleteEnrollment(user.uid, skillId);
         setIsEnrolled(false);
         setAllowedSections([]);
       } else {
-        const firstSectionId = skill.sections[0]?.id;
-        const allowed = firstSectionId ? [firstSectionId] : [];
+        // Enroll: visibility decides initial allowed sections
+        const allSections = skill.sections?.map((sec) => sec.id) || [];
+
+        let allowed: string[] = [];
+
+        if (skill.visibility === 'public') {
+          // Public lessons: unlock all sections immediately after enrollment
+          allowed = allSections;
+        } else {
+          // Private (swap-only) lessons: no sections unlocked until swap is approved
+          allowed = [];
+        }
+
         await setEnrollment(user.uid, skillId, allowed);
         setIsEnrolled(true);
         setAllowedSections(allowed);
@@ -348,7 +369,14 @@ export default function SkillPage({ skillId }: SkillPageProps) {
           <>
             {skill.sections.map((section: LessonSection, idx: number) => {
               const sectionId = section.id || `section-${idx}`;
-              const isAllowed = allowedSections.includes(sectionId);
+              const isPrivate = skill.visibility === 'swap-only';
+
+              // For public lessons: all sections are accessible after enrollment
+              // For private lessons: sections locked until swap is approved
+              const isAllowed = isPrivate 
+                ? allowedSections.includes(sectionId)
+                : allowedSections.includes(sectionId);
+
               return (
                 <AccordionSection
                   key={sectionId}
@@ -387,7 +415,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
                   ) : (
                     <div className="bg-gray-50 p-6 rounded-lg text-center">
                       <p className="text-gray-600">
-                        This section is locked. Swap request approval will unlock it.
+                        This section is locked. Complete a skill swap to unlock all sections.
                       </p>
                     </div>
                   )}
