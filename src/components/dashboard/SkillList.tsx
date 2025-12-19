@@ -18,28 +18,10 @@ function useDebounce(value: string, delay: number) {
   return debounced;
 }
 
-const hardcodedSkills: Skill[] = [
-  {
-    id: "python-for-beginners",
-    title: "Python for Beginners",
-    description: "Learn Python basics with clear lessons and sample code.",
-    category: "Programming",
-    instructor: "Alex Doe",
-  },
-  {
-    id: "js-essentials",
-    title: "JavaScript Essentials",
-    description:
-      "Master JavaScript for modern web development, including all the fundamental building blocks.",
-    category: "Web Development",
-    instructor: "Sam Smith",
-  },
-];
-
 type LessonFromFirestore = Skill & { id: string };
 
 export default function SkillsListPage() {
-  const [skills, setSkills] = useState<Skill[]>(hardcodedSkills);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -62,7 +44,7 @@ export default function SkillsListPage() {
         const search = searchRaw.toLowerCase();
         const collRef = collection(db, "lessons");
 
-        // 1) Load all lessons (no Firestore-level filters)
+        // Load all lessons from Firestore
         const snapshot = await getDocs(collRef);
         const lessonsFromFirestore: LessonFromFirestore[] = snapshot.docs.map(
           (doc) => ({
@@ -71,49 +53,47 @@ export default function SkillsListPage() {
           })
         );
 
-        // 2) Merge and filter on client
-        const merged: Skill[] = [...hardcodedSkills, ...lessonsFromFirestore].filter(
-          (skill) => {
-            // Category tab filter
-            if (
-              category !== "all" &&
-              skill.category !== category &&
-              (skill as any).skillCategory !== category
-            ) {
-              return false;
-            }
-
-            if (!search) return true;
-
-            const s = search.toLowerCase();
-
-            // Actual stored category value
-            const rawSkillCategory = ((skill as any).skillCategory ||
-              skill.category ||
-              "") as string;
-
-            // Normalize: "Machine Learning" → "machinelearning"
-            const normalizedSkillCategory = rawSkillCategory
-              .toLowerCase()
-              .replace(/[\s/-]+/g, "");
-            const normalizedSearch = s.replace(/[\s/-]+/g, "");
-
-            const categoryMatches = normalizedSkillCategory.includes(
-              normalizedSearch
-            );
-
-            // Text search over title/description/instructor/category
-            const haystack = `${skill.title} ${skill.description} ${
-              skill.category || ""
-            } ${rawSkillCategory} ${skill.instructor || ""}`.toLowerCase();
-
-            const textMatches = haystack.includes(s);
-
-            return textMatches || categoryMatches;
+        // Filter on client
+        const filtered: Skill[] = lessonsFromFirestore.filter((skill) => {
+          // Category tab filter
+          if (
+            category !== "all" &&
+            skill.category !== category &&
+            (skill as any).skillCategory !== category
+          ) {
+            return false;
           }
-        );
 
-        setSkills(merged);
+          if (!search) return true;
+
+          const s = search.toLowerCase();
+
+          // Actual stored category value
+          const rawSkillCategory = ((skill as any).skillCategory ||
+            skill.category ||
+            "") as string;
+
+          // Normalize: "Machine Learning" → "machinelearning"
+          const normalizedSkillCategory = rawSkillCategory
+            .toLowerCase()
+            .replace(/[\s/-]+/g, "");
+          const normalizedSearch = s.replace(/[\s/-]+/g, "");
+
+          const categoryMatches = normalizedSkillCategory.includes(
+            normalizedSearch
+          );
+
+          // Text search over title/description/instructor/category
+          const haystack = `${skill.title} ${skill.description} ${
+            skill.category || ""
+          } ${rawSkillCategory} ${skill.instructor || ""}`.toLowerCase();
+
+          const textMatches = haystack.includes(s);
+
+          return textMatches || categoryMatches;
+        });
+
+        setSkills(filtered);
       } catch (err) {
         console.error("Failed to fetch filtered lessons:", err);
       } finally {
@@ -175,13 +155,13 @@ export default function SkillsListPage() {
           </div>
         )}
 
-        {/* Skills Grid */}
+        {/* Skills Grid - Changed to 4 columns on desktop */}
         {loading ? (
           <div className="text-center text-gray-500 text-lg">
             Loading skills...
           </div>
         ) : skills.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {skills.map((skill) => (
               <SkillCard key={skill.id ?? skill.title} skill={skill} />
             ))}
