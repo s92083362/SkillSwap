@@ -29,12 +29,51 @@ export default function SkillsListPage() {
 
   const categories: string[] = [
     "all",
-    "Programming",
-    "Web Development",
     "Frontend",
     "Backend",
     "DevOps",
+    "FullStack",
+    "DataScience",
+    "MachineLearning",
+    "AI",
+    "CyberSecurity",
+    "CloudComputing",
+    "MobileDevelopment",
+    "SoftwareEngineering",
+    "ComputerNetworks",
+    "DatabaseManagement",
+    "UIUXDesign",
   ];
+
+  const formatCategoryLabel = (cat: string) => {
+    if (cat === "all") return "All";
+    switch (cat) {
+      case "FullStack":
+        return "Full Stack";
+      case "DataScience":
+        return "Data Science";
+      case "MachineLearning":
+        return "Machine Learning";
+      case "AI":
+        return "Artificial Intelligence";
+      case "CyberSecurity":
+        return "Cybersecurity";
+      case "CloudComputing":
+        return "Cloud Computing";
+      case "MobileDevelopment":
+        return "Mobile Development";
+      case "SoftwareEngineering":
+        return "Software Engineering";
+      case "ComputerNetworks":
+        return "Computer Networks";
+      case "DatabaseManagement":
+        return "Database Management";
+      case "UIUXDesign":
+        return "UI/UX Design";
+      default:
+        return cat;
+    }
+  };
 
   const fetchFilteredLessons = useCallback(
     async (category: string, searchRaw: string) => {
@@ -145,7 +184,7 @@ export default function SkillsListPage() {
           >
             {categories.map((cat) => (
               <option key={cat} value={cat}>
-                {cat === "all" ? "All" : cat}
+                {formatCategoryLabel(cat)}
               </option>
             ))}
           </select>
@@ -163,7 +202,7 @@ export default function SkillsListPage() {
                   : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
               }`}
             >
-              {cat === "all" ? "All" : cat}
+              {formatCategoryLabel(cat)}
             </button>
           ))}
         </div>
