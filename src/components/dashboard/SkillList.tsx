@@ -108,14 +108,14 @@ export default function SkillsListPage() {
   }, [filter, debouncedSearch, fetchFilteredLessons]);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2 text-center">
+          <h1 className="text-3xl sm:text-4xl font-bold text-black mb-2 text-center">
             Explore Skills
           </h1>
-          <p className="text-gray-600 text-base sm:text-lg text-center">
+          <p className="text-gray-800 text-base sm:text-lg text-center">
             Browse and learn from our collection of courses
           </p>
         </div>
@@ -128,8 +128,31 @@ export default function SkillsListPage() {
           onClear={() => setSearchQuery("")}
         />
 
-        {/* Category Filter */}
-        <div className="mb-8 flex flex-wrap gap-2 justify-center">
+        {/* Category Filter - dropdown on mobile, buttons on larger screens */}
+        {/* Mobile dropdown */}
+        <div className="mb-4 sm:hidden">
+          <label
+            htmlFor="category-select"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Category
+          </label>
+          <select
+            id="category-select"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === "all" ? "All" : cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Tablet / Desktop buttons */}
+        <div className="mb-8 hidden sm:flex flex-wrap gap-2 justify-center">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -155,7 +178,7 @@ export default function SkillsListPage() {
           </div>
         )}
 
-        {/* Skills Grid - Changed to 4 columns on desktop */}
+        {/* Skills Grid */}
         {loading ? (
           <div className="text-center text-gray-500 text-lg">
             Loading skills...
