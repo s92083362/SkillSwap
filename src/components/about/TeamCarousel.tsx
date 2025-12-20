@@ -9,10 +9,10 @@ interface Member {
 }
 
 const members: Member[] = [
-  { name: "R.M.B.P.B. Weerakoon", role: "Lead Engineer / Fullstack", img: "https://ik.imagekit.io/gopichakradhar/luffy/o1.jpeg?updatedAt=1754289569411" },
-  { name: "R.M.Y.C.K. Rathnayake", role: "UI/UX Designer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o2.jpeg?updatedAt=1754289569307" },
-  { name: "D.M.S. Eswarage", role: "Backend Developer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o4.jpeg?updatedAt=1754289569398" },
-  { name: "P.V.V.R. Paranavitharana", role: "Frontend Developer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o3.jpeg?updatedAt=1754289569422" },
+  { name: "R.M.B.P.B. Weerakoon", role: "Lead Engineer / Fullstack", img: "https://i.ibb.co/0jcH7WVQ/Chat-GPT-Image-Dec-17-2025-08-08-09-AM.png" },
+  { name: "R.M.Y.C.K. Rathnayake", role: "UI/UX Designer", img: "https://i.ibb.co/JFKQGs4Z/Chat-GPT-Image-Dec-17-2025-08-13-03-AM.png" },
+  { name: "D.M.S. Eswarage", role: "Backend Developer", img: "https://i.ibb.co/FLBh5D80/Gemini-Generated-Image-ykdkk6ykdkk6ykdk.png" },
+  { name: "P.V.V.R. Paranavitharana", role: "Frontend Developer", img: "https://i.ibb.co/bjMV98rQ/Gemini-Generated-Image-di6qxpdi6qxpdi6q.png" },
   { name: "W.K. Amila Sandaruwan", role: "QA Engineer", img: "https://ik.imagekit.io/gopichakradhar/luffy/o5.jpeg?updatedAt=1754289569406" }
 ];
 
@@ -101,7 +101,7 @@ export default function TeamCarousel() {
         
         {/* Carousel Track */}
         <div 
-          className="relative w-[350px] md:w-[450px] h-[500px] md:h-[600px]" 
+          className="relative w-[350px] md:w-[450px] h-[600px] md:h-[700px]" 
           style={{perspective: '1000px'}}
         >
           {members.map((m, idx) => {
@@ -109,7 +109,7 @@ export default function TeamCarousel() {
             return (
               <div
                 key={m.name}
-                className={`card ${pos} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[180px] md:w-[400px] md:h-[225px] rounded-[20px] overflow-hidden cursor-pointer transition-all duration-[800ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)] shadow-[0_20px_40px_rgba(0,0,0,0.15)]`}
+                className={`card ${pos} absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[240px] md:w-[400px] md:h-[300px] rounded-[20px] overflow-hidden cursor-pointer transition-all duration-[800ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)] shadow-[0_20px_40px_rgba(0,0,0,0.15)]`}
                 style={{
                   transformStyle: 'preserve-3d',
                 }}
