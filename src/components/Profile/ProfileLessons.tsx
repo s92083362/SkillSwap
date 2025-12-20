@@ -1,15 +1,25 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../lib/firebase/firebaseConfig";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 
+type LessonItem = {
+  id: string;
+  title: string;
+  description: string;
+  instructor: string;
+  image: string;
+  uploaded: string;
+  status: "active" | "inactive";
+  enrolledAtDate: Date | null;
+};
+
 export default function ProfileLessons() {
   const router = useRouter();
   const [user] = useAuthState(auth);
-  const [lessons, setLessons] = useState<any[]>([]);
+  const [lessons, setLessons] = useState<LessonItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // pagination state
@@ -26,7 +36,12 @@ export default function ProfileLessons() {
     const fetchLessons = async () => {
       setLoading(true);
       try {
-        const enrolledRef = collection(db, "users", user.uid, "enrolledSkills");
+        const enrolledRef = collection(
+          db,
+          "users",
+          user.uid,
+          "enrolledSkills"
+        );
         const enrolledSnap = await getDocs(enrolledRef);
 
         const lessonPromises = enrolledSnap.docs.map(async (enrollDoc) => {
@@ -36,12 +51,12 @@ export default function ProfileLessons() {
           const lessonRef = doc(db, "lessons", lessonId);
           const lessonSnap = await getDoc(lessonRef);
 
-          const enrolledAt = enrollData.enrolledAt;
-          let uploaded = "";
+          const enrolledAt = (enrollData as any).enrolledAt;
+          let uploaded = "Unknown";
           let enrolledAtDate: Date | null = null;
 
-          if (enrolledAt && enrolledAt.toDate) {
-            enrolledAtDate = enrolledAt.toDate();
+          if (enrolledAt && typeof enrolledAt.toDate === "function") {
+            enrolledAtDate = enrolledAt.toDate() as Date;
             const now = new Date();
             const days = Math.floor(
               (now.getTime() - enrolledAtDate.getTime()) /
@@ -49,12 +64,10 @@ export default function ProfileLessons() {
             );
             uploaded =
               days === 0 ? "Today" : `${days} day${days > 1 ? "s" : ""} ago`;
-          } else {
-            uploaded = "Unknown";
           }
 
           if (lessonSnap.exists()) {
-            const lessonData = lessonSnap.data();
+            const lessonData = lessonSnap.data() as any;
             return {
               id: lessonId,
               title: lessonData.title || "Untitled Lesson",
@@ -62,10 +75,11 @@ export default function ProfileLessons() {
               instructor: lessonData.instructor || "",
               image: lessonData.image || "",
               uploaded,
-              status: "active",
+              status: "active" as const,
               enrolledAtDate,
             };
           }
+
           return {
             id: lessonId,
             title: lessonId.replace(/-/g, " "),
@@ -73,7 +87,7 @@ export default function ProfileLessons() {
             instructor: "",
             image: "",
             uploaded,
-            status: "inactive",
+            status: "inactive" as const,
             enrolledAtDate,
           };
         });
@@ -120,7 +134,9 @@ export default function ProfileLessons() {
   return (
     <section>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-        <h2 className="font-bold text-base sm:text-lg text-black">My Lessons</h2>
+        <h2 className="font-bold text-base sm:text-lg text-black">
+          My Lessons
+        </h2>
       </div>
 
       {loading ? (
@@ -217,7 +233,6 @@ export default function ProfileLessons() {
             ))}
           </ul>
 
-          {/* pagination controls, only if more than 4 lessons */}
           {lessons.length > pageSize && (
             <div className="flex items-center justify-between mb-4">
               <button
