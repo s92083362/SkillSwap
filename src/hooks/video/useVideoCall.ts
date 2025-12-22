@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { db } from "../../lib/firebase/firebaseConfig";
+import { db } from "@/lib/firebase/firebaseConfig";
 import {
   collection,
   addDoc,
@@ -10,11 +10,8 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
-  query,
-  orderBy,
   getDoc,
 } from "firebase/firestore";
-import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
 import { getLiveKitToken } from "@/lib/livekit/getLiveKitToken";
 import {
   Room,
@@ -25,6 +22,7 @@ import {
   Track,
   LocalTrackPublication,
 } from "livekit-client";
+import { usePresenceAndChat } from "@/hooks/chat/usePresenceAndChat";
 
 export interface VideoCallHookArgs {
   currentUserId: string;
@@ -43,6 +41,44 @@ export function useVideoCall({
   onClose,
   autoAnswer = false,
 }: VideoCallHookArgs) {
+  // shared presence + chat + files + draggable UI
+  const {
+    chatId,
+    isReceiverOnline,
+    showChat,
+    chatMessages,
+    chatInput,
+    unreadCount,
+    showAttachMenu,
+    selectedFile,
+    filePreview,
+    fileCaption,
+    uploading,
+    uploadError,
+    minimized,
+    offset,
+    dragHandleRef,
+    chatEndRef,
+    fileInputRef,
+    setShowChat,
+    setChatInput,
+    setUnreadCount,
+    setShowAttachMenu,
+    setFileCaption,
+    setMinimized,
+    setOffset,
+    handleFileSelect,
+    cancelFileUpload,
+    sendFileMessage,
+    sendChatMessage,
+  } = usePresenceAndChat(
+    currentUserId,
+    currentUserName,
+    otherUserId,
+    otherUserName
+  );
+
+  // LiveKit / call state
   const [room, setRoom] = useState<Room | null>(null);
   const [isCalling, setIsCalling] = useState(false);
   const [isReceivingCall, setIsReceivingCall] = useState(false);
@@ -58,43 +94,24 @@ export function useVideoCall({
   const [remoteScreenSharerName, setRemoteScreenSharerName] =
     useState<string | null>(null);
 
-  // Chat state
-  const [showChat, setShowChat] = useState(false);
-  const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // File upload state
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [fileCaption, setFileCaption] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-
-  // Draggable / minimize
-  const [minimized, setMinimized] = useState(false);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const dragHandleRef = useRef<HTMLDivElement | null>(null);
-
+  // media refs
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const screenShareRef = useRef<HTMLVideoElement>(null);
-  const callDocIdRef = useRef<string | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
   const outgoingAudioRef = useRef<HTMLAudioElement | null>(null);
   const incomingAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // signaling refs
+  const callDocIdRef = useRef<string | null>(null);
   const hasEndedRef = useRef(false);
   const callStatusUnsubscribeRef = useRef<(() => void) | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isOutgoingCallRef = useRef(false);
 
-  // Unified chatId / roomName
-  const chatId = [currentUserId, otherUserId].sort().join("_");
+  // LiveKit room name = chatId
   const roomName = chatId;
 
-  // ----- Helpers for safe call doc updates -----
+  // ---------- Firestore helpers ----------
 
   const safeUpdateCall = async (callId: string, data: any) => {
     try {
@@ -118,7 +135,6 @@ export function useVideoCall({
     }
   };
 
-  // save video call message into chat history
   const saveCallMessage = async (
     status: "completed" | "missed" | "rejected" | "cancelled"
   ) => {
@@ -167,7 +183,8 @@ export function useVideoCall({
     }
   };
 
-  // ----- Listen for call disconnect (other side ends) -----
+  // ---------- Firestore listeners ----------
+
   const listenForCallDisconnect = () => {
     if (!callDocIdRef.current) return;
 
@@ -179,7 +196,6 @@ export function useVideoCall({
         if (!hasEndedRef.current) {
           hasEndedRef.current = true;
           setCallStatus("Call ended");
-
           saveCallMessage(isConnected ? "completed" : "missed");
 
           setTimeout(() => {
@@ -194,8 +210,6 @@ export function useVideoCall({
     return unsubscribe;
   };
 
-  // ----- Listen for incoming calls -----
-
   const listenForIncomingCalls = () => {
     const callsRef = collection(db, "calls");
     const unsubscribe = onSnapshot(callsRef, (snapshot) => {
@@ -209,6 +223,7 @@ export function useVideoCall({
             !data.ended
           ) {
             setIsReceivingCall(true);
+            isOutgoingCallRef.current = false;
             callDocIdRef.current = change.doc.id;
             setCallStatus(`Incoming call from ${otherUserName}...`);
             playIncomingRingtone();
@@ -219,8 +234,6 @@ export function useVideoCall({
 
     return unsubscribe;
   };
-
-  // ----- Effects -----
 
   useEffect(() => {
     const unsubscribeIncoming = listenForIncomingCalls();
@@ -234,82 +247,71 @@ export function useVideoCall({
     };
   }, []);
 
+  // auto-answer
   useEffect(() => {
     if (autoAnswer && isReceivingCall && callDocIdRef.current) {
       answerCall();
     }
   }, [autoAnswer, isReceivingCall]);
 
+  // reflect presence in status for outgoing calls
   useEffect(() => {
-    const messagesRef = collection(db, "privateChats", chatId, "messages");
-    const q = query(messagesRef, orderBy("timestamp"));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages: any[] = [];
-      snapshot.forEach((d) => {
-        messages.push({ id: d.id, ...(d.data() as any) });
-      });
-      setChatMessages(messages);
-
-      if (!showChat) {
-        const newUnread = messages.filter(
-          (msg) =>
-            msg.senderId !== currentUserId &&
-            msg.timestamp?.toMillis &&
-            msg.timestamp.toMillis() > Date.now() - 5000
-        ).length;
-        setUnreadCount(newUnread);
+    if (isCalling && !isConnected && isOutgoingCallRef.current) {
+      if (isReceiverOnline === true) {
+        setCallStatus("Ringing...");
+      } else if (isReceiverOnline === false) {
+        setCallStatus("Calling...");
       }
-    });
+    }
+  }, [isReceiverOnline, isCalling, isConnected]);
 
-    return () => unsubscribe();
-  }, [chatId, showChat, currentUserId]);
-
+  // 30s timeout
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
+    const shouldStartTimer =
+      (isCalling || isReceivingCall) && !isConnected && !hasEndedRef.current;
 
-  useEffect(() => {
-    if (showChat) setUnreadCount(0);
-  }, [showChat]);
+    if (!shouldStartTimer) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      return;
+    }
 
-  useEffect(() => {
-    if (!minimized) return;
+    timeoutRef.current = setTimeout(async () => {
+      if (hasEndedRef.current || isConnected) return;
 
-    let isDragging = false;
-    let startX = 0;
-    let startY = 0;
+      if (callDocIdRef.current) {
+        await safeUpdateCall(callDocIdRef.current, {
+          ended: true,
+          endedBy: currentUserId,
+          endedAt: serverTimestamp(),
+          timeout: true,
+        });
+        await saveCallMessage("missed");
+        setTimeout(async () => {
+          if (callDocIdRef.current) await safeDeleteCall(callDocIdRef.current);
+        }, 400);
+      }
 
-    const handleMouseDown = (e: MouseEvent) => {
-      isDragging = true;
-      startX = e.clientX - offset.x;
-      startY = e.clientY - offset.y;
-    };
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      setOffset({
-        x: e.clientX - startX,
-        y: e.clientY - startY,
-      });
-    };
-    const handleMouseUp = () => {
-      isDragging = false;
-    };
+      setCallStatus("No answer");
+      hasEndedRef.current = true;
+      cleanup(true);
 
-    const el = dragHandleRef.current;
-    el?.addEventListener("mousedown", handleMouseDown as any);
-    window.addEventListener("mousemove", handleMouseMove as any);
-    window.addEventListener("mouseup", handleMouseUp as any);
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    }, 30_000);
 
     return () => {
-      el?.removeEventListener("mousedown", handleMouseDown as any);
-      window.removeEventListener("mousemove", handleMouseMove as any);
-      window.removeEventListener("mouseup", handleMouseUp as any);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
-  }, [minimized, offset.x, offset.y]);
+  }, [isCalling, isReceivingCall, isConnected, currentUserId, onClose]);
 
-  // ----- Local screen share view (attach local screen track) -----
-
+  // local screen share preview
   useEffect(() => {
     if (!room) return;
 
@@ -348,7 +350,7 @@ export function useVideoCall({
     };
   }, [room, isScreenSharing]);
 
-  // ----- Ringtones -----
+  // ---------- Ringtones ----------
 
   const playOutgoingRingtone = () => {
     try {
@@ -376,7 +378,7 @@ export function useVideoCall({
     }
   };
 
-  // ----- LiveKit Room Setup -----
+  // ---------- LiveKit room setup ----------
 
   const setupLiveKitRoom = async () => {
     try {
@@ -390,10 +392,7 @@ export function useVideoCall({
         adaptiveStream: true,
         dynacast: true,
         videoCaptureDefaults: {
-          resolution: {
-            width: 1280,
-            height: 720,
-          },
+          resolution: { width: 1280, height: 720 },
         },
       });
 
@@ -405,11 +404,23 @@ export function useVideoCall({
         handleParticipantDisconnected
       );
       newRoom.on(RoomEvent.Disconnected, handleDisconnected);
-      newRoom.on(RoomEvent.Connected, () => {
+
+      // mark connected when remote joins
+      newRoom.on(RoomEvent.ParticipantConnected, () => {
         setIsConnected(true);
         setCallStatus("Connected");
         stopOutgoingRingtone();
         stopIncomingRingtone();
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+      });
+
+      newRoom.on(RoomEvent.Connected, async () => {
+        if (!isOutgoingCallRef.current) {
+          stopIncomingRingtone();
+        }
       });
 
       const wsUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
@@ -429,8 +440,6 @@ export function useVideoCall({
       }
 
       setRoom(newRoom);
-      setCallStatus("Connected");
-
       listenForCallDisconnect();
 
       return newRoom;
@@ -452,7 +461,7 @@ export function useVideoCall({
     }
   };
 
-  // ----- LiveKit Event Handlers -----
+  // ---------- LiveKit event handlers ----------
 
   const handleTrackSubscribed = (
     track: RemoteTrack,
@@ -516,7 +525,14 @@ export function useVideoCall({
 
   const handleParticipantConnected = (participant: RemoteParticipant) => {
     console.log("Participant connected:", participant.identity);
+    setIsConnected(true);
     setCallStatus("Connected");
+    stopOutgoingRingtone();
+    stopIncomingRingtone();
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   };
 
   const handleParticipantDisconnected = (participant: RemoteParticipant) => {
@@ -547,11 +563,18 @@ export function useVideoCall({
     }
   };
 
-  // ----- Call flow -----
+  // ---------- Call flow ----------
 
   const startCall = async () => {
     setIsCalling(true);
-    setCallStatus("Calling...");
+    isOutgoingCallRef.current = true;
+
+    if (isReceiverOnline === true) {
+      setCallStatus("Ringing...");
+    } else {
+      setCallStatus("Calling...");
+    }
+
     playOutgoingRingtone();
 
     try {
@@ -560,11 +583,12 @@ export function useVideoCall({
         fromName: currentUserName,
         to: otherUserId,
         toName: otherUserName,
-        roomName: roomName,
+        roomName,
         answered: false,
         ended: false,
         declined: false,
         timestamp: serverTimestamp(),
+        calleeOnlineAtDial: isReceiverOnline === true,
       });
 
       callDocIdRef.current = callDoc.id;
@@ -584,8 +608,6 @@ export function useVideoCall({
         read: false,
         actions: ["Answer", "Decline"],
       });
-
-      setCallStatus("Ringing...");
     } catch (error) {
       console.error("Error starting call:", error);
       setCallStatus("Failed to start call");
@@ -628,6 +650,7 @@ export function useVideoCall({
           ended: true,
           declined: true,
           declinedAt: serverTimestamp(),
+          endedBy: currentUserId,
         });
 
         await saveCallMessage("rejected");
@@ -647,7 +670,40 @@ export function useVideoCall({
     onClose();
   };
 
-  // ----- Controls -----
+  const endCall = async () => {
+    if (hasEndedRef.current) {
+      cleanup(true);
+      onClose();
+      return;
+    }
+
+    hasEndedRef.current = true;
+
+    if (callDocIdRef.current) {
+      try {
+        await safeUpdateCall(callDocIdRef.current, {
+          ended: true,
+          endedBy: currentUserId,
+          endedAt: serverTimestamp(),
+        });
+
+        await saveCallMessage(isConnected ? "completed" : "cancelled");
+
+        setTimeout(async () => {
+          if (callDocIdRef.current) {
+            await safeDeleteCall(callDocIdRef.current);
+          }
+        }, 1000);
+      } catch (error) {
+        console.error("Error ending call:", error);
+      }
+    }
+
+    cleanup(true);
+    onClose();
+  };
+
+  // ---------- Controls ----------
 
   const toggleMute = async () => {
     if (room) {
@@ -721,169 +777,16 @@ export function useVideoCall({
     }
   };
 
-  // ----- Chat send -----
-
-  const sendChatMessage = async () => {
-    if (!chatInput.trim()) return;
-    const text = chatInput.trim();
-
-    try {
-      await addDoc(collection(db, "privateChats", chatId, "messages"), {
-        senderId: currentUserId,
-        senderName: currentUserName,
-        content: text,
-        type: "text",
-        fileUrl: null,
-        fileName: null,
-        timestamp: serverTimestamp(),
-      });
-
-      await addDoc(collection(db, "messages"), {
-        senderId: currentUserId,
-        senderName: currentUserName,
-        receiverId: otherUserId,
-        content: text,
-        type: "text",
-        fileUrl: null,
-        conversationId: chatId,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
-
-      await updateDoc(doc(db, "privateChats", chatId), {
-        lastMessage: text,
-        lastUpdated: serverTimestamp(),
-      });
-
-      setChatInput("");
-    } catch (error) {
-      console.error("Error sending chat message:", error);
-    }
-  };
-
-  // ----- File helpers -----
-
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
-    setShowAttachMenu(false);
-
-    if (file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setFilePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setFilePreview(null);
-    }
-  };
-
-  const cancelFileUpload = () => {
-    setSelectedFile(null);
-    setFilePreview(null);
-    setFileCaption("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const sendFileMessage = async () => {
-    if (!selectedFile) return;
-
-    const file = selectedFile;
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      setUploadError("File size must be less than 10MB");
-      setTimeout(() => setUploadError(null), 5000);
-      return;
-    }
-
-    try {
-      setUploading(true);
-      setUploadError(null);
-
-      const { url, resourceType } = await uploadChatFileToCloudinary(file);
-      const isImage = resourceType === "image" && file.type.startsWith("image/");
-      const displayContent = fileCaption || (isImage ? "" : file.name);
-      const type = isImage ? "image" : "file";
-
-      await addDoc(collection(db, "privateChats", chatId, "messages"), {
-        senderId: currentUserId,
-        senderName: currentUserName,
-        content: displayContent,
-        type,
-        fileUrl: url,
-        fileName: file.name,
-        timestamp: serverTimestamp(),
-      });
-
-      await addDoc(collection(db, "messages"), {
-        senderId: currentUserId,
-        senderName: currentUserName,
-        receiverId: otherUserId,
-        content: displayContent,
-        type,
-        fileUrl: url,
-        conversationId: chatId,
-        timestamp: serverTimestamp(),
-        read: false,
-      });
-
-      await updateDoc(doc(db, "privateChats", chatId), {
-        lastMessage: isImage ? "📷 Photo" : `📎 ${file.name}`,
-        lastUpdated: serverTimestamp(),
-      });
-
-      cancelFileUpload();
-    } catch (error: any) {
-      console.error("Error sending file message:", error);
-      setUploadError(
-        error instanceof Error ? error.message : "Failed to upload file"
-      );
-      setTimeout(() => setUploadError(null), 5000);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // ----- End call / cleanup -----
-
-  const endCall = async () => {
-    if (hasEndedRef.current) {
-      cleanup(true);
-      onClose();
-      return;
-    }
-
-    hasEndedRef.current = true;
-
-    if (callDocIdRef.current) {
-      try {
-        await safeUpdateCall(callDocIdRef.current, {
-          ended: true,
-          endedBy: currentUserId,
-          endedAt: serverTimestamp(),
-        });
-
-        await saveCallMessage(isConnected ? "completed" : "cancelled");
-
-        setTimeout(async () => {
-          if (callDocIdRef.current) {
-            await safeDeleteCall(callDocIdRef.current);
-          }
-        }, 1000);
-      } catch (error) {
-        console.error("Error ending call:", error);
-      }
-    }
-
-    cleanup(true);
-    onClose();
-  };
+  // ---------- Cleanup & permissions ----------
 
   const cleanup = (disconnectOnly = false) => {
     stopOutgoingRingtone();
     stopIncomingRingtone();
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     if (callStatusUnsubscribeRef.current) {
       callStatusUnsubscribeRef.current();
@@ -905,8 +808,6 @@ export function useVideoCall({
     setIsScreenSharing(false);
     setRemoteScreenSharing(false);
   };
-
-  // ----- Permission instructions -----
 
   const getBrowserInstructions = () => {
     const userAgent =
@@ -932,10 +833,10 @@ export function useVideoCall({
     }
   };
 
-  // ----- Return all data for JSX -----
+  // ---------- Returned API ----------
 
   return {
-    // state
+    // call state
     isCalling,
     isReceivingCall,
     callStatus,
@@ -948,6 +849,9 @@ export function useVideoCall({
     isConnected,
     remoteScreenSharing,
     remoteScreenSharerName,
+
+    // presence + chat
+    isReceiverOnline,
     showChat,
     chatMessages,
     chatInput,
@@ -971,7 +875,7 @@ export function useVideoCall({
     outgoingAudioRef,
     incomingAudioRef,
 
-    // actions / helpers
+    // actions
     setShowChat,
     setUnreadCount,
     setShowAttachMenu,

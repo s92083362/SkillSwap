@@ -15,10 +15,7 @@ import {
 import { useAudioCall, AudioCallProps } from "@/hooks/audio/useAudioCall";
 
 export default function AudioCall(props: AudioCallProps) {
-  const {
-    currentUserId,
-    otherUserName,
-  } = props;
+  const { currentUserId, otherUserName } = props;
 
   const {
     // state
@@ -38,6 +35,7 @@ export default function AudioCall(props: AudioCallProps) {
     fileCaption,
     uploading,
     uploadError,
+    isReceiverOnline,
 
     // refs
     incomingAudioRef,
@@ -68,6 +66,14 @@ export default function AudioCall(props: AudioCallProps) {
     sendFileMessage,
   } = useAudioCall(props);
 
+  const topStatusText = isConnected
+    ? "Connected"
+    : isCalling
+    ? isReceiverOnline
+      ? "Ringing"
+      : "Calling"
+    : callStatus;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-2 sm:p-4">
       <audio ref={incomingAudioRef} src="/sounds/incoming-call.mp3" loop />
@@ -78,14 +84,16 @@ export default function AudioCall(props: AudioCallProps) {
         {/* Main call interface */}
         <div className="bg-gray-900 text-white rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 w-full lg:max-w-sm flex flex-col items-center gap-3 sm:gap-4 shadow-2xl flex-shrink-0">
           <p className="text-xs sm:text-sm text-gray-300 text-center">
-            {isConnected ? "Connected" : callStatus}
+            {topStatusText}
           </p>
           <h2 className="text-xl sm:text-2xl font-semibold text-center">
             {otherUserName}
           </h2>
 
           {!isConnected && isCalling && (
-            <p className="text-xs text-gray-400">Ringing...</p>
+            <p className="text-xs text-gray-400">
+              {isReceiverOnline ? "Ringing..." : "Calling..."}
+            </p>
           )}
           {!isConnected && isReceivingCall && (
             <p className="text-xs text-gray-400">Incoming audio call...</p>
@@ -227,8 +235,7 @@ export default function AudioCall(props: AudioCallProps) {
                       {msg.type === "audio-call" && (
                         <p className="text-xs sm:text-sm italic">
                           {msg.callStatus === "completed" && "Audio call"}
-                          {msg.callStatus === "missed" &&
-                            "Missed audio call"}
+                          {msg.callStatus === "missed" && "Missed audio call"}
                           {msg.callStatus === "rejected" &&
                             "Rejected audio call"}
                           {msg.callStatus === "cancelled" &&
