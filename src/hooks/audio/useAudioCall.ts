@@ -48,6 +48,23 @@ export interface ChatMessage {
   callDirection?: "incoming" | "outgoing";
 }
 
+/** Presence hook: reads /status/{uid}.state === "online" */
+function useUserOnline(userId: string) {
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    const ref = doc(db, "status", userId);
+    const unsub = onSnapshot(ref, (snap) => {
+      const data = snap.data() as any;
+      setIsOnline(data?.state === "online");
+    });
+    return () => unsub();
+  }, [userId]);
+
+  return isOnline;
+}
+
 export function useAudioCall({
   currentUserId,
   currentUserName,
@@ -64,6 +81,8 @@ export function useAudioCall({
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerOff, setIsSpeakerOff] = useState(false);
 
+  const isReceiverOnline = useUserOnline(otherUserId);
+
   // Chat state
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -78,13 +97,20 @@ export function useAudioCall({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  const [audioBlocked, setAudioBlocked] = useState(false);
+
   const callDocIdRef = useRef<string | null>(null);
   const hasEndedRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const incomingAudioRef = useRef<HTMLAudioElement | null>(null);
   const outgoingAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // NEW: Track if we're the caller (outgoing) vs receiver (incoming)
+  const isOutgoingCallRef = useRef(false);
 
   const chatId = [currentUserId, otherUserId].sort().join("_");
   const roomName = chatId;
@@ -156,7 +182,7 @@ export function useAudioCall({
     const unsub = onSnapshot(callsRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type !== "added") return;
-        const data = change.doc.data();
+        const data = change.doc.data() as any;
         if (
           data.callType !== "audio" ||
           data.to !== currentUserId ||
@@ -167,6 +193,7 @@ export function useAudioCall({
           return;
         }
         callDocIdRef.current = change.doc.id;
+        isOutgoingCallRef.current = false; // incoming
         setIsReceivingCall(true);
         setCallStatus(`Incoming audio call from ${otherUserName}`);
         playIncoming();
@@ -193,7 +220,7 @@ export function useAudioCall({
           }
           return;
         }
-        const data = snap.data();
+        const data = snap.data() as any;
         if (data?.ended && !hasEndedRef.current) {
           hasEndedRef.current = true;
           const endedByOther = data.endedBy && data.endedBy !== currentUserId;
@@ -225,9 +252,14 @@ export function useAudioCall({
   };
 
   const playIncoming = () => {
-    try {
-      incomingAudioRef.current?.play().catch(() => {});
-    } catch {}
+    const el = incomingAudioRef.current;
+    if (!el) return;
+    const p = el.play();
+    if (p && typeof p.then === "function") {
+      p.catch((err) => {
+        console.warn("Incoming ring play blocked:", err);
+      });
+    }
   };
 
   const stopIncoming = () => {
@@ -237,9 +269,14 @@ export function useAudioCall({
   };
 
   const playOutgoing = () => {
-    try {
-      outgoingAudioRef.current?.play().catch(() => {});
-    } catch {}
+    const el = outgoingAudioRef.current;
+    if (!el) return;
+    const p = el.play();
+    if (p && typeof p.then === "function") {
+      p.catch((err) => {
+        console.warn("Outgoing ring play blocked:", err);
+      });
+    }
   };
 
   const stopOutgoing = () => {
@@ -256,6 +293,13 @@ export function useAudioCall({
     if (track.kind === Track.Kind.Audio) {
       if (remoteAudioRef.current) {
         track.attach(remoteAudioRef.current);
+        const p = remoteAudioRef.current.play();
+        if (p && typeof p.then === "function") {
+          p.catch((err) => {
+            console.warn("Remote audio play blocked:", err);
+            setAudioBlocked(true);
+          });
+        }
       } else {
         track.attach();
       }
@@ -271,7 +315,11 @@ export function useAudioCall({
   };
 
   const setupAudioRoom = async () => {
-    const token = await getLiveKitToken(roomName, currentUserName, currentUserId);
+    const token = await getLiveKitToken(
+      roomName,
+      currentUserName,
+      currentUserId
+    );
     const newRoom = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -282,15 +330,25 @@ export function useAudioCall({
 
     newRoom.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
     newRoom.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
-    newRoom.on(RoomEvent.ParticipantConnected, () => {
-      setCallStatus("Connected");
-    });
 
-    newRoom.on(RoomEvent.Connected, async () => {
+    // Remote participant joins = call is now truly connected on caller side
+    newRoom.on(RoomEvent.ParticipantConnected, () => {
       setIsConnected(true);
       setCallStatus("Connected");
       stopIncoming();
       stopOutgoing();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    });
+
+    // Local connect: DON'T stop outgoing ringtone here for outgoing calls
+    newRoom.on(RoomEvent.Connected, async () => {
+      // Only stop incoming ringtone if we're receiving
+      if (!isOutgoingCallRef.current) {
+        stopIncoming();
+      }
       try {
         await newRoom.localParticipant.setCameraEnabled(false);
       } catch (e) {
@@ -323,8 +381,16 @@ export function useAudioCall({
 
   const startCall = async () => {
     setIsCalling(true);
-    setCallStatus("Calling...");
+    isOutgoingCallRef.current = true; // outgoing
+
+    if (isReceiverOnline === true) {
+      setCallStatus("Ringing...");
+    } else {
+      setCallStatus("Calling...");
+    }
+
     playOutgoing();
+
     try {
       const callDoc = await addDoc(collection(db, "calls"), {
         from: currentUserId,
@@ -337,11 +403,11 @@ export function useAudioCall({
         ended: false,
         declined: false,
         timestamp: serverTimestamp(),
+        calleeOnlineAtDial: isReceiverOnline === true,
       });
       callDocIdRef.current = callDoc.id;
       hasEndedRef.current = false;
       await setupAudioRoom();
-      setCallStatus("Ringing...");
     } catch (e) {
       console.error("Failed to start call:", e);
       setCallStatus("Failed to start call");
@@ -350,21 +416,30 @@ export function useAudioCall({
     }
   };
 
+  // UPDATED: receiver sees "Connected" immediately after answering
   const answerCall = async () => {
     if (!callDocIdRef.current) return;
+
     setCallStatus("Connecting...");
     stopIncoming();
     setIsReceivingCall(false);
     hasEndedRef.current = false;
+
     try {
       await safeUpdateCall(callDocIdRef.current, {
         answered: true,
         answeredAt: serverTimestamp(),
       });
+
+      // Mark receiver as connected right after answering
+      setIsConnected(true);
+      setCallStatus("Connected");
+
       await setupAudioRoom();
     } catch (e) {
       console.error("Failed to answer call:", e);
       setCallStatus("Failed to answer call");
+      setIsConnected(false);
     }
   };
 
@@ -412,6 +487,10 @@ export function useAudioCall({
   const cleanup = (disconnectOnly = false) => {
     stopIncoming();
     stopOutgoing();
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (room) {
       room.disconnect();
       setRoom(null);
@@ -559,15 +638,70 @@ export function useAudioCall({
       unsubDisconnect?.();
       cleanup(true);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (autoAnswer && isReceivingCall && callDocIdRef.current) {
       answerCall();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnswer, isReceivingCall]);
+
+  // Monitor receiver's online status and update call status accordingly (for outgoing calls)
+  useEffect(() => {
+    if (isCalling && !isConnected && isOutgoingCallRef.current) {
+      if (isReceiverOnline === true) {
+        setCallStatus("Ringing...");
+      } else if (isReceiverOnline === false) {
+        setCallStatus("Calling...");
+      }
+    }
+  }, [isReceiverOnline, isCalling, isConnected]);
+
+  // 30s timeout
+  useEffect(() => {
+    const shouldStartTimer =
+      (isCalling || isReceivingCall) && !isConnected && !hasEndedRef.current;
+
+    if (!shouldStartTimer) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      return;
+    }
+
+    timeoutRef.current = setTimeout(async () => {
+      if (hasEndedRef.current || isConnected) return;
+
+      if (callDocIdRef.current) {
+        await safeUpdateCall(callDocIdRef.current, {
+          ended: true,
+          endedBy: currentUserId,
+          endedAt: serverTimestamp(),
+          timeout: true,
+        });
+        await saveCallMessage("missed");
+        setTimeout(async () => {
+          if (callDocIdRef.current) await safeDeleteCall(callDocIdRef.current);
+        }, 400);
+      }
+
+      setCallStatus("No answer");
+      hasEndedRef.current = true;
+      cleanup(true);
+
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+    }, 30_000);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [isCalling, isReceivingCall, isConnected, currentUserId, onClose]);
 
   useEffect(() => {
     const messagesRef = collection(db, "privateChats", chatId, "messages");
@@ -614,6 +748,15 @@ export function useAudioCall({
     }
   }, [room, isConnected]);
 
+  const tryEnableRemoteAudio = () => {
+    const el = remoteAudioRef.current;
+    if (!el) return;
+    el
+      .play()
+      .then(() => setAudioBlocked(false))
+      .catch(() => setAudioBlocked(true));
+  };
+
   // ----- Return values for UI -----
 
   return {
@@ -634,6 +777,8 @@ export function useAudioCall({
     fileCaption,
     uploading,
     uploadError,
+    isReceiverOnline,
+    audioBlocked,
 
     // refs
     incomingAudioRef,
@@ -656,6 +801,7 @@ export function useAudioCall({
     endCall,
     toggleMute,
     toggleSpeaker,
+    tryEnableRemoteAudio,
 
     // chat / file
     sendChatMessage,

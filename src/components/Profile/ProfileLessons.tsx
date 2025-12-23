@@ -58,15 +58,12 @@ export default function ProfileLessons() {
           if (enrolledAt && typeof enrolledAt.toDate === "function") {
             enrolledAtDate = enrolledAt.toDate() as Date;
             const now = new Date();
-            // Add null check here
-            if (enrolledAtDate) {
-              const days = Math.floor(
-                (now.getTime() - enrolledAtDate.getTime()) /
-                  (1000 * 60 * 60 * 24)
-              );
-              uploaded =
-                days === 0 ? "Today" : `${days} day${days > 1 ? "s" : ""} ago`;
-            }
+            const days = Math.floor(
+              (now.getTime() - enrolledAtDate.getTime()) /
+                (1000 * 60 * 60 * 24)
+            );
+            uploaded =
+              days === 0 ? "Today" : `${days} day${days > 1 ? "s" : ""} ago`;
           }
 
           if (lessonSnap.exists()) {
