@@ -4,8 +4,8 @@
 import { useCurrentUser } from "@/hooks/users/useCurrentUser";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import AdminDashboard from "@/components/dashboard/AdminDashboard";
-import UserDashboard from "@/components/dashboard/UserDashboard";
+import AdminDashboard from "@/components/dashboard/admin/AdminDashboard";
+import UserDashboard from "@/components/dashboard/user/UserDashboard";
 
 export default function DashboardPage() {
   const { user, role, loading } = useCurrentUser();
