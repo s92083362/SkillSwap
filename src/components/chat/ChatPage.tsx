@@ -57,8 +57,8 @@ export default function ChatPage() {
   const autoAnswerCallId = searchParams.get("callId");
   const urlCallType = searchParams.get("callType");
 
-  // Custom hooks
-  const user = useCurrentUser() as ChatUser | null;
+  // Custom hooks - FIX: Destructure user from useCurrentUser()
+  const { user } = useCurrentUser();
   const { allUsers, error: usersError } = useAllUsers() as {
     allUsers: ChatUser[];
     error: string | null;
@@ -124,6 +124,7 @@ export default function ChatPage() {
         void selectUser(targetUser);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUserId, autoAnswerCallId, urlCallType, allUsers, user]);
 
   // Auto-scroll messages
@@ -176,7 +177,6 @@ export default function ChatPage() {
       );
     });
 
-    // Important: return unsubscribe if you call selectUser inside a useEffect
     return () => unsub();
   };
 
@@ -221,7 +221,7 @@ export default function ChatPage() {
     const text = input.trim();
 
     try {
-      await sendTextMessage(user, selectedUser, text, chatId);
+      await sendTextMessage(user as ChatUser, selectedUser, text, chatId);
       setInput("");
     } catch (error) {
       console.error("Error sending message:", error);
@@ -236,7 +236,7 @@ export default function ChatPage() {
       setUploading(true);
       setUploadError(null);
       await sendFileMessage(
-        user,
+        user as ChatUser,
         selectedUser,
         selectedFile,
         fileCaption,

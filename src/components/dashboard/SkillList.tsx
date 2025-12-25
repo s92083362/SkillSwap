@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import SkillCard, { Skill } from "./SkillCard";
+import SkillCard, { Skill } from "./UserSkillCard";
 import SearchBar from "./SearchBar";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
@@ -18,6 +18,7 @@ function useDebounce(value: string, delay: number) {
   return debounced;
 }
 
+// Firestore lesson type
 type LessonFromFirestore = Skill & { id: string };
 
 export default function SkillsListPage() {
@@ -86,14 +87,20 @@ export default function SkillsListPage() {
         // Load all lessons from Firestore
         const snapshot = await getDocs(collRef);
         const lessonsFromFirestore: LessonFromFirestore[] = snapshot.docs.map(
-          (doc) => ({
-            id: doc.id,
-            ...(doc.data() as Omit<LessonFromFirestore, "id">),
-          })
+          (d) =>
+            ({
+              id: d.id,
+              ...(d.data() as Omit<LessonFromFirestore, "id">),
+            } satisfies LessonFromFirestore)
         );
 
         // Filter on client
         const filtered: Skill[] = lessonsFromFirestore.filter((skill) => {
+          // Hide skills where visibleOnHome is explicitly false
+          if ((skill as any).visibleOnHome === false) {
+            return false;
+          }
+
           // Category tab filter
           if (
             category !== "all" &&
@@ -149,16 +156,6 @@ export default function SkillsListPage() {
   return (
     <div className="min-h-screen py-10 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-black mb-2 text-center">
-            Explore Skills
-          </h1>
-          <p className="text-gray-800 text-base sm:text-lg text-center">
-            Browse and learn from our collection of courses
-          </p>
-        </div>
-
         {/* Search Bar */}
         <SearchBar
           value={searchQuery}
@@ -167,7 +164,6 @@ export default function SkillsListPage() {
           onClear={() => setSearchQuery("")}
         />
 
-        {/* Category Filter - dropdown on mobile, buttons on larger screens */}
         {/* Mobile dropdown */}
         <div className="mb-4 sm:hidden">
           <label

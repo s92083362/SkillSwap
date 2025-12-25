@@ -8,92 +8,118 @@ import {
   signInWithPopup,
   sendPasswordResetEmail,
   updateProfile,
-  User
+  User,
+  onAuthStateChanged,
+  getAuth,
 } from "firebase/auth";
-import { auth } from "./firebaseConfig";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "./firebaseConfig";
+
+// 1) set your fixed admin email(s) here
+const ADMIN_EMAILS = ["admin@skillswap.com"]; // <-- change to your real admin email(s)
+
+// 2) helper: create/update user doc with role
+async function ensureUserDoc(user: User) {
+  const ref = doc(db, "users", user.uid);
+  const snap = await getDoc(ref);
+
+  const isAdmin = ADMIN_EMAILS.includes(user.email || "");
+
+  if (!snap.exists()) {
+    await setDoc(
+      ref,
+      {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: isAdmin ? "admin" : "user",
+        createdAt: Date.now(),
+      },
+      { merge: true }
+    );
+  } else if (isAdmin) {
+    // make sure this account always has admin role
+    await setDoc(ref, { role: "admin" }, { merge: true });
+  }
+}
 
 /**
  * Logs in a user with email/password.
- * @returns Promise<User>
- * @throws FirebaseAuthError
  */
 export async function login(email: string, password: string): Promise<User> {
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return userCredential.user;
-  } catch (error) {
-    // You can augment error handling here, e.g. parse Firebase error codes
-    throw error;
-  }
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+  await ensureUserDoc(userCredential.user);
+  return userCredential.user;
 }
 
 /**
  * Registers a new user and sets display name.
- * @returns Promise<User>
- * @throws FirebaseAuthError
  */
-export async function register(email: string, password: string, name: string): Promise<User> {
-  try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName: name });
-    return userCredential.user;
-  } catch (error) {
-    throw error;
-  }
+export async function register(
+  email: string,
+  password: string,
+  name: string
+): Promise<User> {
+  // optional: you can block registration with admin email from UI if you like
+  const userCredential = await createUserWithEmailAndPassword(
+    auth,
+    email,
+    password
+  );
+  await updateProfile(userCredential.user, { displayName: name });
+  await ensureUserDoc(userCredential.user);
+  return userCredential.user;
 }
 
 /**
  * Logs out the current user.
- * @returns Promise<void>
- * @throws FirebaseAuthError
  */
 export async function logout(): Promise<void> {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    throw error;
-  }
+  await signOut(auth);
 }
 
 /**
  * Logs in user via Google Sign-In popup.
- * @returns Promise<User>
- * @throws FirebaseAuthError
  */
 export async function googleLogin(): Promise<User> {
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return result.user;
-  } catch (error) {
-    throw error;
-  }
+  const provider = new GoogleAuthProvider();
+  const result = await signInWithPopup(auth, provider);
+  await ensureUserDoc(result.user);
+  return result.user;
 }
 
 /**
  * Logs in user via Facebook Sign-In popup.
- * @returns Promise<User>
- * @throws FirebaseAuthError
  */
 export async function facebookLogin(): Promise<User> {
-  try {
-    const provider = new FacebookAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    return result.user;
-  } catch (error) {
-    throw error;
-  }
+  const provider = new FacebookAuthProvider();
+  const result = await signInWithPopup(auth, provider);
+  await ensureUserDoc(result.user);
+  return result.user;
 }
 
 /**
  * Sends a password reset email to the user.
- * @returns Promise<void>
- * @throws FirebaseAuthError
  */
 export async function resetPassword(email: string): Promise<void> {
-  try {
-    await sendPasswordResetEmail(auth, email);
-  } catch (error) {
-    throw error;
-  }
+  await sendPasswordResetEmail(auth, email);
+}
+
+/**
+ * Subscribe to auth + role (for hooks / components).
+ */
+export function onAuthStateChangedWithRole(
+  callback: (user: User | null, role: "admin" | "user" | null) => void
+) {
+  const firebaseAuth = getAuth();
+  return onAuthStateChanged(firebaseAuth, async (user) => {
+    if (!user) {
+      callback(null, null);
+      return;
+    }
+    const ref = doc(db, "users", user.uid);
+    const snap = await getDoc(ref);
+    const role = (snap.data()?.role as "admin" | "user") || "user";
+    callback(user, role);
+  });
 }
