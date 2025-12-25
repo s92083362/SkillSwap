@@ -1,3 +1,4 @@
+
 "use client";
  
 import React, { useState } from "react";
@@ -34,6 +35,7 @@ export default function ProfileSidebar({
 }: ProfileSidebarProps) {
   const router = useRouter();
   const [success, setSuccess] = useState("");
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [user, loading] = useAuthState(auth as any);
  
   const navItems: { key: SectionKey; icon: React.ReactNode; label: string }[] = [
@@ -44,7 +46,11 @@ export default function ProfileSidebar({
     { key: "profile", icon: <User className="w-5 h-5" />, label: "Profile" },
   ];
  
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleLogoutConfirm = async () => {
     try {
       // Mark user as offline before logging out
       if (user?.uid) {
@@ -58,13 +64,14 @@ export default function ProfileSidebar({
           { merge: true }
         );
         console.log("✅ User marked offline successfully");
-        
+       
         // Small delay to ensure Firestore write completes
         await new Promise(resolve => setTimeout(resolve, 500));
       }
  
       await logout();
       setSuccess("You have successfully logged out");
+      setShowLogoutConfirm(false);
       setTimeout(() => {
         setSuccess("");
         router.push("/auth/login-and-signup?tab=login");
@@ -76,7 +83,12 @@ export default function ProfileSidebar({
         "Logout failed: " +
           (err instanceof Error ? err.message : String(err))
       );
+      setShowLogoutConfirm(false);
     }
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutConfirm(false);
   };
  
   const getButtonClasses = (sectionKey: SectionKey) =>
@@ -135,7 +147,7 @@ export default function ProfileSidebar({
       </ul>
  
       <button
-        onClick={handleLogout}
+        onClick={handleLogoutClick}
         className="w-full flex items-center gap-2 text-gray-500 hover:text-red-500 py-2 mt-7 lg:mt-9"
       >
         <LogOut className="w-5 h-5" /> Logout
@@ -166,6 +178,34 @@ export default function ProfileSidebar({
             </button>
             {sidebarContent}
           </aside>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal - Fully Responsive */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 sm:p-6">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-[90%] sm:max-w-md md:max-w-lg p-4 sm:p-6 md:p-8">
+            <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">
+              Confirm Logout
+            </h3>
+            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 md:mb-8">
+              Are you sure you want to log out now?
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 justify-end">
+              <button
+                onClick={handleLogoutCancel}
+                className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 text-sm sm:text-base text-gray-700 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg font-medium transition"
+              >
+                No, Stay
+              </button>
+              <button
+                onClick={handleLogoutConfirm}
+                className="w-full sm:w-auto px-4 sm:px-5 md:px-6 py-2 sm:py-2.5 text-sm sm:text-base text-white bg-red-500 hover:bg-red-600 active:bg-red-700 rounded-lg font-medium transition"
+              >
+                Yes, Logout
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
