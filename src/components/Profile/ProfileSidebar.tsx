@@ -67,7 +67,7 @@ export default function ProfileSidebar({
       setSuccess("You have successfully logged out");
       setTimeout(() => {
         setSuccess("");
-        router.push("/auth/login-and-signup");
+        router.push("/auth/login-and-signup?tab=login");
         setMobileMenuOpen(false);
       }, 1500);
     } catch (err) {
