@@ -36,11 +36,11 @@ export default function LoginAndSignupInner() {
     }
   }, [searchParams]);
 
-  // Google Login - UPDATED to save user data with createdAt
+  // Google Login - save user data with createdAt
   const handleGoogleLogin = async () => {
     setError("");
     try {
-      const user = await googleLogin(); // Returns User object
+      const user = await googleLogin(); // Returns User
 
       await setDoc(
         doc(db, "users", user.uid),
@@ -66,11 +66,11 @@ export default function LoginAndSignupInner() {
     }
   };
 
-  // Facebook Login - UPDATED to save user data with createdAt
+  // Facebook Login - save user data with createdAt
   const handleFacebookLogin = async () => {
     setError("");
     try {
-      const user = await facebookLogin(); // Returns User object
+      const user = await facebookLogin(); // Returns User
 
       await setDoc(
         doc(db, "users", user.uid),
@@ -96,7 +96,7 @@ export default function LoginAndSignupInner() {
     }
   };
 
-  // Sign Up - UPDATED to save user data with createdAt
+  // Sign Up - save user data + send welcome email
   const handleSignUp = async () => {
     if (
       !signupData.username ||
@@ -116,13 +116,16 @@ export default function LoginAndSignupInner() {
       return;
     }
     setError("");
+
     try {
+      // 1) Register with Firebase Auth
       const user = await register(
         signupData.email,
         signupData.password,
         signupData.username
       );
 
+      // 2) Save Firestore user
       await setDoc(doc(db, "users", user.uid), {
         email: signupData.email,
         username: signupData.username,
@@ -132,7 +135,22 @@ export default function LoginAndSignupInner() {
         photoURL: "",
       });
 
+      // 3) Show success popup
       setSuccess("You are registered successfully");
+
+      // 4) Send welcome email in background
+      fetch("/api/send-welcome-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: signupData.email,
+          name: signupData.username || signupData.email.split("@")[0],
+        }),
+      }).catch((err) => {
+        console.error("Welcome email error:", err);
+      });
+
+      // 5) Switch to login tab
       setTimeout(() => {
         setSuccess("");
         setActiveTab("login");
@@ -142,7 +160,7 @@ export default function LoginAndSignupInner() {
     }
   };
 
-  // Login - UPDATED to update lastLogin timestamp
+  // Login - update lastLogin timestamp
   const handleLogin = async () => {
     if (!loginData.email || !loginData.password) {
       setError("Please fill all the fields");
@@ -196,6 +214,7 @@ export default function LoginAndSignupInner() {
             className="w-full h-full object-contain"
           />
         </div>
+
         {/* Right Side - Form Section */}
         <div className="w-full lg:w-1/2 p-6 lg:p-10">
           {/* Tabs */}
@@ -357,7 +376,6 @@ export default function LoginAndSignupInner() {
                   type="button"
                   onClick={handleGoogleLogin}
                 >
-                  {/* Google SVG unchanged */}
                   <svg
                     className="w-10 h-10 lg:w-12 lg:h-12"
                     viewBox="0 0 48 48"
@@ -385,7 +403,6 @@ export default function LoginAndSignupInner() {
                   type="button"
                   onClick={handleFacebookLogin}
                 >
-                  {/* Facebook SVG unchanged */}
                   <svg
                     className="w-10 h-10 lg:w-12 lg:h-12"
                     viewBox="0 0 48 48"
@@ -459,7 +476,6 @@ export default function LoginAndSignupInner() {
                   type="button"
                   onClick={handleGoogleLogin}
                 >
-                  {/* Google SVG unchanged */}
                   <svg
                     className="w-10 h-10 lg:w-12 lg:h-12"
                     viewBox="0 0 48 48"
@@ -487,7 +503,6 @@ export default function LoginAndSignupInner() {
                   type="button"
                   onClick={handleFacebookLogin}
                 >
-                  {/* Facebook SVG unchanged */}
                   <svg
                     className="w-10 h-10 lg:w-12 lg:h-12"
                     viewBox="0 0 48 48"
