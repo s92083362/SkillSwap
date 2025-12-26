@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -57,7 +58,10 @@ export default function ProfilePage() {
       const requestRef = doc(db, "swapRequests", requestId);
       const requestSnap = await getDoc(requestRef);
 
-      if (!requestSnap.exists()) return;
+      if (!requestSnap.exists()) {
+        alert("Request not found.");
+        return;
+      }
 
       const requestData = requestSnap.data();
 
@@ -72,15 +76,18 @@ export default function ProfilePage() {
         requestId: requestId,
         courseTitle: requestData.requestedLessonTitle,
         ownerName: user?.displayName || "Unknown",
-        message: `Your request for "${requestData.requestedLessonTitle}" was accepted.`,
+        message: `Your request for "${requestData.requestedLessonTitle}" has been accepted by ${user?.displayName || "the owner"}.`,
         createdAt: new Date(),
         read: false,
       });
 
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+     
+      // Success message
+      alert("Request accepted successfully! The user has been notified.");
     } catch (err) {
       console.error("Accept error:", err);
-      alert("Failed to accept request.");
+      alert("Failed to accept request. Please try again.");
     }
   };
 
@@ -90,7 +97,10 @@ export default function ProfilePage() {
       const requestRef = doc(db, "swapRequests", requestId);
       const requestSnap = await getDoc(requestRef);
 
-      if (!requestSnap.exists()) return;
+      if (!requestSnap.exists()) {
+        alert("Request not found.");
+        return;
+      }
 
       const requestData = requestSnap.data();
 
@@ -105,15 +115,18 @@ export default function ProfilePage() {
         requestId: requestId,
         courseTitle: requestData.requestedLessonTitle,
         ownerName: user?.displayName || "Unknown",
-        message: `Your request for "${requestData.requestedLessonTitle}" was rejected.`,
+        message: `Your request for "${requestData.requestedLessonTitle}" was rejected by ${user?.displayName || "the owner"}.`,
         createdAt: new Date(),
         read: false,
       });
 
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
+     
+      // Success message
+      alert("Request rejected successfully. The user has been notified.");
     } catch (err) {
       console.error("Decline error:", err);
-      alert("Failed to decline request.");
+      alert("Failed to reject request. Please try again.");
     }
   };
 
