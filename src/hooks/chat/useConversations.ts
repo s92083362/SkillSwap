@@ -24,42 +24,49 @@ export function useConversations(userId: string | undefined) {
       if (!currentUserId) return;
       
       try {
-        const chatsSnapshot = await getDocs(collection(db, 'privateChats'));
+        // FIXED: Use a proper query with array-contains instead of fetching all chats
+        const chatsQuery = query(
+          collection(db, 'privateChats'),
+          where('participants', 'array-contains', currentUserId)
+        );
+        
+        const chatsSnapshot = await getDocs(chatsQuery);
         const userChats: ConversationMeta[] = [];
         
         for (const chatDoc of chatsSnapshot.docs) {
           const chatData = chatDoc.data() as any;
-          if (chatData.participants?.includes(currentUserId)) {
-            const chatId = chatDoc.id;
-            const otherUserId = chatData.participants.find(
-              (id: string) => id !== currentUserId
-            ) as string;
-            
-            // Skip if no other user found
-            if (!otherUserId) continue;
-            
-            const unreadQueryRef = query(
-              collection(db, 'messages'),
-              where('receiverId', '==', currentUserId),
-              where('senderId', '==', otherUserId),
-              where('read', '==', false)
-            );
-            const unreadSnapshot = await getDocs(unreadQueryRef);
-            const unreadCount = unreadSnapshot.size;
-            
-            userChats.push({
-              chatId,
-              otherUserId,
-              lastMessage: chatData.lastMessage || '',
-              lastUpdated: chatData.lastUpdated?.toDate() || new Date(0),
-              unreadCount,
-            });
-          }
+          const chatId = chatDoc.id;
+          const otherUserId = chatData.participants.find(
+            (id: string) => id !== currentUserId
+          ) as string;
+          
+          // Skip if no other user found
+          if (!otherUserId) continue;
+          
+          // Query unread messages from the other user
+          const unreadQueryRef = query(
+            collection(db, 'messages'),
+            where('receiverId', '==', currentUserId),
+            where('senderId', '==', otherUserId),
+            where('read', '==', false)
+          );
+          const unreadSnapshot = await getDocs(unreadQueryRef);
+          const unreadCount = unreadSnapshot.size;
+          
+          userChats.push({
+            chatId,
+            otherUserId,
+            lastMessage: chatData.lastMessage || '',
+            lastUpdated: chatData.lastUpdated?.toDate() || new Date(0),
+            unreadCount,
+          });
         }
         
+        // Sort by most recent first
         userChats.sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime());
         setConversations(userChats);
         
+        // Build unread counts map
         const counts: Record<string, number> = {};
         userChats.forEach((chat) => {
           counts[chat.otherUserId] = chat.unreadCount;
