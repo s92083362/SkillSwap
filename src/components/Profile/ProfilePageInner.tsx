@@ -82,7 +82,7 @@ export default function ProfilePage() {
       });
 
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-     
+      
       // Success message
       alert("Request accepted successfully! The user has been notified.");
     } catch (err) {
@@ -121,7 +121,7 @@ export default function ProfilePage() {
       });
 
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-     
+      
       // Success message
       alert("Request rejected successfully. The user has been notified.");
     } catch (err) {

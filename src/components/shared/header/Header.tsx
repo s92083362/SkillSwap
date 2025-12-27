@@ -1,7 +1,7 @@
 "use client";
- 
+
 import React, { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Bell, Menu, X, Phone, PhoneOff, Video } from "lucide-react";
 import {
   useNotifications,
@@ -22,12 +22,12 @@ import {
 } from "firebase/firestore";
 import NotificationList from "./NotificationList";
 import { useTrackUserActivity } from "@/hooks/users/useTrackUserActivity";
- 
+
 interface HeaderProps {
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (open: boolean) => void;
 }
- 
+
 interface IncomingCall {
   callId: string;
   callerName: string;
@@ -35,33 +35,41 @@ interface IncomingCall {
   callerPhoto?: string;
   callType: "audio" | "video";
 }
- 
+
 const Header: React.FC<HeaderProps> = ({
   mobileMenuOpen,
   setMobileMenuOpen,
 }) => {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [user] = useAuthState(auth);
   const userId = user?.uid;
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useNotifications(userId);
- 
+
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const ringtoneRef = useRef<HTMLAudioElement | null>(null);
- 
+
   useTrackUserActivity(60000);
-  // Helper function to check if a path is active
+
+  // Simple path check (no query)
   const isActivePath = (path: string) => {
     if (path === "/dash-board") {
       return pathname === "/dash-board" || pathname === "/";
     }
-    return pathname?.startsWith(path);
+    return pathname === path;
   };
-  // Listen for incoming audio/video calls for this user
+
+  // Use section query to decide if "My Skills" should be active
+  const currentSection = searchParams.get("section");
+  const isMySkillsActive =
+    pathname === "/profile" && currentSection === "skills";
+
+  // Listen for incoming audio/video calls
   useEffect(() => {
     if (!userId) return;
- 
+
     const callsRef = collection(db, "calls");
     const q = fsQuery(
       callsRef,
@@ -69,14 +77,14 @@ const Header: React.FC<HeaderProps> = ({
       where("answered", "==", false),
       where("ended", "==", false)
     );
- 
+
     const unsub = fsOnSnapshot(q, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         const callData = change.doc.data();
- 
+
         if (change.type === "added") {
           const callType = (callData.callType || "video") as "audio" | "video";
- 
+
           setIncomingCall({
             callId: change.doc.id,
             callerName: callData.fromName || "Unknown",
@@ -96,49 +104,49 @@ const Header: React.FC<HeaderProps> = ({
         }
       });
     });
- 
+
     return () => {
       unsub();
       stopRingtone();
     };
   }, [userId]);
- 
+
   const playRingtone = () => {
     if (ringtoneRef.current) {
       ringtoneRef.current.loop = true;
       ringtoneRef.current.play().catch(() => {});
     }
   };
- 
+
   const stopRingtone = () => {
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
       ringtoneRef.current.currentTime = 0;
     }
   };
- 
+
   const handleAnswerCall = () => {
     if (!incomingCall || !user) return;
- 
+
     stopRingtone();
- 
+
     const chatId = [user.uid, incomingCall.callerId].sort().join("_");
- 
+
     const url =
       `/chat/${chatId}` +
       `?user=${incomingCall.callerId}` +
       `&callId=${encodeURIComponent(incomingCall.callId)}` +
       `&callType=${incomingCall.callType}`;
- 
+
     router.push(url);
     setIncomingCall(null);
   };
- 
+
   const handleDeclineCall = async () => {
     if (!incomingCall) return;
- 
+
     stopRingtone();
- 
+
     try {
       const callRef = doc(db, "calls", incomingCall.callId);
       await updateDoc(callRef, {
@@ -149,15 +157,15 @@ const Header: React.FC<HeaderProps> = ({
     } catch (error) {
       console.error("Error declining call:", error);
     }
- 
+
     setIncomingCall(null);
   };
- 
+
   // Ensure user document exists
   useEffect(() => {
     async function ensureUserDocument() {
       if (!user) return;
- 
+
       try {
         await setDoc(
           doc(db, "users", user.uid),
@@ -175,10 +183,10 @@ const Header: React.FC<HeaderProps> = ({
         console.error("❌ Error ensuring user document:", error);
       }
     }
- 
+
     ensureUserDocument();
   }, [user]);
- 
+
   const dismissNotification = async (notifId: string | number) => {
     try {
       const notifRef = doc(db, "notifications", String(notifId));
@@ -194,26 +202,26 @@ const Header: React.FC<HeaderProps> = ({
       console.error("Error dismissing notification:", error);
     }
   };
- 
+
   const handleNotificationAction = async (
     notifId: string | number,
     action: string,
     notif: Notification
   ) => {
     await dismissNotification(notifId);
- 
+
     if (notif.type === "swap_request" && action === "View") {
       router.push("/swap-requests");
       setNotificationsOpen(false);
       return;
     }
- 
+
     if (notif.type === "ping" && action === "View") {
       router.push("/swap-requests");
       setNotificationsOpen(false);
       return;
     }
- 
+
     if (
       (notif.type === "requestAccepted" || notif.type === "requestRejected") &&
       action === "View"
@@ -222,7 +230,7 @@ const Header: React.FC<HeaderProps> = ({
       setNotificationsOpen(false);
       return;
     }
- 
+
     if (notif.type === "video_call" && action === "Answer") {
       if (!user) {
         alert("You must be logged in to answer the call.");
@@ -232,19 +240,19 @@ const Header: React.FC<HeaderProps> = ({
         alert("Missing caller information for this call.");
         return;
       }
- 
+
       const chatId = [user.uid, notif.senderId].sort().join("_");
       const url =
         `/chat/${chatId}` +
         `?user=${notif.senderId}` +
         `&callId=${encodeURIComponent(notif.callId || "")}` +
         `&callType=video`;
- 
+
       router.push(url);
       setNotificationsOpen(false);
       return;
     }
- 
+
     if (
       (notif.type === "chat" || notif.type === "message") &&
       action === "View"
@@ -266,24 +274,23 @@ const Header: React.FC<HeaderProps> = ({
       setNotificationsOpen(false);
       return;
     }
- 
+
     if (action === "Open" || action === "View") {
       setNotificationsOpen(false);
     }
   };
- 
+
   const isAudio = incomingCall?.callType === "audio";
- 
+
   return (
     <>
       {/* Ringtone Audio */}
       <audio ref={ringtoneRef} src="/sounds/incoming-call.mp3" />
- 
+
       {/* Incoming Call Full Screen Overlay */}
       {incomingCall && (
         <div className="fixed inset-0 bg-gradient-to-b from-blue-600 to-blue-800 z-[9999] flex flex-col items-center justify-center animate-pulse-slow">
           <div className="text-center px-4">
-            {/* Caller Photo/Avatar */}
             <div className="mb-6">
               {incomingCall.callerPhoto ? (
                 <img
@@ -299,18 +306,15 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
               )}
             </div>
- 
-            {/* Caller Name */}
+
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-2">
               {incomingCall.callerName}
             </h2>
- 
-            {/* Call Status */}
+
             <p className="text-xl text-blue-100 mb-2">
               {isAudio ? "Incoming audio call..." : "Incoming video call..."}
             </p>
- 
-            {/* Animated Icon */}
+
             <div className="relative w-20 h-20 mx-auto mb-12">
               <div className="absolute inset-0 rounded-full bg-white opacity-20 animate-ping" />
               <div className="absolute inset-0 rounded-full bg-white opacity-40 animate-pulse" />
@@ -320,10 +324,8 @@ const Header: React.FC<HeaderProps> = ({
                 <Video className="absolute inset-0 m-auto w-10 h-10 text-white" />
               )}
             </div>
- 
-            {/* Action Buttons */}
+
             <div className="flex gap-8 justify-center items-center mt-8">
-              {/* Decline */}
               <button
                 onClick={handleDeclineCall}
                 className="w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95"
@@ -331,8 +333,7 @@ const Header: React.FC<HeaderProps> = ({
               >
                 <PhoneOff className="w-10 h-10 text-white" />
               </button>
- 
-              {/* Answer */}
+
               <button
                 onClick={handleAnswerCall}
                 className="w-20 h-20 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95 animate-bounce"
@@ -341,7 +342,7 @@ const Header: React.FC<HeaderProps> = ({
                 <Phone className="w-10 h-10 text-white" />
               </button>
             </div>
- 
+
             <div className="flex gap-8 justify-center items-center mt-4">
               <span className="text-white font-semibold w-20 text-center">
                 Decline
@@ -353,12 +354,11 @@ const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       )}
- 
+
       {/* Fixed Header Component */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
-            {/* Logo Section */}
             <div className="flex items-center gap-2">
               <a href="/dash-board">
                 <img
@@ -368,7 +368,7 @@ const Header: React.FC<HeaderProps> = ({
                 />
               </a>
             </div>
- 
+
             {/* Desktop Navigation */}
             <nav className="hidden lg:flex items-center gap-8">
               <a
@@ -379,20 +379,22 @@ const Header: React.FC<HeaderProps> = ({
               >
                 Home
                 {isActivePath("/dash-board") && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
                 )}
               </a>
+
               <a
                 href="/profile?section=skills"
                 className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
-                  isActivePath("/profile") ? "text-cyan-500" : ""
+                  isMySkillsActive ? "text-cyan-500" : ""
                 }`}
               >
                 My Skills
-                {isActivePath("/profile") && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                {isMySkillsActive && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
                 )}
               </a>
+
               <a
                 href="/my-requests"
                 className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
@@ -401,9 +403,10 @@ const Header: React.FC<HeaderProps> = ({
               >
                 Learn
                 {isActivePath("/my-requests") && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
                 )}
               </a>
+
               <a
                 href="/swap-requests"
                 className={`relative text-gray-700 hover:text-gray-900 font-medium pb-1 transition-colors ${
@@ -412,13 +415,12 @@ const Header: React.FC<HeaderProps> = ({
               >
                 Teach
                 {isActivePath("/swap-requests") && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500"></span>
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
                 )}
               </a>
             </nav>
- 
+
             <div className="flex items-center gap-2 sm:gap-4">
-              {/* Notifications Dropdown */}
               <div className="relative">
                 <button
                   className="p-2 hover:bg-gray-100 rounded-lg relative"
@@ -446,8 +448,7 @@ const Header: React.FC<HeaderProps> = ({
                   />
                 )}
               </div>
- 
-              {/* Profile Image Button */}
+
               <button
                 onClick={() => router.push("/profile")}
                 className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-orange-400 hover:ring-2 hover:ring-orange-400 transition flex items-center justify-center"
@@ -469,8 +470,7 @@ const Header: React.FC<HeaderProps> = ({
                   </span>
                 )}
               </button>
- 
-              {/* Mobile Menu Button */}
+
               <button
                 className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -484,7 +484,7 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
           </div>
- 
+
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
             <nav className="lg:hidden flex flex-col gap-4 mt-4 pb-4 border-t border-gray-200 pt-4">
@@ -496,20 +496,22 @@ const Header: React.FC<HeaderProps> = ({
               >
                 Home
                 {isActivePath("/dash-board") && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500" />
                 )}
               </a>
+
               <a
                 href="/profile?section=skills"
                 className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
-                  isActivePath("/profile") ? "text-cyan-500" : ""
+                  isMySkillsActive ? "text-cyan-500" : ""
                 }`}
               >
                 My Skills
-                {isActivePath("/profile") && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                {isMySkillsActive && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500" />
                 )}
               </a>
+
               <a
                 href="/my-requests"
                 className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
@@ -518,9 +520,10 @@ const Header: React.FC<HeaderProps> = ({
               >
                 Learn
                 {isActivePath("/my-requests") && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500" />
                 )}
               </a>
+
               <a
                 href="/swap-requests"
                 className={`relative inline-block text-gray-700 hover:text-gray-900 font-medium pb-1 ${
@@ -529,14 +532,14 @@ const Header: React.FC<HeaderProps> = ({
               >
                 Teach
                 {isActivePath("/swap-requests") && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500"></span>
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-cyan-500" />
                 )}
               </a>
             </nav>
           )}
         </div>
       </header>
- 
+
       <style jsx>{`
         @keyframes pulse-slow {
           0%,
@@ -554,5 +557,5 @@ const Header: React.FC<HeaderProps> = ({
     </>
   );
 };
- 
+
 export default Header;
