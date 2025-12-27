@@ -178,15 +178,25 @@ export default function ProfilePage() {
         if (snap.exists()) {
           const d = snap.data() as UserProfile;
           setProfile(d);
-          setName(currentUser.displayName || d.name || "");
-          setPhotoUrl(currentUser.photoURL || d.photoUrl || null);
+          setName(d.name || currentUser.displayName || "");
+          setPhotoUrl(d.photoUrl || currentUser.photoURL || null);
           setUsername(d.username || "");
           setBio(d.bio || "");
           setSkills(d.skills || "");
           setSkillsToLearn(d.skillsToLearn || "");
           setAvailability(d.availability || "Available for new swaps");
         } else {
-          setProfile(null);
+          // Create a default profile object
+          const defaultProfile: UserProfile = {
+            name: currentUser.displayName || "",
+            photoUrl: currentUser.photoURL || null,
+            username: "",
+            bio: "",
+            skills: "",
+            skillsToLearn: "",
+            availability: "Available for new swaps"
+          };
+          setProfile(defaultProfile);
           setName(currentUser.displayName || "");
           setPhotoUrl(currentUser.photoURL || null);
           setUsername("");
@@ -195,13 +205,26 @@ export default function ProfilePage() {
           setSkillsToLearn("");
           setAvailability("Available for new swaps");
         }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+        // Set a basic profile even on error
+        const defaultProfile: UserProfile = {
+          name: currentUser.displayName || "",
+          photoUrl: currentUser.photoURL || null,
+          username: "",
+          bio: "",
+          skills: "",
+          skillsToLearn: "",
+          availability: "Available for new swaps"
+        };
+        setProfile(defaultProfile);
       } finally {
         setProfileLoading(false);
       }
     }
 
     fetchProfile(user);
-  }, [user, editMode]);
+  }, [user]);
 
   const handlePhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
@@ -262,6 +285,7 @@ export default function ProfilePage() {
       await setDoc(
         doc(db, "users", auth.currentUser.uid),
         {
+          name: name,
           username,
           bio,
           skills,
@@ -281,14 +305,14 @@ export default function ProfilePage() {
 
   const handleCancelEdit = () => {
     setEditMode(false);
-    if (profile && user) {
-      setName(user.displayName || profile.name || "");
-      setPhotoUrl(user.photoURL || profile.photoUrl || null);
-      setUsername(profile.username || "");
-      setBio(profile.bio || "");
-      setSkills(profile.skills || "");
-      setSkillsToLearn(profile.skillsToLearn || "");
-      setAvailability(profile.availability || "Available for new swaps");
+    if (user) {
+      setName(profile?.name || user.displayName || "");
+      setPhotoUrl(profile?.photoUrl || user.photoURL || null);
+      setUsername(profile?.username || "");
+      setBio(profile?.bio || "");
+      setSkills(profile?.skills || "");
+      setSkillsToLearn(profile?.skillsToLearn || "");
+      setAvailability(profile?.availability || "Available for new swaps");
     }
   };
 
@@ -343,8 +367,7 @@ export default function ProfilePage() {
                 <div className="relative">
                   <img
                     src={
-                      user.photoURL ||
-                      profile?.photoUrl ||
+                      photoUrl ||
                       "https://ui-avatars.com/api/?background=4F46E5&color=fff&bold=true&size=120"
                     }
                     alt="Profile"
@@ -373,18 +396,13 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <p className="text-gray-600 mb-4">
-                    {profile?.username &&
-                    profile.username.trim().length > 0
-                      ? profile.username
-                      : "No username"}
+                    @{username || "username"}
                   </p>
 
                   <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span>
-                        {profile?.availability || "Available for new swaps"}
-                      </span>
+                      <span>{availability}</span>
                     </div>
                   </div>
                 </div>
@@ -432,7 +450,7 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-bold text-gray-900">About Me</h2>
               </div>
               <p className="text-gray-700 leading-relaxed">
-                {profile?.bio || "No bio yet. Tell us about yourself!"}
+                {bio || "No bio yet. Tell us about yourself!"}
               </p>
             </div>
 
@@ -460,7 +478,7 @@ export default function ProfilePage() {
                   </h3>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {(profile?.skills || "")
+                  {(skills || "")
                     .split(",")
                     .filter((skill) => skill.trim().length > 0)
                     .map((skill, idx) => {
@@ -485,7 +503,7 @@ export default function ProfilePage() {
                         </div>
                       );
                     })}
-                  {!(profile?.skills || "").trim() && (
+                  {!(skills || "").trim() && (
                     <p className="text-gray-500 italic">No skills added yet</p>
                   )}
                 </div>
@@ -513,7 +531,7 @@ export default function ProfilePage() {
                   </h3>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {(profile?.skillsToLearn || "")
+                  {(skillsToLearn || "")
                     .split(",")
                     .filter((skill) => skill.trim().length > 0)
                     .map((skill, idx) => {
@@ -538,7 +556,7 @@ export default function ProfilePage() {
                         </div>
                       );
                     })}
-                  {!(profile?.skillsToLearn || "").trim() && (
+                  {!(skillsToLearn || "").trim() && (
                     <p className="text-gray-500 italic">
                       No skills to learn added yet
                     </p>
