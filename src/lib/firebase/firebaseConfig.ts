@@ -20,9 +20,3 @@ export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const db = getFirestore(app);
 
-export let analytics: ReturnType<typeof getAnalytics> | undefined;
-if (typeof window !== "undefined") {
-  isSupported().then((supported) => {
-    if (supported) analytics = getAnalytics(app);
-  });
-}
