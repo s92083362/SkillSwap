@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from "react";
@@ -94,7 +95,6 @@ export default function ProfileSidebar({
   const handleLogoutCancel = () => {
     setShowLogoutConfirm(false);
   };
-
   const getButtonClasses = (sectionKey: SectionKey) =>
     `flex items-center gap-3 py-2 px-4 rounded-lg w-full text-left transition ${
       activeSection === sectionKey
