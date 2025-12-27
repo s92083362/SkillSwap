@@ -44,6 +44,12 @@ export default function ProfilePage() {
     | string
     | undefined;
 
+  // DEBUG: log auth + profile states
+  useEffect(() => {
+    console.log("auth user:", user?.uid, "displayName:", user?.displayName);
+    console.log("profile state:", profile);
+  }, [user, profile]);
+
   const getSkillLogo = (skill: string) => {
     const skillLower = skill.toLowerCase().trim();
     const logos: { [key: string]: string } = {
@@ -292,7 +298,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Global loading state: while auth or profile is loading, show the loader
+  // Global loading state
   if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 flex items-center justify-center p-4">
