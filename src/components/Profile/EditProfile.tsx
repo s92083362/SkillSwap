@@ -178,25 +178,15 @@ export default function ProfilePage() {
         if (snap.exists()) {
           const d = snap.data() as UserProfile;
           setProfile(d);
-          setName(d.name || currentUser.displayName || "");
-          setPhotoUrl(d.photoUrl || currentUser.photoURL || null);
+          setName(currentUser.displayName || d.name || "");
+          setPhotoUrl(currentUser.photoURL || d.photoUrl || null);
           setUsername(d.username || "");
           setBio(d.bio || "");
           setSkills(d.skills || "");
           setSkillsToLearn(d.skillsToLearn || "");
           setAvailability(d.availability || "Available for new swaps");
         } else {
-          // Create a default profile object
-          const defaultProfile: UserProfile = {
-            name: currentUser.displayName || "",
-            photoUrl: currentUser.photoURL || null,
-            username: "",
-            bio: "",
-            skills: "",
-            skillsToLearn: "",
-            availability: "Available for new swaps"
-          };
-          setProfile(defaultProfile);
+          setProfile(null);
           setName(currentUser.displayName || "");
           setPhotoUrl(currentUser.photoURL || null);
           setUsername("");
@@ -205,26 +195,13 @@ export default function ProfilePage() {
           setSkillsToLearn("");
           setAvailability("Available for new swaps");
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-        // Set a basic profile even on error
-        const defaultProfile: UserProfile = {
-          name: currentUser.displayName || "",
-          photoUrl: currentUser.photoURL || null,
-          username: "",
-          bio: "",
-          skills: "",
-          skillsToLearn: "",
-          availability: "Available for new swaps"
-        };
-        setProfile(defaultProfile);
       } finally {
         setProfileLoading(false);
       }
     }
 
     fetchProfile(user);
-  }, [user]);
+  }, [user, editMode]);
 
   const handlePhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
@@ -285,7 +262,6 @@ export default function ProfilePage() {
       await setDoc(
         doc(db, "users", auth.currentUser.uid),
         {
-          name: name,
           username,
           bio,
           skills,
@@ -305,21 +281,21 @@ export default function ProfilePage() {
 
   const handleCancelEdit = () => {
     setEditMode(false);
-    if (user) {
-      setName(profile?.name || user.displayName || "");
-      setPhotoUrl(profile?.photoUrl || user.photoURL || null);
-      setUsername(profile?.username || "");
-      setBio(profile?.bio || "");
-      setSkills(profile?.skills || "");
-      setSkillsToLearn(profile?.skillsToLearn || "");
-      setAvailability(profile?.availability || "Available for new swaps");
+    if (profile && user) {
+      setName(user.displayName || profile.name || "");
+      setPhotoUrl(user.photoURL || profile.photoUrl || null);
+      setUsername(profile.username || "");
+      setBio(profile.bio || "");
+      setSkills(profile.skills || "");
+      setSkillsToLearn(profile.skillsToLearn || "");
+      setAvailability(profile.availability || "Available for new swaps");
     }
   };
 
   // Global loading state: while auth or profile is loading, show the loader
   if (authLoading || profileLoading) {
     return (
-      <div className="min-h-screen  flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 flex items-center justify-center p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-8 text-center">
           <div className="inline-block w-12 h-12 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
           <p className="mt-4 text-gray-700">Loading profile...</p>
@@ -367,7 +343,8 @@ export default function ProfilePage() {
                 <div className="relative">
                   <img
                     src={
-                      photoUrl ||
+                      user.photoURL ||
+                      profile?.photoUrl ||
                       "https://ui-avatars.com/api/?background=4F46E5&color=fff&bold=true&size=120"
                     }
                     alt="Profile"
@@ -396,13 +373,18 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <p className="text-gray-600 mb-4">
-                    @{username || "username"}
+                    {profile?.username &&
+                    profile.username.trim().length > 0
+                      ? profile.username
+                      : "No username"}
                   </p>
 
                   <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-600">
                     <div className="flex items-center gap-2">
                       <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span>{availability}</span>
+                      <span>
+                        {profile?.availability || "Available for new swaps"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -450,7 +432,7 @@ export default function ProfilePage() {
                 <h2 className="text-2xl font-bold text-gray-900">About Me</h2>
               </div>
               <p className="text-gray-700 leading-relaxed">
-                {bio || "No bio yet. Tell us about yourself!"}
+                {profile?.bio || "No bio yet. Tell us about yourself!"}
               </p>
             </div>
 
@@ -478,7 +460,7 @@ export default function ProfilePage() {
                   </h3>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {(skills || "")
+                  {(profile?.skills || "")
                     .split(",")
                     .filter((skill) => skill.trim().length > 0)
                     .map((skill, idx) => {
@@ -503,7 +485,7 @@ export default function ProfilePage() {
                         </div>
                       );
                     })}
-                  {!(skills || "").trim() && (
+                  {!(profile?.skills || "").trim() && (
                     <p className="text-gray-500 italic">No skills added yet</p>
                   )}
                 </div>
@@ -531,7 +513,7 @@ export default function ProfilePage() {
                   </h3>
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {(skillsToLearn || "")
+                  {(profile?.skillsToLearn || "")
                     .split(",")
                     .filter((skill) => skill.trim().length > 0)
                     .map((skill, idx) => {
@@ -556,7 +538,7 @@ export default function ProfilePage() {
                         </div>
                       );
                     })}
-                  {!(skillsToLearn || "").trim() && (
+                  {!(profile?.skillsToLearn || "").trim() && (
                     <p className="text-gray-500 italic">
                       No skills to learn added yet
                     </p>
