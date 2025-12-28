@@ -29,6 +29,15 @@ export async function POST(request: Request) {
 
     const statusText = type === "accepted" ? "accepted" : "rejected";
 
+    // After login, user should land on the chat/messages page
+    const chatMessagesUrl =
+      "https://skill-swaps-mydeployments.vercel.app/chat/messages";
+
+    // Login URL with redirect back to /chat/messages
+    const loginUrl = `https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(
+      chatMessagesUrl
+    )}`;
+
     await transporter.sendMail({
       from: `"SkillSwap" <${process.env.SMTP_USER}>`,
       to,
@@ -38,7 +47,27 @@ export async function POST(request: Request) {
         <p>Your swap request for <strong>${lessonTitle}</strong> was <strong>${statusText}</strong> by ${
         ownerName || "the lesson owner"
       }.</p>
-        <p>You can log in to SkillSwap to see more details.</p>
+        <p>You can log in to SkillSwap to see more details about this swap and your messages.</p>
+        <p>
+          <a
+            href="${loginUrl}"
+            style="
+              display:inline-block;
+              padding:10px 20px;
+              background-color:#1F426E;
+              color:#ffffff;
+              text-decoration:none;
+              border-radius:6px;
+              font-weight:600;
+            "
+          >
+            View in SkillSwap
+          </a>
+        </p>
+        <p style="margin-top:16px;">
+          Or open this link:<br/>
+          <a href="${loginUrl}">${loginUrl}</a>
+        </p>
       `,
     });
 
