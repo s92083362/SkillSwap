@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -52,7 +51,7 @@ export default function ProfilePage() {
     }
   }, [searchParams]);
 
-  // Handle Accept (with notifications)
+  // Handle Accept (with notifications + email)
   const handleAccept = async (requestId: string) => {
     try {
       const requestRef = doc(db, "swapRequests", requestId);
@@ -76,14 +75,29 @@ export default function ProfilePage() {
         requestId: requestId,
         courseTitle: requestData.requestedLessonTitle,
         ownerName: user?.displayName || "Unknown",
-        message: `Your request for "${requestData.requestedLessonTitle}" has been accepted by ${user?.displayName || "the owner"}.`,
+        message: `Your request for "${requestData.requestedLessonTitle}" has been accepted by ${
+          user?.displayName || "the owner"
+        }.`,
         createdAt: new Date(),
         read: false,
       });
 
+      // send email to requester (fire-and-forget)
+      if (requestData.requesterEmail) {
+        fetch("/api/send-swap-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: requestData.requesterEmail,
+            type: "accepted",
+            lessonTitle: requestData.requestedLessonTitle,
+            ownerName: user?.displayName || "the owner",
+          }),
+        }).catch((err) => console.error("swap accept email error:", err));
+      }
+
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-      
-      // Success message
+
       alert("Request accepted successfully! The user has been notified.");
     } catch (err) {
       console.error("Accept error:", err);
@@ -91,7 +105,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Handle Decline (with notifications)
+  // Handle Decline (with notifications + email)
   const handleDecline = async (requestId: string) => {
     try {
       const requestRef = doc(db, "swapRequests", requestId);
@@ -115,14 +129,29 @@ export default function ProfilePage() {
         requestId: requestId,
         courseTitle: requestData.requestedLessonTitle,
         ownerName: user?.displayName || "Unknown",
-        message: `Your request for "${requestData.requestedLessonTitle}" was rejected by ${user?.displayName || "the owner"}.`,
+        message: `Your request for "${requestData.requestedLessonTitle}" was rejected by ${
+          user?.displayName || "the owner"
+        }.`,
         createdAt: new Date(),
         read: false,
       });
 
+      // send email to requester (fire-and-forget)
+      if (requestData.requesterEmail) {
+        fetch("/api/send-swap-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: requestData.requesterEmail,
+            type: "rejected",
+            lessonTitle: requestData.requestedLessonTitle,
+            ownerName: user?.displayName || "the owner",
+          }),
+        }).catch((err) => console.error("swap reject email error:", err));
+      }
+
       setPendingRequests((prev) => prev.filter((r) => r.id !== requestId));
-      
-      // Success message
+
       alert("Request rejected successfully. The user has been notified.");
     } catch (err) {
       console.error("Decline error:", err);
@@ -186,6 +215,7 @@ export default function ProfilePage() {
                 data.requestedLessonTitle || data.requestedLesson || "",
               offeredSkillTitle:
                 data.offeredSkillTitle || data.offeredSkill || "",
+              requesterEmail: data.requesterEmail || "",
             });
           })
         );
@@ -319,13 +349,11 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header should include the hamburger icon that toggles mobileMenuOpen */}
       <Header
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
       />
 
-      {/* Sidebar (desktop fixed + mobile drawer via hamburger) */}
       <ProfileSidebar
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
@@ -333,7 +361,6 @@ export default function ProfilePage() {
         activeSection={activeSection}
       />
 
-      {/* Main content area */}
       <main className="min-h-screen pt-20 sm:pt-24 md:pt-28 pb-20 md:pb-10 md:ml-64 lg:ml-72">
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-10 max-w-7xl mx-auto w-full">
           {activeSection === "dashboard" && (
@@ -369,7 +396,6 @@ export default function ProfilePage() {
         </div>
       </main>
 
-      {/* Bottom Tab Navigation - Mobile Only */}
       <BottomNavigation />
     </div>
   );
