@@ -28,6 +28,9 @@ export default function LoginAndSignupInner() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Get redirect URL from query params
+  const redirectUrl = searchParams.get("redirect");
+
   // Initialize tab from URL (?tab=login or ?tab=signup)
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -35,6 +38,17 @@ export default function LoginAndSignupInner() {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  // Helper function to handle post-login redirect
+  const handlePostLoginRedirect = () => {
+    if (redirectUrl) {
+      // Redirect to the specific chat or page from email
+      router.push(redirectUrl);
+    } else {
+      // Default redirect to dashboard
+      router.push("/dash-board");
+    }
+  };
 
   // Google Login - save user data with createdAt
   const handleGoogleLogin = async () => {
@@ -59,7 +73,7 @@ export default function LoginAndSignupInner() {
       setSuccess("You are logged in successfully");
       setTimeout(() => {
         setSuccess("");
-        router.push("/dash-board");
+        handlePostLoginRedirect();
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -89,7 +103,7 @@ export default function LoginAndSignupInner() {
       setSuccess("You are logged in successfully");
       setTimeout(() => {
         setSuccess("");
-        router.push("/dash-board");
+        handlePostLoginRedirect();
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -150,10 +164,15 @@ export default function LoginAndSignupInner() {
         console.error("Welcome email error:", err);
       });
 
-      // 5) Switch to login tab
+      // 5) If there's a redirect URL, log them in and redirect
+      // Otherwise, switch to login tab
       setTimeout(() => {
         setSuccess("");
-        setActiveTab("login");
+        if (redirectUrl) {
+          handlePostLoginRedirect();
+        } else {
+          setActiveTab("login");
+        }
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -181,7 +200,7 @@ export default function LoginAndSignupInner() {
       setSuccess("You are logged in successfully");
       setTimeout(() => {
         setSuccess("");
-        router.push("/dash-board");
+        handlePostLoginRedirect();
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -217,6 +236,13 @@ export default function LoginAndSignupInner() {
 
         {/* Right Side - Form Section */}
         <div className="w-full lg:w-1/2 p-6 lg:p-10">
+          {/* Show redirect notice if coming from email */}
+          {redirectUrl && (
+            <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded mb-4 text-sm text-center">
+              Please log in to view your message
+            </div>
+          )}
+
           {/* Tabs */}
           <div className="flex mb-6">
             <button
@@ -260,9 +286,11 @@ export default function LoginAndSignupInner() {
             </p>
           )}
 
+          {/* Rest of your form code remains the same... */}
           {/* SignUp Form */}
           {activeTab === "signup" && (
             <div className="space-y-4">
+              {/* ... all your signup form inputs ... */}
               <input
                 type="text"
                 placeholder="User Name"
