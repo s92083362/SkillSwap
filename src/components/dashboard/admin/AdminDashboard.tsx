@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
-import Header from "../../shared/header/Header";
+import Header from "../../shared/header/AdminHeader";
 import AdminSkillList from "./AdminSkillList";
 import { Skill } from "./AdminSkillCard";
 import { useCurrentUser } from "@/hooks/users/useCurrentUser";
