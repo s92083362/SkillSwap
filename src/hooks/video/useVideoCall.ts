@@ -11,6 +11,8 @@ import {
   deleteDoc,
   serverTimestamp,
   getDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { getLiveKitToken } from "@/lib/livekit/getLiveKitToken";
 import {
@@ -104,9 +106,12 @@ export function useVideoCall({
   // signaling refs
   const callDocIdRef = useRef<string | null>(null);
   const hasEndedRef = useRef(false);
-  const callStatusUnsubscribeRef = useRef<(() => void) | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOutgoingCallRef = useRef(false);
+
+  // ✅ Store unsubscribe functions to prevent permission errors
+  const unsubIncomingRef = useRef<(() => void) | null>(null);
+  const unsubDisconnectRef = useRef<(() => void) | null>(null);
 
   // LiveKit room name = chatId
   const roomName = chatId;
@@ -185,67 +190,128 @@ export function useVideoCall({
 
   // ---------- Firestore listeners ----------
 
+  // ✅ FIXED: Better error handling with permission-denied handling
   const listenForCallDisconnect = () => {
-    if (!callDocIdRef.current) return;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    const callRef = doc(db, "calls", callDocIdRef.current);
-    const unsubscribe = onSnapshot(callRef, (snapshot) => {
-      const data = snapshot.data();
+    const attach = (callId: string) => {
+      const callRef = doc(db, "calls", callId);
+      const unsubscribe = onSnapshot(
+        callRef,
+        (snapshot) => {
+          const data = snapshot.data();
 
-      if (!snapshot.exists() || data?.ended) {
-        if (!hasEndedRef.current) {
-          hasEndedRef.current = true;
-          setCallStatus("Call ended");
-          saveCallMessage(isConnected ? "completed" : "missed");
+          if (!snapshot.exists() || data?.ended) {
+            if (!hasEndedRef.current) {
+              hasEndedRef.current = true;
+              setCallStatus("Call ended");
+              saveCallMessage(isConnected ? "completed" : "missed");
 
-          setTimeout(() => {
-            cleanup(true);
-            onClose();
-          }, 1500);
-        }
-      }
-    });
-
-    callStatusUnsubscribeRef.current = unsubscribe;
-    return unsubscribe;
-  };
-
-  const listenForIncomingCalls = () => {
-    const callsRef = collection(db, "calls");
-    const unsubscribe = onSnapshot(callsRef, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === "added") {
-          const data = change.doc.data();
-          if (
-            data.to === currentUserId &&
-            data.from === otherUserId &&
-            !data.answered &&
-            !data.ended
-          ) {
-            setIsReceivingCall(true);
-            isOutgoingCallRef.current = false;
-            callDocIdRef.current = change.doc.id;
-            setCallStatus(`Incoming call from ${otherUserName}...`);
-            playIncomingRingtone();
+              setTimeout(() => {
+                cleanup(true);
+                onClose();
+              }, 1500);
+            }
+          }
+        },
+        (error) => {
+          // Silently handle permission errors - they're expected when call doc is deleted
+          if (error.code === 'permission-denied') {
+            if (!hasEndedRef.current) {
+              hasEndedRef.current = true;
+              setTimeout(() => {
+                cleanup(true);
+                onClose();
+              }, 100);
+            }
+          } else {
+            console.error("Unexpected error listening to call:", error);
           }
         }
-      });
-    });
+      );
 
+      unsubDisconnectRef.current = unsubscribe;
+      return unsubscribe;
+    };
+
+    if (callDocIdRef.current) {
+      attach(callDocIdRef.current);
+    } else {
+      intervalId = setInterval(() => {
+        if (callDocIdRef.current) {
+          attach(callDocIdRef.current);
+          if (intervalId) clearInterval(intervalId);
+        }
+      }, 200);
+      
+      timeoutId = setTimeout(() => {
+        if (intervalId) clearInterval(intervalId);
+      }, 5000);
+    }
+    
+    return () => {
+      if (unsubDisconnectRef.current) {
+        unsubDisconnectRef.current();
+        unsubDisconnectRef.current = null;
+      }
+      if (intervalId) clearInterval(intervalId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  };
+
+  // ✅ FIXED: Use query with proper filters instead of listening to all calls
+  const listenForIncomingCalls = () => {
+    const callsRef = collection(db, "calls");
+    
+    // Query only calls meant for current user
+    const q = query(
+      callsRef,
+      where('to', '==', currentUserId),
+      where('answered', '==', false),
+      where('ended', '==', false)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const data = change.doc.data();
+            
+            // Additional filter: only from the specific user we're talking to
+            if (data.from === otherUserId && data.callType !== 'audio') {
+              setIsReceivingCall(true);
+              isOutgoingCallRef.current = false;
+              callDocIdRef.current = change.doc.id;
+              setCallStatus(`Incoming call from ${otherUserName}...`);
+              playIncomingRingtone();
+            }
+          }
+        });
+      },
+      (error) => {
+        console.error("Error listening for incoming calls:", error);
+      }
+    );
+
+    unsubIncomingRef.current = unsubscribe;
     return unsubscribe;
   };
 
+  // ✅ FIXED: Store unsubscribe functions in refs
   useEffect(() => {
     const unsubscribeIncoming = listenForIncomingCalls();
 
     return () => {
       unsubscribeIncoming?.();
-      if (callStatusUnsubscribeRef.current) {
-        callStatusUnsubscribeRef.current();
+      if (unsubDisconnectRef.current) {
+        unsubDisconnectRef.current();
+        unsubDisconnectRef.current = null;
       }
       cleanup(true);
     };
-  }, []);
+  }, [currentUserId, otherUserId]); // Added dependencies
 
   // auto-answer
   useEffect(() => {
@@ -584,6 +650,7 @@ export function useVideoCall({
         to: otherUserId,
         toName: otherUserName,
         roomName,
+        callType: "video",
         answered: false,
         ended: false,
         declined: false,
@@ -635,14 +702,22 @@ export function useVideoCall({
 
       await setupLiveKitRoom();
       setCallStatus("Connected");
+      setIsConnected(true);
     } catch (error) {
       console.error("Error answering call:", error);
       setCallStatus("Failed to answer call");
     }
   };
 
+  // ✅ FIXED: Unsubscribe before updating/deleting
   const declineCall = async () => {
     stopIncomingRingtone();
+
+    // Unsubscribe BEFORE updating/deleting to prevent permission errors
+    if (unsubDisconnectRef.current) {
+      unsubDisconnectRef.current();
+      unsubDisconnectRef.current = null;
+    }
 
     if (callDocIdRef.current) {
       try {
@@ -670,6 +745,7 @@ export function useVideoCall({
     onClose();
   };
 
+  // ✅ FIXED: Unsubscribe before updating/deleting
   const endCall = async () => {
     if (hasEndedRef.current) {
       cleanup(true);
@@ -678,6 +754,12 @@ export function useVideoCall({
     }
 
     hasEndedRef.current = true;
+
+    // Unsubscribe BEFORE updating/deleting to prevent permission errors
+    if (unsubDisconnectRef.current) {
+      unsubDisconnectRef.current();
+      unsubDisconnectRef.current = null;
+    }
 
     if (callDocIdRef.current) {
       try {
@@ -788,9 +870,9 @@ export function useVideoCall({
       timeoutRef.current = null;
     }
 
-    if (callStatusUnsubscribeRef.current) {
-      callStatusUnsubscribeRef.current();
-      callStatusUnsubscribeRef.current = null;
+    if (unsubDisconnectRef.current) {
+      unsubDisconnectRef.current();
+      unsubDisconnectRef.current = null;
     }
 
     if (room) {
@@ -876,26 +958,26 @@ export function useVideoCall({
     incomingAudioRef,
 
     // actions
-    setShowChat,
-    setUnreadCount,
-    setShowAttachMenu,
-    setFileCaption,
-    setChatInput,
-    setMinimized,
-    setOffset,
-    retryPermissions,
-    toggleMute,
-    toggleVideo,
-    toggleSpeaker,
-    toggleScreenShare,
-    sendChatMessage,
-    handleFileSelect,
-    cancelFileUpload,
-    sendFileMessage,
-    startCall,
-    answerCall,
-    declineCall,
-    endCall,
-    getBrowserInstructions,
-  };
+setShowChat,
+setUnreadCount,
+setShowAttachMenu,
+setFileCaption,
+setChatInput,
+setMinimized,
+setOffset,
+retryPermissions,
+toggleMute,
+toggleVideo,
+toggleSpeaker,
+toggleScreenShare,
+sendChatMessage,
+handleFileSelect,
+cancelFileUpload,
+sendFileMessage,
+startCall,
+answerCall,
+declineCall,
+endCall,
+getBrowserInstructions,
+};
 }

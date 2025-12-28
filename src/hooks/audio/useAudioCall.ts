@@ -13,6 +13,7 @@ import {
   updateDoc,
   query,
   orderBy,
+  where,
 } from "firebase/firestore";
 import { getLiveKitToken } from "@/lib/livekit/getLiveKitToken";
 import { uploadChatFileToCloudinary } from "@/lib/cloudinary/uploadChatFile";
@@ -55,10 +56,17 @@ function useUserOnline(userId: string) {
   useEffect(() => {
     if (!userId) return;
     const ref = doc(db, "status", userId);
-    const unsub = onSnapshot(ref, (snap) => {
-      const data = snap.data() as any;
-      setIsOnline(data?.state === "online");
-    });
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        const data = snap.data() as any;
+        setIsOnline(data?.state === "online");
+      },
+      (error) => {
+        console.error("Error listening to user status:", error);
+        setIsOnline(null);
+      }
+    );
     return () => unsub();
   }, [userId]);
 
@@ -116,17 +124,25 @@ export function useAudioCall({
   const roomName = chatId;
 
   const safeUpdateCall = async (callId: string, data: any) => {
-    const ref = doc(db, "calls", callId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    await updateDoc(ref, data);
+    try {
+      const ref = doc(db, "calls", callId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      await updateDoc(ref, data);
+    } catch (error) {
+      console.error("Error updating call:", error);
+    }
   };
 
   const safeDeleteCall = async (callId: string) => {
-    const ref = doc(db, "calls", callId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
-    await deleteDoc(ref);
+    try {
+      const ref = doc(db, "calls", callId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+      await deleteDoc(ref);
+    } catch (error) {
+      console.error("Error deleting call:", error);
+    }
   };
 
   const saveCallMessage = async (
@@ -177,77 +193,125 @@ export function useAudioCall({
     }
   };
 
+  // ✅ FIXED: Use proper query filters instead of listening to all calls
   const listenForIncomingCalls = () => {
     const callsRef = collection(db, "calls");
-    const unsub = onSnapshot(callsRef, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type !== "added") return;
-        const data = change.doc.data() as any;
-        if (
-          data.callType !== "audio" ||
-          data.to !== currentUserId ||
-          data.from !== otherUserId ||
-          data.answered ||
-          data.ended
-        ) {
-          return;
-        }
-        callDocIdRef.current = change.doc.id;
-        isOutgoingCallRef.current = false; // incoming
-        setIsReceivingCall(true);
-        setCallStatus(`Incoming audio call from ${otherUserName}`);
-        playIncoming();
-      });
-    });
+    
+    // Query only calls meant for current user
+    const q = query(
+      callsRef,
+      where('to', '==', currentUserId),
+      where('answered', '==', false),
+      where('ended', '==', false)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type !== "added") return;
+          const data = change.doc.data() as any;
+          
+          // Additional filter: only from the specific user we're talking to
+          if (
+            data.callType !== "audio" ||
+            data.from !== otherUserId
+          ) {
+            return;
+          }
+          
+          callDocIdRef.current = change.doc.id;
+          isOutgoingCallRef.current = false; // incoming
+          setIsReceivingCall(true);
+          setCallStatus(`Incoming audio call from ${otherUserName}`);
+          playIncoming();
+        });
+      },
+      (error) => {
+        console.error("Error listening for incoming calls:", error);
+      }
+    );
+
     return unsub;
   };
 
+  // ✅ FIXED: Better error handling for call disconnect listener
   const listenForCallDisconnect = () => {
     let unsub: (() => void) | undefined;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     const attach = (callId: string) => {
       const ref = doc(db, "calls", callId);
-      unsub = onSnapshot(ref, (snap) => {
-        if (!snap.exists()) {
-          if (!hasEndedRef.current) {
+      unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (!snap.exists()) {
+            if (!hasEndedRef.current) {
+              hasEndedRef.current = true;
+              setCallStatus("Call ended");
+              saveCallMessage(isConnected ? "completed" : "missed");
+              setTimeout(() => {
+                cleanup(true);
+                onClose();
+              }, 1200);
+            }
+            return;
+          }
+          const data = snap.data() as any;
+          if (data?.ended && !hasEndedRef.current) {
             hasEndedRef.current = true;
-            setCallStatus("Call ended");
+            const endedByOther = data.endedBy && data.endedBy !== currentUserId;
+            setCallStatus(
+              endedByOther ? "Call ended by other user" : "Call ended"
+            );
             saveCallMessage(isConnected ? "completed" : "missed");
             setTimeout(() => {
               cleanup(true);
               onClose();
             }, 1200);
           }
-          return;
+        },
+        (error) => {
+          // Silently handle permission errors - they're expected when call doc is deleted
+          if (error.code === 'permission-denied') {
+            // Document was deleted or we lost access - treat as call ended
+            if (!hasEndedRef.current) {
+              hasEndedRef.current = true;
+              // Don't show error status, just end gracefully
+              setTimeout(() => {
+                cleanup(true);
+                onClose();
+              }, 100);
+            }
+          } else {
+            // Log other unexpected errors
+            console.error("Unexpected error listening to call:", error);
+          }
         }
-        const data = snap.data() as any;
-        if (data?.ended && !hasEndedRef.current) {
-          hasEndedRef.current = true;
-          const endedByOther = data.endedBy && data.endedBy !== currentUserId;
-          setCallStatus(
-            endedByOther ? "Call ended by other user" : "Call ended"
-          );
-          saveCallMessage(isConnected ? "completed" : "missed");
-          setTimeout(() => {
-            cleanup(true);
-            onClose();
-          }, 1200);
-        }
-      });
+      );
     };
 
     if (callDocIdRef.current) {
       attach(callDocIdRef.current);
     } else {
-      const interval = setInterval(() => {
+      intervalId = setInterval(() => {
         if (callDocIdRef.current) {
           attach(callDocIdRef.current);
-          clearInterval(interval);
+          if (intervalId) clearInterval(intervalId);
         }
       }, 200);
+      
+      // Cleanup interval after 5 seconds if call ID is never set
+      timeoutId = setTimeout(() => {
+        if (intervalId) clearInterval(intervalId);
+      }, 5000);
     }
+    
     return () => {
       if (unsub) unsub();
+      if (intervalId) clearInterval(intervalId);
+      if (timeoutId) clearTimeout(timeoutId);
     };
   };
 
@@ -445,6 +509,13 @@ export function useAudioCall({
 
   const declineCall = async () => {
     stopIncoming();
+    
+    // Unsubscribe BEFORE updating/deleting to prevent permission errors
+    if (unsubDisconnectRef.current) {
+      unsubDisconnectRef.current();
+      unsubDisconnectRef.current = null;
+    }
+    
     if (callDocIdRef.current) {
       await safeUpdateCall(callDocIdRef.current, {
         ended: true,
@@ -469,6 +540,13 @@ export function useAudioCall({
       return;
     }
     hasEndedRef.current = true;
+    
+    // Unsubscribe BEFORE updating/deleting to prevent permission errors
+    if (unsubDisconnectRef.current) {
+      unsubDisconnectRef.current();
+      unsubDisconnectRef.current = null;
+    }
+    
     if (callDocIdRef.current) {
       await safeUpdateCall(callDocIdRef.current, {
         ended: true,
@@ -628,17 +706,26 @@ export function useAudioCall({
     }
   };
 
+  // Store unsubscribe functions in refs so we can call them before deleting
+  const unsubIncomingRef = useRef<(() => void) | null>(null);
+  const unsubDisconnectRef = useRef<(() => void) | null>(null);
+
   // ----- Effects wiring -----
 
   useEffect(() => {
     const unsubIncoming = listenForIncomingCalls();
     const unsubDisconnect = listenForCallDisconnect();
+    
+    // Store in refs
+    unsubIncomingRef.current = unsubIncoming;
+    unsubDisconnectRef.current = unsubDisconnect;
+    
     return () => {
       unsubIncoming?.();
       unsubDisconnect?.();
       cleanup(true);
     };
-  }, []);
+  }, [currentUserId, otherUserId]); // ✅ Added dependencies
 
   useEffect(() => {
     if (autoAnswer && isReceivingCall && callDocIdRef.current) {
@@ -706,22 +793,28 @@ export function useAudioCall({
   useEffect(() => {
     const messagesRef = collection(db, "privateChats", chatId, "messages");
     const q = query(messagesRef, orderBy("timestamp"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages: ChatMessage[] = [];
-      snapshot.forEach((d) => {
-        messages.push({ id: d.id, ...(d.data() as any) } as ChatMessage);
-      });
-      setChatMessages(messages);
-      if (!showChat) {
-        const newUnread = messages.filter(
-          (msg) =>
-            msg.senderId !== currentUserId &&
-            msg.timestamp?.toMillis &&
-            msg.timestamp.toMillis() > Date.now() - 5000
-        ).length;
-        setUnreadCount(newUnread);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const messages: ChatMessage[] = [];
+        snapshot.forEach((d) => {
+          messages.push({ id: d.id, ...(d.data() as any) } as ChatMessage);
+        });
+        setChatMessages(messages);
+        if (!showChat) {
+          const newUnread = messages.filter(
+            (msg) =>
+              msg.senderId !== currentUserId &&
+              msg.timestamp?.toMillis &&
+              msg.timestamp.toMillis() > Date.now() - 5000
+          ).length;
+          setUnreadCount(newUnread);
+        }
+      },
+      (error) => {
+        console.error("Error listening to chat messages:", error);
       }
-    });
+    );
     return () => unsubscribe();
   }, [chatId, showChat, currentUserId]);
 
