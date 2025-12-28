@@ -11,7 +11,7 @@ type LessonItem = {
   description: string;
   instructor: string;
   image: string;
-  uploaded: string;
+  enrolledDate: string; // Store the formatted date string
   status: "active" | "inactive";
   enrolledAtDate: Date | null;
 };
@@ -52,18 +52,17 @@ export default function ProfileLessons() {
           const lessonSnap = await getDoc(lessonRef);
 
           const enrolledAt = (enrollData as any).enrolledAt;
-          let uploaded = "Unknown";
+          let enrolledDate = "Unknown";
           let enrolledAtDate: Date | null = null;
 
           if (enrolledAt && typeof enrolledAt.toDate === "function") {
             enrolledAtDate = enrolledAt.toDate() as Date;
-            const now = new Date();
-            const days = Math.floor(
-              (now.getTime() - enrolledAtDate.getTime()) /
-                (1000 * 60 * 60 * 24)
-            );
-            uploaded =
-              days === 0 ? "Today" : `${days} day${days > 1 ? "s" : ""} ago`;
+            // Format the enrollment date as a readable string
+            enrolledDate = enrolledAtDate.toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            });
           }
 
           if (lessonSnap.exists()) {
@@ -74,7 +73,7 @@ export default function ProfileLessons() {
               description: lessonData.description || "",
               instructor: lessonData.instructor || "",
               image: lessonData.image || "",
-              uploaded,
+              enrolledDate,
               status: "active" as const,
               enrolledAtDate,
             };
@@ -86,7 +85,7 @@ export default function ProfileLessons() {
             description: "",
             instructor: "",
             image: "",
-            uploaded,
+            enrolledDate,
             status: "inactive" as const,
             enrolledAtDate,
           };
@@ -141,11 +140,81 @@ export default function ProfileLessons() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          {/* loader unchanged */}
           <div className="relative flex justify-center items-center">
             <div className="w-12 h-12 relative">
               <div className="absolute inset-0 flex justify-center items-center">
-                {/* your dots here */}
+                <div
+                  className="w-2.5 h-2.5 bg-purple-600 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "0%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-600 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "14.6%",
+                    left: "85.4%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.1s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-500 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "50%",
+                    left: "100%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.2s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-400 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "85.4%",
+                    left: "85.4%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.3s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-300 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "100%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.4s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-200 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "85.4%",
+                    left: "14.6%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.5s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-200 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "50%",
+                    left: "0%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.6s",
+                  }}
+                ></div>
+                <div
+                  className="w-2.5 h-2.5 bg-purple-300 rounded-full absolute animate-pulse"
+                  style={{
+                    top: "14.6%",
+                    left: "14.6%",
+                    transform: "translate(-50%, -50%)",
+                    animationDelay: "0.7s",
+                  }}
+                ></div>
               </div>
             </div>
           </div>
@@ -202,7 +271,7 @@ export default function ProfileLessons() {
                     )}
                     {lesson.instructor && <span>•</span>}
                     <span className="whitespace-nowrap">
-                      Enrolled {lesson.uploaded}
+                      Enrolled on {lesson.enrolledDate}
                     </span>
                   </div>
                   {lesson.status === "inactive" && (
