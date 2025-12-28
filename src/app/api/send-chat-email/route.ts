@@ -23,10 +23,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // The chat page expects /chat?user=USER_ID format
-    const chatUrl = `/chat?user=${encodeURIComponent(otherUserId)}`;
+    // The chat page is at /chat/messages with user parameter
+    const chatUrl = `/chat/messages?user=${encodeURIComponent(otherUserId)}`;
     
-    // Updated testing URL
+    // Testing URL
     const baseUrl = "https://skill-swaps-git-frontend-backend-bawantha-mydeployments.vercel.app";
     const loginUrl = `${baseUrl}/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(chatUrl)}`;
 
