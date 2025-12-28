@@ -6,8 +6,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { useCurrentUser } from "@/hooks/users/useCurrentUser";
-import ProfilePageInner from "@/components/Profile/ProfilePageInner";
-// import AdminUserProfileInner from "@/components/Profile/AdminUserProfileInner";
+import ProfilePageInner from "@/components/Profile/user/ProfilePageInner";
+import AdminUserProfileInner from "@/components/Profile/admin/AdminUserProfileInner";
 
 function ProfileContent() {
   const { user, role, loading } = useCurrentUser();
@@ -31,7 +31,7 @@ function ProfileContent() {
 
   // If admin, show admin profile; otherwise show user profile
   if (role === "admin") {
-    // return <AdminUserProfileInner />;
+    return <AdminUserProfileInner />;
   }
 
   return <ProfilePageInner />;
