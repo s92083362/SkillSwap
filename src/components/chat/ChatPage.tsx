@@ -57,7 +57,7 @@ export default function ChatPage() {
   const autoAnswerCallId = searchParams.get("callId");
   const urlCallType = searchParams.get("callType");
 
-  // Custom hooks - FIX: Destructure user from useCurrentUser()
+  // Custom hooks
   const { user } = useCurrentUser();
   const { allUsers, error: usersError } = useAllUsers() as {
     allUsers: ChatUser[];
@@ -215,6 +215,7 @@ export default function ChatPage() {
     setActiveCall(null);
   };
 
+  // TEXT MESSAGE + EMAIL
   async function handleSendMessage() {
     if (!user || !input.trim() || !selectedUser) return;
     const chatId = createChatId(user.uid, selectedUser.uid);
@@ -223,11 +224,27 @@ export default function ChatPage() {
     try {
       await sendTextMessage(user as ChatUser, selectedUser, text, chatId);
       setInput("");
+
+      // send email notification to receiver
+      if (selectedUser.email) {
+        fetch("/api/send-chat-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: selectedUser.email,
+            fromName: user.displayName || user.email || "SkillSwap user",
+            previewText: text.length > 120 ? text.slice(0, 117) + "..." : text,
+            chatId,
+            otherUserId: selectedUser.uid,
+          }),
+        }).catch((err) => console.error("chat email error:", err));
+      }
     } catch (error) {
       console.error("Error sending message:", error);
     }
   }
 
+  // FILE MESSAGE + EMAIL
   async function handleSendFileMessage() {
     if (!user || !selectedUser || !selectedFile) return;
     const chatId = createChatId(user.uid, selectedUser.uid);
@@ -242,6 +259,24 @@ export default function ChatPage() {
         fileCaption,
         chatId
       );
+
+      // send email notification to receiver
+      if (selectedUser.email) {
+        fetch("/api/send-chat-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: selectedUser.email,
+            fromName: user.displayName || user.email || "SkillSwap user",
+            previewText:
+              fileCaption ||
+              "You received a new file in SkillSwap chat. Log in to view it.",
+            chatId,
+            otherUserId: selectedUser.uid,
+          }),
+        }).catch((err) => console.error("chat file email error:", err));
+      }
+
       cancelFileUpload();
     } catch (error) {
       console.error("Error sending file:", error);
@@ -414,8 +449,12 @@ export default function ChatPage() {
                 selectedFile={selectedFile}
                 selectedUser={selectedUser}
                 showAttachMenu={showAttachMenu}
-                attachMenuRef={attachMenuRef as React.RefObject<HTMLDivElement>}
-                fileInputRef={fileInputRef as React.RefObject<HTMLInputElement>}
+                attachMenuRef={
+                  attachMenuRef as React.RefObject<HTMLDivElement>
+                }
+                fileInputRef={
+                  fileInputRef as React.RefObject<HTMLInputElement>
+                }
                 onInputChange={setInput}
                 onSubmit={(e) => {
                   e.preventDefault();
