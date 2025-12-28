@@ -26,36 +26,86 @@ export async function POST(request: Request) {
     // The chat page expects /chat?user=USER_ID format
     const chatUrl = `/chat?user=${encodeURIComponent(otherUserId)}`;
     
-    // Full login URL with encoded redirect parameter
-    const loginUrl = `https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(chatUrl)}`;
+    // Updated testing URL
+    const baseUrl = "https://skill-swaps-git-frontend-backend-bawantha-mydeployments.vercel.app";
+    const loginUrl = `${baseUrl}/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(chatUrl)}`;
 
     await transporter.sendMail({
       from: `"SkillSwap Chat" <${process.env.SMTP_USER}>`,
       to,
       subject: "You have a new SkillSwap message",
       html: `
-        <h2>New message from ${fromName || "a SkillSwap user"}</h2>
-        <p>${previewText}</p>
-        <p>Click the button below to view the conversation in SkillSwap. You may be asked to log in first.</p>
-        <p>
-          
-            href="${loginUrl}"
-            style="
-              display:inline-block;
-              padding:10px 20px;
-              background-color:#1F426E;
-              color:#ffffff;
-              text-decoration:none;
-              border-radius:6px;
-              font-weight:600;
-            "
-          >
-            View message in SkillSwap
-          </a>
-        </p>
-        <p style="margin-top:16px;">Or open this link: <br/>
-          <a href="${loginUrl}">${loginUrl}</a>
-        </p>
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333333;
+              margin: 0;
+              padding: 0;
+              background-color: #f5f5f5;
+            }
+            .email-container {
+              max-width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              padding: 20px;
+            }
+            h2 {
+              color: #1F426E;
+              margin-bottom: 16px;
+            }
+            p {
+              margin-bottom: 16px;
+              color: #555555;
+            }
+            .button {
+              display: inline-block;
+              padding: 12px 24px;
+              background-color: #1F426E;
+              color: #ffffff !important;
+              text-decoration: none;
+              border-radius: 6px;
+              font-weight: 600;
+              margin: 16px 0;
+            }
+            .link-text {
+              word-break: break-all;
+              color: #1F426E;
+              text-decoration: none;
+            }
+            .footer {
+              margin-top: 24px;
+              padding-top: 16px;
+              border-top: 1px solid #eeeeee;
+              font-size: 12px;
+              color: #999999;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="email-container">
+            <h2>New message from ${fromName || "a SkillSwap user"}</h2>
+            <p>${previewText}</p>
+            <p>Click the button below to view the conversation in SkillSwap. You may be asked to log in first.</p>
+            <p>
+              <a href="${loginUrl}" class="button">
+                View message in SkillSwap
+              </a>
+            </p>
+            <p style="margin-top:16px;">Or copy and paste this link in your browser:<br/>
+              <a href="${loginUrl}" class="link-text">${loginUrl}</a>
+            </p>
+            <div class="footer">
+              <p>This email was sent by SkillSwap. If you didn't expect this message, you can safely ignore it.</p>
+            </div>
+          </div>
+        </body>
+        </html>
       `,
     });
 
