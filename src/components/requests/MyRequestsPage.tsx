@@ -14,7 +14,7 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
-import Header from "@/components/shared/header/Header";
+import Header from "@/components/shared/header/UserHeader";
 import Link from "next/link";
  
 export default function MyRequestsPage() {

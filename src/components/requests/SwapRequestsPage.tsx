@@ -12,7 +12,7 @@ import {
   getDoc,
   addDoc,
 } from "firebase/firestore";
-import Header from "../../components/shared/header/Header";
+import Header from "../shared/header/UserHeader";
 import { useRouter } from "next/navigation";
 
 interface SwapRequest {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Header from '@/components/shared/header/Header';
+import Header from '@/components/shared/header/UserHeader';
 import AccordionSection from '@/components/dashboard/AccordionSection';
 import LessonNotes from '@/components/lessons/LessonNotes';
 import { useRouter } from 'next/navigation';
