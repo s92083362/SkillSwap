@@ -17,15 +17,23 @@ export default function AdminDashboard() {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Set tab title for admin dashboard
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Dashboard";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []); // runs once when component mounts[web:23][web:26][web:29][web:40]
+
   useEffect(() => {
     const lessonsRef = collection(db, "lessons");
     const unsubscribe = onSnapshot(lessonsRef, (snapshot) => {
-      const firebaseLessons: LessonFromFirestore[] = snapshot.docs.map(
-        (doc) => ({
-          id: doc.id,
-          ...(doc.data() as Omit<LessonFromFirestore, "id">),
-        })
-      );
+      const firebaseLessons: LessonFromFirestore[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<LessonFromFirestore, "id">),
+      }));
       setSkills(firebaseLessons);
       setLoading(false);
     });
@@ -59,14 +67,6 @@ export default function AdminDashboard() {
       </div>
     );
   }
-    useEffect(() => {
-      const prevTitle = document.title;
-      document.title = "SkillSwap | Dashboard";
-  
-      return () => {
-        document.title = prevTitle;
-      };
-    }, []);
 
   return (
     <div className="min-h-screen bg-[#e7e9f0]">

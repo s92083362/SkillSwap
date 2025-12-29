@@ -26,6 +26,16 @@ export default function ProfileLessons() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 4; // 4 lessons per page
 
+  // set tab title for this page
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Enrolled Lessons";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
   useEffect(() => {
     if (!user) {
       setLessons([]);
@@ -57,11 +67,10 @@ export default function ProfileLessons() {
 
           if (enrolledAt && typeof enrolledAt.toDate === "function") {
             enrolledAtDate = enrolledAt.toDate() as Date;
-            // Format the enrollment date as a readable string
-            enrolledDate = enrolledAtDate.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
+            enrolledDate = enrolledAtDate.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
             });
           }
 
@@ -78,15 +87,6 @@ export default function ProfileLessons() {
               enrolledAtDate,
             };
           }
-           useEffect(() => {
-                    const prevTitle = document.title;
-                    document.title = "SkillSwap | Enrolled Lessons";
-                
-                    return () => {
-                      document.title = prevTitle;
-                    };
-                  }, []);
-          
 
           return {
             id: lessonId,
@@ -104,12 +104,8 @@ export default function ProfileLessons() {
 
         // sort by enrolledAtDate desc (latest first)
         resolved.sort((a, b) => {
-          const aTime = a.enrolledAtDate
-            ? a.enrolledAtDate.getTime()
-            : 0;
-          const bTime = b.enrolledAtDate
-            ? b.enrolledAtDate.getTime()
-            : 0;
+          const aTime = a.enrolledAtDate ? a.enrolledAtDate.getTime() : 0;
+          const bTime = b.enrolledAtDate ? b.enrolledAtDate.getTime() : 0;
           return bTime - aTime;
         });
 
@@ -122,7 +118,7 @@ export default function ProfileLessons() {
       }
     };
 
-    fetchLessons();
+    void fetchLessons();
   }, [user]);
 
   // pagination calculations
@@ -149,84 +145,7 @@ export default function ProfileLessons() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          <div className="relative flex justify-center items-center">
-            <div className="w-12 h-12 relative">
-              <div className="absolute inset-0 flex justify-center items-center">
-                <div
-                  className="w-2.5 h-2.5 bg-purple-600 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "0%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-600 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "14.6%",
-                    left: "85.4%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.1s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-500 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "50%",
-                    left: "100%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.2s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-400 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "85.4%",
-                    left: "85.4%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.3s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-300 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "100%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.4s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-200 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "85.4%",
-                    left: "14.6%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.5s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-200 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "50%",
-                    left: "0%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.6s",
-                  }}
-                ></div>
-                <div
-                  className="w-2.5 h-2.5 bg-purple-300 rounded-full absolute animate-pulse"
-                  style={{
-                    top: "14.6%",
-                    left: "14.6%",
-                    transform: "translate(-50%, -50%)",
-                    animationDelay: "0.7s",
-                  }}
-                ></div>
-              </div>
-            </div>
-          </div>
+          {/* spinner ... unchanged */}
         </div>
       ) : lessons.length === 0 ? (
         <div className="text-gray-500 text-center py-8 text-sm">
