@@ -59,6 +59,14 @@ export default function AdminDashboard() {
       </div>
     );
   }
+    useEffect(() => {
+      const prevTitle = document.title;
+      document.title = "SkillSwap | Dashboard";
+  
+      return () => {
+        document.title = prevTitle;
+      };
+    }, []);
 
   return (
     <div className="min-h-screen bg-[#e7e9f0]">

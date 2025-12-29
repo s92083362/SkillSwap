@@ -178,6 +178,15 @@ export default function MyRequestsPage() {
     activeTab === "all"
       ? requests
       : requests.filter((r) => r.status === activeTab);
+
+     useEffect(() => {
+        const prevTitle = document.title;
+        document.title = "SkillSwap | MyRequests";
+    
+        return () => {
+          document.title = prevTitle;
+        };
+      }, []);
  
   return (
     <div className="min-h-screen bg-gray-50">

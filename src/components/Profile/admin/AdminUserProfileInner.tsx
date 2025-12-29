@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../lib/firebase/firebaseConfig";
@@ -32,6 +32,14 @@ export default function AdminProfilePageInner() {
     router.push(`/profile?section=${sectionName}`);
     setMobileMenuOpen(false);
   };
+   useEffect(() => {
+      const prevTitle = document.title;
+      document.title = "SkillSwap | Profile";
+  
+      return () => {
+        document.title = prevTitle;
+      };
+    }, []);
 
   const renderContent = () => {
     switch (section) {

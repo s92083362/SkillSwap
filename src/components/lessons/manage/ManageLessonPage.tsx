@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, Trash2, Plus, X, Eye, Edit } from 'lucide-react';
+import React, { useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { useLessonManager } from '@/hooks/lessons/useLessonManager';
 
@@ -44,6 +45,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
     handleSaveChanges,
   } = useLessonManager(lessonId);
 
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -61,6 +63,14 @@ export default function ManageLessonPage({ lessonId }: Props) {
     const ok = await handleSaveChanges();
     if (ok) router.push('/profile');
   };
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | ManageLesson";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">

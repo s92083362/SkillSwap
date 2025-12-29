@@ -78,6 +78,15 @@ export default function ProfileLessons() {
               enrolledAtDate,
             };
           }
+           useEffect(() => {
+                    const prevTitle = document.title;
+                    document.title = "SkillSwap | Enrolled Lessons";
+                
+                    return () => {
+                      document.title = prevTitle;
+                    };
+                  }, []);
+          
 
           return {
             id: lessonId,

@@ -71,6 +71,15 @@ export default function ChatPage() {
     useIncomingCalls(user?.uid, pathname, allUsers);
 
   useTrackUserActivity(60000);
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Chat";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
 
   // Local state
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);

@@ -29,6 +29,16 @@ export default function UserDashboard() {
     "DevOps",
   ];
 
+ 
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Dashboard";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
   useEffect(() => {
     const lessonsRef = collection(db, "lessons");
 
@@ -38,10 +48,7 @@ export default function UserDashboard() {
           id: d.id,
           ...(d.data() as Omit<LessonFromFirestore, "id">),
         }))
-        .filter((lesson) => {
-          // Only show skills that are NOT explicitly hidden
-          return lesson.visibleOnHome !== false;
-        });
+        .filter((lesson) => lesson.visibleOnHome !== false);
 
       setSkills(firebaseLessons);
       setLoading(false);
@@ -83,8 +90,6 @@ export default function UserDashboard() {
           </p>
         </div>
 
-        {/* The SkillList component already handles its own data fetching and filtering.
-            We can remove the props being passed to it from UserDashboard. */}
         <SkillList />
       </main>
     </div>

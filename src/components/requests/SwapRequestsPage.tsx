@@ -222,6 +222,14 @@ export default function SwapRequestsPage() {
       </div>
     );
   }
+   useEffect(() => {
+          const prevTitle = document.title;
+          document.title = "SkillSwap | SwapRequests";
+      
+          return () => {
+            document.title = prevTitle;
+          };
+        }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">

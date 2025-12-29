@@ -76,6 +76,16 @@ export default function SkillPage({ skillId }: SkillPageProps) {
     [skills, skillId]
   );
 
+  // tab title: SkillSwap – <lesson title>
+  useEffect(() => {
+    if (!skill) return;
+    const prevTitle = document.title;
+    document.title = `SkillSwap | ${skill.title}`;
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [skill]); // updates when lesson changes[web:23][web:29][web:40]
+
   // check owner
   useEffect(() => {
     if (!user || !skill) return;
@@ -307,7 +317,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
       />
-      <main className="max-w-5xl mx-auto px-4 py-10">
+      <main className="max-w-5xl mx_auto px-4 py-10">
         <SkillHero skill={skill}>
           {user && hasSwapped && (
             <ContactCard
@@ -371,9 +381,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
               const sectionId = section.id || `section-${idx}`;
               const isPrivate = skill.visibility === 'swap-only';
 
-              // For public lessons: all sections are accessible after enrollment
-              // For private lessons: sections locked until swap is approved
-              const isAllowed = isPrivate 
+              const isAllowed = isPrivate
                 ? allowedSections.includes(sectionId)
                 : allowedSections.includes(sectionId);
 
@@ -415,7 +423,8 @@ export default function SkillPage({ skillId }: SkillPageProps) {
                   ) : (
                     <div className="bg-gray-50 p-6 rounded-lg text-center">
                       <p className="text-gray-600">
-                        This section is locked. Complete a skill swap to unlock all sections.
+                        This section is locked. Complete a skill swap to unlock
+                        all sections.
                       </p>
                     </div>
                   )}

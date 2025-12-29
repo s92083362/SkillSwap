@@ -44,7 +44,7 @@ const FireworksEffect: React.FC = () => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentDate = now.getDate();
-    
+
     // Show fireworks only on January 1st (month 0, date 1)
     if (currentMonth !== 0 || currentDate !== 1) return;
 
@@ -99,8 +99,8 @@ const FireworksEffect: React.FC = () => {
 
     function loop() {
       if (!ctx) return;
-      
-      // Clear canvas with transparent background (like snow effect)
+
+      // Clear canvas
       ctx.clearRect(0, 0, windowW, windowH);
 
       // Random firework launch
@@ -115,7 +115,7 @@ const FireworksEffect: React.FC = () => {
         if (!fw.exploded) {
           // Rising rocket
           fw.y -= 8;
-          
+
           ctx.beginPath();
           ctx.arc(fw.x, fw.y, 3, 0, Math.PI * 2);
           ctx.fillStyle = `hsl(${fw.hue}, 100%, 60%)`;
@@ -130,7 +130,7 @@ const FireworksEffect: React.FC = () => {
           // Draw explosion particles
           for (let j = fw.particles.length - 1; j >= 0; j--) {
             const p = fw.particles[j];
-            
+
             p.x += p.vx;
             p.y += p.vy;
             p.vy += 0.1; // gravity
@@ -176,7 +176,7 @@ const FireworksEffect: React.FC = () => {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentDate = now.getDate();
-  
+
   // Show fireworks only on January 1st
   if (currentMonth !== 0 || currentDate !== 1) return null;
 
@@ -197,7 +197,7 @@ const SnowEffect: React.FC = () => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentDate = now.getDate();
-    
+
     // Show snow only in December (month 11, dates 1-31)
     if (currentMonth !== 11 || currentDate > 31) return;
 
@@ -307,7 +307,7 @@ const SnowEffect: React.FC = () => {
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentDate = now.getDate();
-  
+
   // Show snow only in December (month 11, dates 1-31)
   if (currentMonth !== 11 || currentDate > 31) return null;
 
@@ -469,12 +469,13 @@ export default function SkillSwapLanding() {
 
   const handleSignUp = () => {
     setSelectedTab("signup");
-    router.push("/auth/login-and-signup?tab=signup");
+    // Use replace so user cannot go "back" to landing after navigating to auth
+    router.replace("/auth/login-and-signup?tab=signup");
   };
 
   const handleLogin = () => {
     setSelectedTab("login");
-    router.push("/auth/login-and-signup?tab=login");
+    router.replace("/auth/login-and-signup?tab=login");
   };
 
   const pageBg = darkMode ? "bg-gray-900" : "bg-white";
@@ -579,7 +580,7 @@ export default function SkillSwapLanding() {
                 darkMode ? "bg-gray-800" : "bg-white"
               } rounded-lg shadow-lg p-3 sm:p-4 flex items-center gap-3`}
             >
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-300 rounded-full" />
+              <div className="w-8 h-8 sm:w-10 bg-gray-300 rounded-full" />
               <div>
                 <p
                   className={`font-bold text-xs sm:text-sm ${
