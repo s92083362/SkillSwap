@@ -2,7 +2,7 @@
 
 import React from "react";
 import { X } from "lucide-react";
-import type { Notification } from "../../../hooks/useNotifications";
+import type { Notification } from "@/hooks/useNotifications";
 
 interface NotificationListProps {
   notifications: Notification[];
