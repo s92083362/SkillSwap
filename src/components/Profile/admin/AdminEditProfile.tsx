@@ -183,6 +183,15 @@ export default function AdminEditProfile() {
       setPermissions(profile.permissions || "");
     }
   };
+  useEffect(() => {
+              const prevTitle = document.title;
+              document.title = "SkillSwap | Edit Profile";
+          
+              return () => {
+                document.title = prevTitle;
+              };
+            }, []);
+    
 
   if (!user) {
     return (

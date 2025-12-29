@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowLeft, Trash2, Plus, X, Eye, Edit } from 'lucide-react';
+import React, { useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { useLessonManager } from '@/hooks/lessons/useLessonManager';
 
@@ -43,6 +44,16 @@ export default function ManageLessonPage({ lessonId }: Props) {
     handleDeleteLesson,
     handleSaveChanges,
   } = useLessonManager(lessonId);
+
+  // set tab title
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Manage Lesson";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []); // runs once when page is mounted[web:23][web:26][web:29][web:40]
 
   if (isLoading) {
     return (
@@ -253,32 +264,32 @@ export default function ManageLessonPage({ lessonId }: Props) {
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Skill Category
-  </label>
-  <select
-    value={skillCategory}
-    onChange={(e) => setSkillCategory(e.target.value)}
-    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none appearance-none bg-white text-sm md:text-base"
-  >
-    <option value="">Select a category</option>
-    <option value="Frontend">Frontend</option>
-    <option value="Backend">Backend</option>
-    <option value="DevOps">DevOps</option>
-    <option value="FullStack">Full Stack</option>
-    <option value="DataScience">Data Science</option>
-    <option value="MachineLearning">Machine Learning</option>
-    <option value="AI">Artificial Intelligence</option>
-    <option value="CyberSecurity">Cybersecurity</option>
-    <option value="CloudComputing">Cloud Computing</option>
-    <option value="MobileDevelopment">Mobile Development</option>
-    <option value="SoftwareEngineering">Software Engineering</option>
-    <option value="ComputerNetworks">Computer Networks</option>
-    <option value="DatabaseManagement">Database Management</option>
-    <option value="UIUXDesign">UI/UX Design</option>
-  </select>
-</div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Skill Category
+                  </label>
+                  <select
+                    value={skillCategory}
+                    onChange={(e) => setSkillCategory(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none appearance-none bg-white text-sm md:text-base"
+                  >
+                    <option value="">Select a category</option>
+                    <option value="Frontend">Frontend</option>
+                    <option value="Backend">Backend</option>
+                    <option value="DevOps">DevOps</option>
+                    <option value="FullStack">Full Stack</option>
+                    <option value="DataScience">Data Science</option>
+                    <option value="MachineLearning">Machine Learning</option>
+                    <option value="AI">Artificial Intelligence</option>
+                    <option value="CyberSecurity">Cybersecurity</option>
+                    <option value="CloudComputing">Cloud Computing</option>
+                    <option value="MobileDevelopment">Mobile Development</option>
+                    <option value="SoftwareEngineering">Software Engineering</option>
+                    <option value="ComputerNetworks">Computer Networks</option>
+                    <option value="DatabaseManagement">Database Management</option>
+                    <option value="UIUXDesign">UI/UX Design</option>
+                  </select>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

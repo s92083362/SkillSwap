@@ -232,6 +232,15 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, [user]);
 
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Profile";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
   // Pending Requests Cards
   const PendingRequestsSection = () => (
     <div className="mt-4 sm:mt-6 md:mt-8 mb-3">

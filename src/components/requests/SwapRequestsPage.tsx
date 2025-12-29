@@ -44,6 +44,16 @@ export default function SwapRequestsPage() {
   const getAvatarUrl = (u: any) =>
     u?.photoURL || u?.photoUrl || "/default-avatar.png";
 
+  // set tab title
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Swap Requests";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []); // runs once when page mounts[web:23][web:26][web:29][web:40]
+
   useEffect(() => {
     if (!user) {
       setLoading(false);
@@ -52,7 +62,7 @@ export default function SwapRequestsPage() {
 
     async function fetchSwapRequests() {
       if (!user) return;
-      
+
       try {
         const qRef = query(
           collection(db, "swapRequests"),
@@ -107,9 +117,12 @@ export default function SwapRequestsPage() {
     fetchSwapRequests();
   }, [user]);
 
-  async function handleUpdateStatus(requestId: string, newStatus: "accepted" | "rejected") {
+  async function handleUpdateStatus(
+    requestId: string,
+    newStatus: "accepted" | "rejected"
+  ) {
     if (!user) return;
-    
+
     try {
       const requestRef = doc(db, "swapRequests", requestId);
       const requestSnap = await getDoc(requestRef);
@@ -309,7 +322,9 @@ export default function SwapRequestsPage() {
 
         {loading ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-sm sm:text-base">Loading requests...</p>
+            <p className="text-gray-500 text-sm sm:text-base">
+              Loading requests...
+            </p>
           </div>
         ) : filteredRequests.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6 sm:p-8 text-center">
@@ -353,7 +368,7 @@ export default function SwapRequestsPage() {
                         </h3>
                         <p className="text-xs sm:text-sm text-gray-500">
                           {request.createdAt?.toLocaleDateString()}{" "}
-                          <span className="hidden xs:inline">at{" "}</span>
+                          <span className="hidden xs:inline">at </span>
                           <span className="block xs:inline">
                             {request.createdAt?.toLocaleTimeString()}
                           </span>

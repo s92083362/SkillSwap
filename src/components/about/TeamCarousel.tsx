@@ -83,6 +83,16 @@ export default function TeamCarousel() {
     };
   }, [prev, next]);
 
+  useEffect(() => {
+              const prevTitle = document.title;
+              document.title = "SkillSwap | About Team";
+          
+              return () => {
+                document.title = prevTitle;
+              };
+            }, []);
+    
+
   return (
     <div className="flex flex-col lg:flex-row gap-12 w-full items-center justify-center py-8">
       {/* Carousel Section */}

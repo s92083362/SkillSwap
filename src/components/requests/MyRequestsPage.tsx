@@ -16,22 +16,32 @@ import {
 } from "firebase/firestore";
 import Header from "@/components/shared/header/UserHeader";
 import Link from "next/link";
- 
+
 export default function MyRequestsPage() {
   const [user] = useAuthState(auth);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"all" | "pending" | "accepted" | "rejected">("all");
- 
+
+  // set tab title for this page
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | My Requests";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []); // runs once when mounted[web:23][web:26][web:29][web:40]
+
   // same helper as chat page
   const getAvatarUrl = (u: any) =>
     u?.photoURL || u?.photoUrl || "/default-avatar.png";
- 
+
   const buildRequest = async (docSnap: QueryDocumentSnapshot<DocumentData>) => {
     const req: any = { id: docSnap.id, ...docSnap.data() };
     const created = req.createdAt?.toDate?.() || null;
- 
+
     // owner name
     let ownerName = req.ownerName;
     if (!ownerName && req.creatorId) {
@@ -43,7 +53,7 @@ export default function MyRequestsPage() {
         ownerData?.displayName ||
         "Unknown";
     }
- 
+
     // requester avatar (sender of this request)
     let requesterAvatar: string | null = null;
     if (req.requesterId) {
@@ -52,7 +62,7 @@ export default function MyRequestsPage() {
       const requesterData = requesterSnap.data();
       requesterAvatar = getAvatarUrl(requesterData || null);
     }
- 
+
     return {
       ...req,
       createdAt: created,
@@ -60,32 +70,30 @@ export default function MyRequestsPage() {
       requesterAvatar,
     };
   };
- 
+
   // Fetch swap requests SENT by the user, with incremental updates
   useEffect(() => {
     if (!user) return;
- 
+
     const qRef = query(
       collection(db, "swapRequests"),
       where("requesterId", "==", user.uid)
     );
- 
+
     const unsubscribe = onSnapshot(qRef, (snapshot) => {
       const changes = snapshot.docChanges();
- 
-      // Use functional update so we can await inside
+
       setRequests((prevState) => {
-        // Wrap in async handler, but return a promise-resolved state
         const run = async () => {
           let current = [...prevState];
- 
+
           const builtChanges = await Promise.all(
             changes.map(async (change) => {
               const built = await buildRequest(change.doc);
               return { type: change.type, built };
             })
           );
- 
+
           for (const { type, built } of builtChanges) {
             if (type === "added") {
               if (!current.find((r) => r.id === built.id)) {
@@ -97,50 +105,45 @@ export default function MyRequestsPage() {
               current = current.filter((r) => r.id !== built.id);
             }
           }
- 
+
           current.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           return current;
         };
- 
-        // React state update cannot be async, so we just kick off the async
-        // computation and return the old state immediately, then manually set.
-        // To keep it simple, compute synchronously here by ignoring async in setter:
-        // We instead rebuild from snapshot.docs if you prefer purely sync logic.
-        // For now, we do not await here; we'll update inside a separate setState.
+
         run().then((next) => {
           setRequests(next);
         });
- 
+
         return prevState;
       });
- 
+
       setLoading(false);
     });
- 
+
     return unsubscribe;
   }, [user]);
- 
+
   // Delete request
   const handleDelete = async (requestId: string) => {
     if (!confirm("Are you sure you want to delete this request?")) return;
- 
+
     try {
       await deleteDoc(doc(db, "swapRequests", requestId));
- 
+
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
- 
+
       alert("Request deleted successfully.");
     } catch (err) {
       console.error("Error deleting request:", err);
       alert("Failed to delete request.");
     }
   };
- 
+
   // Ping owner
   const handlePing = async (request: any) => {
     try {
       if (!request.creatorId) return;
- 
+
       await addDoc(collection(db, "notifications"), {
         userId: request.creatorId,
         type: "ping",
@@ -149,14 +152,14 @@ export default function MyRequestsPage() {
         createdAt: new Date(),
         read: false,
       });
- 
+
       alert("Owner has been pinged!");
     } catch (err) {
       console.error("Error pinging owner:", err);
       alert("Failed to ping owner.");
     }
   };
- 
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -172,20 +175,20 @@ export default function MyRequestsPage() {
       </div>
     );
   }
- 
+
   // Filter logic
   const filteredRequests =
     activeTab === "all"
       ? requests
       : requests.filter((r) => r.status === activeTab);
- 
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
       />
- 
+
       <main className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pt-20 sm:pt-24 md:pt-28 pb-6 sm:pb-10">
         {/* Page Header */}
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">
@@ -194,7 +197,7 @@ export default function MyRequestsPage() {
         <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">
           These are the swap requests you have sent to other course owners.
         </p>
- 
+
         {/* Tabs - Scrollable on mobile */}
         <div className="flex gap-2 sm:gap-4 border-b border-gray-200 mb-4 sm:mb-6 overflow-x-auto pb-1">
           {["all", "pending", "accepted", "rejected"].map((tab) => (
@@ -217,7 +220,7 @@ export default function MyRequestsPage() {
             </button>
           ))}
         </div>
- 
+
         {/* Requests */}
         {loading ? (
           <p className="text-gray-500 text-sm sm:text-base">Loading...</p>
@@ -238,7 +241,7 @@ export default function MyRequestsPage() {
               const createdTime = req.createdAt
                 ? req.createdAt.toLocaleTimeString()
                 : "";
- 
+
               return (
                 <div
                   key={req.id}
@@ -255,22 +258,27 @@ export default function MyRequestsPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <span className="text-xs sm:text-sm text-gray-500">U</span>
+                          <span className="text-xs sm:text-sm text-gray-500">
+                            U
+                          </span>
                         )}
                       </div>
- 
+
                       <div className="min-w-0 flex-1">
                         <h3 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 mb-1 truncate">
                           {title}
                         </h3>
                         <p className="text-xs sm:text-sm text-gray-500">
-                          {createdDate} {createdTime && (
-                            <span className="hidden sm:inline">at {createdTime}</span>
+                          {createdDate}{" "}
+                          {createdTime && (
+                            <span className="hidden sm:inline">
+                              at {createdTime}
+                            </span>
                           )}
                         </p>
                       </div>
                     </div>
- 
+
                     <span
                       className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-semibold capitalize flex-shrink-0 ${
                         req.status === "pending"
@@ -283,7 +291,7 @@ export default function MyRequestsPage() {
                       {req.status}
                     </span>
                   </div>
- 
+
                   {/* Arrow link to requested lesson */}
                   <div className="flex items-center gap-2 mt-2">
                     {req.requestedLessonId && (
@@ -296,11 +304,11 @@ export default function MyRequestsPage() {
                       </Link>
                     )}
                   </div>
- 
+
                   <p className="text-sm sm:text-base text-gray-700 mt-2">
                     <span className="font-semibold">Owner:</span> {owner}
                   </p>
- 
+
                   <p className="text-sm sm:text-base text-gray-700 break-words">
                     <span className="font-semibold">Offering:</span>{" "}
                     {offeredId ? (
@@ -314,7 +322,7 @@ export default function MyRequestsPage() {
                       offered
                     )}
                   </p>
- 
+
                   {/* Message */}
                   {req.message && (
                     <div className="mt-3 p-3 bg-gray-50 rounded">
@@ -326,7 +334,7 @@ export default function MyRequestsPage() {
                       </p>
                     </div>
                   )}
- 
+
                   {/* Status Messages */}
                   {req.status === "accepted" && (
                     <div className="mt-4 p-3 bg-green-50 rounded border border-green-200 text-green-800 text-xs sm:text-sm">
@@ -334,13 +342,13 @@ export default function MyRequestsPage() {
                       course.
                     </div>
                   )}
- 
+
                   {req.status === "rejected" && (
                     <div className="mt-4 p-3 bg-red-50 rounded border border-red-200 text-red-800 text-xs sm:text-sm">
                       ✗ This request was rejected.
                     </div>
                   )}
- 
+
                   {/* Ping & Delete Buttons */}
                   {req.status !== "accepted" && (
                     <div className="flex flex-wrap gap-3 sm:gap-4 mt-4">

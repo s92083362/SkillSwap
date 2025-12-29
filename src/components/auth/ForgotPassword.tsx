@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState , useEffect} from "react";
 import { useRouter } from "next/navigation";
 import { resetPassword } from "../../lib/firebase/auth";
 
@@ -25,10 +25,19 @@ export default function ForgotPassword() {
       setError(err instanceof Error ? err.message : String(err));
     }
   };
+  
 
   const handleBackToLogin = () => {
     router.push("/auth/login-and-signup?tab=login");
   };
+   useEffect(() => {
+      const prevTitle = document.title;
+      document.title = "SkillSwap | ForgotPassword";
+  
+      return () => {
+        document.title = prevTitle;
+      };
+    }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">

@@ -297,6 +297,15 @@ export default function ProfilePage() {
       setAvailability(profile.availability || "Available for new swaps");
     }
   };
+   useEffect(() => {
+            const prevTitle = document.title;
+            document.title = "SkillSwap | Edit Profile";
+        
+            return () => {
+              document.title = prevTitle;
+            };
+          }, []);
+  
 
   // Global loading state
   if (authLoading || profileLoading) {

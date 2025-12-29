@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -28,6 +29,11 @@ export default function LoginAndSignupInner() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // loading states
+  const [loadingLogin, setLoadingLogin] = useState(false);
+  const [loadingSignup, setLoadingSignup] = useState(false);
+  const [loadingSocial, setLoadingSocial] = useState(false);
+
   // Get redirect URL from query params (e.g. /profile from email link)
   const redirectUrl = searchParams.get("redirect");
 
@@ -38,6 +44,16 @@ export default function LoginAndSignupInner() {
       setActiveTab(tab);
     }
   }, [searchParams]);
+
+  // Set browser tab title based on activeTab
+  useEffect(() => {
+    const base = "SkillSwap |  ";
+    if (activeTab === "login") {
+      document.title = `${base}Login`;
+    } else {
+      document.title = `${base}SignUp`;
+    }
+  }, [activeTab]); 
 
   // Helper function to handle post-login redirect
   // Use replace so user can't go back to login with browser back button
@@ -52,6 +68,7 @@ export default function LoginAndSignupInner() {
   // Google Login - save user data with createdAt
   const handleGoogleLogin = async () => {
     setError("");
+    setLoadingSocial(true);
     try {
       const user = await googleLogin(); // Returns User
 
@@ -76,12 +93,15 @@ export default function LoginAndSignupInner() {
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingSocial(false);
     }
   };
 
   // Facebook Login - save user data with createdAt
   const handleFacebookLogin = async () => {
     setError("");
+    setLoadingSocial(true);
     try {
       const user = await facebookLogin(); // Returns User
 
@@ -106,6 +126,8 @@ export default function LoginAndSignupInner() {
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingSocial(false);
     }
   };
 
@@ -129,16 +151,15 @@ export default function LoginAndSignupInner() {
       return;
     }
     setError("");
+    setLoadingSignup(true);
 
     try {
-      // 1) Register with Firebase Auth
       const user = await register(
         signupData.email,
         signupData.password,
         signupData.username
       );
 
-      // 2) Save Firestore user
       await setDoc(doc(db, "users", user.uid), {
         email: signupData.email,
         username: signupData.username,
@@ -148,10 +169,8 @@ export default function LoginAndSignupInner() {
         photoURL: "",
       });
 
-      // 3) Show success popup
       setSuccess("You are registered successfully");
 
-      // 4) Send welcome email in background
       fetch("/api/send-welcome-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -163,7 +182,6 @@ export default function LoginAndSignupInner() {
         console.error("Welcome email error:", err);
       });
 
-      // 5) If there's a redirect URL, go there after signup; otherwise switch to login tab
       setTimeout(() => {
         setSuccess("");
         if (redirectUrl) {
@@ -174,6 +192,8 @@ export default function LoginAndSignupInner() {
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingSignup(false);
     }
   };
 
@@ -184,6 +204,7 @@ export default function LoginAndSignupInner() {
       return;
     }
     setError("");
+    setLoadingLogin(true);
     try {
       const user = await login(loginData.email, loginData.password);
 
@@ -202,6 +223,8 @@ export default function LoginAndSignupInner() {
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingLogin(false);
     }
   };
 
@@ -245,6 +268,13 @@ export default function LoginAndSignupInner() {
     </svg>
   );
 
+  // circular grey/white spinner
+  const Spinner = (
+    <span className="inline-block w-6 h-6 rounded-full border-[3px] border-gray-300 border-t-white animate-spin" />
+  );
+
+  const anyAuthLoading = loadingLogin || loadingSignup || loadingSocial;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl flex flex-col lg:flex-row overflow-hidden">
@@ -259,7 +289,6 @@ export default function LoginAndSignupInner() {
 
         {/* Right Side - Form Section */}
         <div className="w-full lg:w-1/2 p-6 lg:p-10">
-          {/* Show redirect notice if coming from email */}
           {redirectUrl && (
             <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded mb-4 text-sm text-center">
               Please log in to view your profile
@@ -391,9 +420,10 @@ export default function LoginAndSignupInner() {
               </div>
               <button
                 onClick={handleSignUp}
-                className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors"
+                disabled={anyAuthLoading}
+                className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                SignUp
+                {loadingSignup ? Spinner : "SignUp"}
               </button>
               <p className="text-center text-gray-700 text-sm lg:text-base">
                 Already got an account?{" "}
@@ -421,17 +451,19 @@ export default function LoginAndSignupInner() {
               </p>
               <div className="flex justify-center space-x-4">
                 <button
-                  className="hover:scale-110 transition-transform"
+                  className="hover:scale-110 transition-transform disabled:opacity-60"
                   type="button"
                   onClick={handleGoogleLogin}
                   aria-label="Sign in with Google"
+                  disabled={anyAuthLoading}
                 >
                   {GoogleIcon}
                 </button>
                 <button
-                  className="hover:scale-110 transition-transform"
+                  className="hover:scale-110 transition-transform disabled:opacity-60"
                   type="button"
                   onClick={handleFacebookLogin}
+                  disabled={anyAuthLoading}
                 >
                   <svg
                     className="w-10 h-10 lg:w-12 lg:h-12"
@@ -489,9 +521,10 @@ export default function LoginAndSignupInner() {
               </div>
               <button
                 onClick={handleLogin}
-                className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors"
+                disabled={anyAuthLoading}
+                className="w-full bg-[#1F426E] text-white py-3 lg:py-4 rounded-[17px] text-lg lg:text-xl font-semibold hover:bg-blue-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Login
+                {loadingLogin || loadingSocial ? Spinner : "Login"}
               </button>
               <div className="flex items-center my-4">
                 <div className="flex-1 border-t-2 border-gray-300" />
@@ -502,17 +535,19 @@ export default function LoginAndSignupInner() {
               </div>
               <div className="flex justify-center space-x-4 mb-4">
                 <button
-                  className="hover:scale-110 transition-transform"
+                  className="hover:scale-110 transition-transform disabled:opacity-60"
                   type="button"
                   onClick={handleGoogleLogin}
                   aria-label="Sign in with Google"
+                  disabled={anyAuthLoading}
                 >
                   {GoogleIcon}
                 </button>
                 <button
-                  className="hover:scale-110 transition-transform"
+                  className="hover:scale-110 transition-transform disabled:opacity-60"
                   type="button"
                   onClick={handleFacebookLogin}
+                  disabled={anyAuthLoading}
                 >
                   <svg
                     className="w-10 h-10 lg:w-12 lg:h-12"

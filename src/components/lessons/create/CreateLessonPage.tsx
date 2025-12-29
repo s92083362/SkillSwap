@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, type RefObject } from "react";
+import React, { useState, useRef, type RefObject, useEffect} from "react";
 import { useRouter } from "next/navigation";
 import { collection, addDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/firebaseConfig";
@@ -276,6 +276,14 @@ export default function CreateLessonPage() {
     }
   };
 
+   useEffect(() => {
+        const prevTitle = document.title;
+        document.title = "SkillSwap | CreateLesson";
+    
+        return () => {
+          document.title = prevTitle;
+        };
+      }, []);
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 md:p-8">
