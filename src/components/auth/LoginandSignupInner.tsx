@@ -28,7 +28,7 @@ export default function LoginAndSignupInner() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Get redirect URL from query params
+  // Get redirect URL from query params (e.g. /profile from email link)
   const redirectUrl = searchParams.get("redirect");
 
   // Initialize tab from URL (?tab=login or ?tab=signup)
@@ -42,10 +42,8 @@ export default function LoginAndSignupInner() {
   // Helper function to handle post-login redirect
   const handlePostLoginRedirect = () => {
     if (redirectUrl) {
-      // Redirect to the specific chat or page from email
       router.push(redirectUrl);
     } else {
-      // Default redirect to dashboard
       router.push("/dash-board");
     }
   };
@@ -164,8 +162,7 @@ export default function LoginAndSignupInner() {
         console.error("Welcome email error:", err);
       });
 
-      // 5) If there's a redirect URL, log them in and redirect
-      // Otherwise, switch to login tab
+      // 5) If there's a redirect URL, go there after signup; otherwise switch to login tab
       setTimeout(() => {
         setSuccess("");
         if (redirectUrl) {
@@ -222,6 +219,31 @@ export default function LoginAndSignupInner() {
     </svg>
   );
 
+  const GoogleIcon = (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 48 48"
+      className="w-10 h-10 lg:w-12 lg:h-12"
+    >
+      <path
+        fill="#FFC107"
+        d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.9 6.1 29.2 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.2-.1-2.3-.4-3.5z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.3 14.7l6.6 4.8C14.7 15.1 18.9 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C33.9 6.1 29.2 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29 35.1 26.6 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.5H42V20H24v8h11.3c-.7 2-2.1 3.7-3.9 4.9l.1.1 6.2 5.2C36.9 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"
+      />
+    </svg>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl flex flex-col lg:flex-row overflow-hidden">
@@ -239,7 +261,7 @@ export default function LoginAndSignupInner() {
           {/* Show redirect notice if coming from email */}
           {redirectUrl && (
             <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded mb-4 text-sm text-center">
-              Please log in to view your message
+              Please log in to view your profile
             </div>
           )}
 
@@ -286,11 +308,9 @@ export default function LoginAndSignupInner() {
             </p>
           )}
 
-          {/* Rest of your form code remains the same... */}
           {/* SignUp Form */}
           {activeTab === "signup" && (
             <div className="space-y-4">
-              {/* ... all your signup form inputs ... */}
               <input
                 type="text"
                 placeholder="User Name"
@@ -403,28 +423,9 @@ export default function LoginAndSignupInner() {
                   className="hover:scale-110 transition-transform"
                   type="button"
                   onClick={handleGoogleLogin}
+                  aria-label="Sign in with Google"
                 >
-                  <svg
-                    className="w-10 h-10 lg:w-12 lg:h-12"
-                    viewBox="0 0 48 48"
-                  >
-                    <path
-                      fill="#FFC107"
-                      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-                    />
-                    <path
-                      fill="#FF3D00"
-                      d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-                    />
-                    <path
-                      fill="#4CAF50"
-                      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-                    />
-                    <path
-                      fill="#1976D2"
-                      d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l-.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-                    />
-                  </svg>
+                  {GoogleIcon}
                 </button>
                 <button
                   className="hover:scale-110 transition-transform"
@@ -503,28 +504,9 @@ export default function LoginAndSignupInner() {
                   className="hover:scale-110 transition-transform"
                   type="button"
                   onClick={handleGoogleLogin}
+                  aria-label="Sign in with Google"
                 >
-                  <svg
-                    className="w-10 h-10 lg:w-12 lg:h-12"
-                    viewBox="0 0 48 48"
-                  >
-                    <path
-                      fill="#FFC107"
-                      d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-                    />
-                    <path
-                      fill="#FF3D00"
-                      d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-                    />
-                    <path
-                      fill="#4CAF50"
-                      d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-                    />
-                    <path
-                      fill="#1976D2"
-                      d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l-.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-                    />
-                  </svg>
+                  {GoogleIcon}
                 </button>
                 <button
                   className="hover:scale-110 transition-transform"
