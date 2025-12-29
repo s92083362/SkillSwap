@@ -40,11 +40,12 @@ export default function LoginAndSignupInner() {
   }, [searchParams]);
 
   // Helper function to handle post-login redirect
+  // Use replace so user can't go back to login with browser back button
   const handlePostLoginRedirect = () => {
     if (redirectUrl) {
-      router.push(redirectUrl);
+      router.replace(redirectUrl);
     } else {
-      router.push("/dash-board");
+      router.replace("/dash-board");
     }
   };
 
