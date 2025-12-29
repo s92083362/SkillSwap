@@ -31,6 +31,16 @@ export default function AcceptedSwapRequests() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Set tab title for this page
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap – Accepted Swaps";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []); // runs once when component mounts[web:23][web:29][web:40]
+
   useEffect(() => {
     if (!user) return;
 

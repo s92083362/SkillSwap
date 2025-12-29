@@ -317,7 +317,7 @@ export default function SkillPage({ skillId }: SkillPageProps) {
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
       />
-      <main className="max-w-5xl mx_auto px-4 py-10">
+      <main className="max-w-5xl mx-auto px-4 py-10">
         <SkillHero skill={skill}>
           {user && hasSwapped && (
             <ContactCard
