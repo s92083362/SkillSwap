@@ -132,7 +132,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
       {!value && (
         <div className="flex flex-wrap gap-2 mt-4 justify-center">
           <span className="text-xs text-gray-500">Popular:</span>
-          {["Python", "JavaScript", "Frontend", "Backend", "Machine Learning"].map(
+          {["Python",  "Frontend", "Backend", "Machine Learning"].map(
             (tag) => (
               <button
                 key={tag}

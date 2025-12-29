@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
-import Header from "../../shared/header/Header";
+import Header from "../../shared/header/UserHeader";
 import SkillList from "./UserSkillList";
 import type { Skill } from "./UserSkillCard";
 
