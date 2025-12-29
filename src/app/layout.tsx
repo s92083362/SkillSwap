@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     images: ['/og-image.png'],
   },
   verification: {
-    google: 'your-google-verification-code', // Add after Google Search Console setup
+    google: 'google451ee1a82b963152', // Add after Google Search Console setup
   },
   alternates: {
     canonical: 'https://skill-swaps-mydeployments.vercel.app',
