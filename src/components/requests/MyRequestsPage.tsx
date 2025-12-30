@@ -32,8 +32,7 @@ export default function MyRequestsPage() {
     return () => {
       document.title = prevTitle;
     };
-  }, []); // runs once when mounted[web:23][web:26][web:29][web:40]
-
+  }, []); 
   // same helper as chat page
   const getAvatarUrl = (u: any) =>
     u?.photoURL || u?.photoUrl || "/default-avatar.png";

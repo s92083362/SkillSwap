@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { logout } from "@/lib/firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -39,22 +38,21 @@ export default function ProfileSidebar({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [user, loading] = useAuthState(auth as any);
 
-  const navItems: { key: SectionKey; icon: React.ReactNode; label: string }[] =
-    [
-      { key: "dashboard", icon: <Home className="w-5 h-5" />, label: "Dashboard" },
-      { key: "skills", icon: <Layers className="w-5 h-5" />, label: "My Skills" },
-      {
-        key: "messages",
-        icon: <MessageSquare className="w-5 h-5" />,
-        label: "Messages",
-      },
-      {
-        key: "swap",
-        icon: <ArrowLeftRight className="w-5 h-5" />,
-        label: "Accepted Swaps",
-      },
-      { key: "profile", icon: <User className="w-5 h-5" />, label: "Profile" },
-    ];
+  const navItems: { key: SectionKey; icon: React.ReactNode; label: string }[] = [
+    { key: "dashboard", icon: <Home className="w-5 h-5" />, label: "Overview" },
+    { key: "skills", icon: <Layers className="w-5 h-5" />, label: "My Skills" },
+    {
+      key: "messages",
+      icon: <MessageSquare className="w-5 h-5" />,
+      label: "Messages",
+    },
+    {
+      key: "swap",
+      icon: <ArrowLeftRight className="w-5 h-5" />,
+      label: "Accepted Swaps",
+    },
+    { key: "profile", icon: <User className="w-5 h-5" />, label: "Profile" },
+  ];
 
   const handleLogoutClick = () => {
     setShowLogoutConfirm(true);
@@ -95,6 +93,7 @@ export default function ProfileSidebar({
   const handleLogoutCancel = () => {
     setShowLogoutConfirm(false);
   };
+
   const getButtonClasses = (sectionKey: SectionKey) =>
     `flex items-center gap-3 py-2 px-4 rounded-lg w-full text-left transition ${
       activeSection === sectionKey
@@ -110,12 +109,37 @@ export default function ProfileSidebar({
 
   const displayName = loading ? "Loading..." : user?.displayName || "User";
 
+  // Update document title based on active section
+  useEffect(() => {
+    const sectionTitles: Record<SectionKey, string> = {
+      dashboard: "SkillSwap | Profile",
+      skills: "SkillSwap | My Skills",
+      messages: "SkillSwap | Messages",
+      swap: "SkillSwap | Accepted Swaps",
+      profile: "SkillSwap | Profile",
+    };
+    
+    // Update title immediately when activeSection changes
+    document.title = sectionTitles[activeSection] || "SkillSwap | Profile";
+    
+    // Log for debugging
+    console.log(`Title updated to: ${document.title} (activeSection: ${activeSection})`);
+  }, [activeSection]);
+
   // Helper: update URL ?section= and local activeSection
   const goToSection = (section: SectionKey) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("section", section);
-    router.push(`/profile?${params.toString()}`);
+
+    // Treat "dashboard" as the profile overview section
+    const sectionForUrl = section === "dashboard" ? "dashboard" : section;
+
+    params.set("section", sectionForUrl);
+    
+    // Update active section BEFORE navigation to ensure title updates first
     setActiveSection(section);
+    
+    router.push(`/profile?${params.toString()}`, { scroll: false });
+
     if (mobileMenuOpen) {
       setMobileMenuOpen(false);
     }
