@@ -58,7 +58,7 @@ export default function ProfilePage() {
       skills: "SkillSwap | My Skills",
       messages: "SkillSwap | Messages",
       swap: "SkillSwap | Accepted Swaps",
-      profile: "SkillSwap | Profile",
+      profile: "SkillSwap | Edit Profile",
     };
     
     document.title = sectionTitles[activeSection] || "SkillSwap | Profile";
