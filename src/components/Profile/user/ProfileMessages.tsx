@@ -176,14 +176,14 @@ export default function ProfileMessages() {
     router.push("/chat/messages");
   };
 
-   useEffect(() => {
-            const prevTitle = document.title;
-            document.title = "SkillSwap | Messages";
+  //  useEffect(() => {
+  //           const prevTitle = document.title;
+  //           document.title = "SkillSwap | Messages";
         
-            return () => {
-              document.title = prevTitle;
-            };
-          }, []);
+  //           return () => {
+  //             document.title = prevTitle;
+  //           };
+  //         }, []);
   
 
   return (

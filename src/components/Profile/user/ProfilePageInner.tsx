@@ -35,7 +35,7 @@ export default function ProfilePage() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
 
-  // Detect URL section
+  // Detect URL section and update activeSection
   useEffect(() => {
     const section = searchParams.get("section");
     if (section === "skills") {
@@ -50,6 +50,19 @@ export default function ProfilePage() {
       setActiveSection("dashboard");
     }
   }, [searchParams]);
+
+  // Update document title based on activeSection
+  useEffect(() => {
+    const sectionTitles = {
+      dashboard: "SkillSwap | Profile",
+      skills: "SkillSwap | My Skills",
+      messages: "SkillSwap | Messages",
+      swap: "SkillSwap | Accepted Swaps",
+      profile: "SkillSwap | Profile",
+    };
+    
+    document.title = sectionTitles[activeSection] || "SkillSwap | Profile";
+  }, [activeSection]);
 
   // Handle Accept (with notifications + email)
   const handleAccept = async (requestId: string) => {
@@ -231,15 +244,6 @@ export default function ProfilePage() {
 
     return () => unsubscribe();
   }, [user]);
-
-  useEffect(() => {
-    const prevTitle = document.title;
-    document.title = "SkillSwap | Profile";
-
-    return () => {
-      document.title = prevTitle;
-    };
-  }, []);
 
   // Pending Requests Cards
   const PendingRequestsSection = () => (
