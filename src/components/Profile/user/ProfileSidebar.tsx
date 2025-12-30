@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { logout } from "@/lib/firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -95,6 +94,7 @@ export default function ProfileSidebar({
   const handleLogoutCancel = () => {
     setShowLogoutConfirm(false);
   };
+
   const getButtonClasses = (sectionKey: SectionKey) =>
     `flex items-center gap-3 py-2 px-4 rounded-lg w-full text-left transition ${
       activeSection === sectionKey
@@ -109,6 +109,23 @@ export default function ProfileSidebar({
       )}&background=F8D5CB&color=555`;
 
   const displayName = loading ? "Loading..." : user?.displayName || "User";
+
+  // Update document title based on active section
+  useEffect(() => {
+    const prevTitle = document.title;
+    const sectionTitles: Record<SectionKey, string> = {
+      dashboard: "SkillSwap | Profile Dashboard",
+      skills: "",
+      messages: "",
+      swap: "",
+      profile: ""
+    };
+    document.title = sectionTitles[activeSection] || "SkillSwap | Profile";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [activeSection]);
 
   // Helper: update URL ?section= and local activeSection
   const goToSection = (section: SectionKey) => {

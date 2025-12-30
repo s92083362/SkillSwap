@@ -26,15 +26,7 @@ export default function ProfileLessons() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 4; // 4 lessons per page
 
-  // set tab title for this page
-  useEffect(() => {
-    const prevTitle = document.title;
-    document.title = "SkillSwap | Enrolled Lessons";
-
-    return () => {
-      document.title = prevTitle;
-    };
-  }, []);
+  
 
   useEffect(() => {
     if (!user) {

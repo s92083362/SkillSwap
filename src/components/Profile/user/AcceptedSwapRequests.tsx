@@ -34,7 +34,7 @@ export default function AcceptedSwapRequests() {
   // Set tab title for this page
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "SkillSwap – Accepted Swaps";
+    document.title = "SkillSwap | Accepted Swaps";
 
     return () => {
       document.title = prevTitle;

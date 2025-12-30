@@ -52,7 +52,7 @@ export default function SwapRequestsPage() {
     return () => {
       document.title = prevTitle;
     };
-  }, []); // runs once when page mounts[web:23][web:26][web:29][web:40]
+  }, []); 
 
   useEffect(() => {
     if (!user) {
