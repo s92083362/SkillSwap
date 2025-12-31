@@ -30,7 +30,10 @@ export default function UserList({
   isUserOnline,
   currentUserId,
 }: UserListProps) {
-  const usersWithConversations: ChatUser[] = conversations
+  // Only show users with actual messages (conversations with lastMessage)
+  const conversationsWithMessages = conversations.filter(conv => conv.lastMessage && conv.lastMessage.trim() !== '');
+  
+  const usersWithConversations: ChatUser[] = conversationsWithMessages
     .map((conv) => getUserById(conv.otherUserId, allUsers))
     .filter((u): u is ChatUser => !!u);
 
@@ -40,6 +43,9 @@ export default function UserList({
 
   const filteredUsersWithConv = filterUsers(usersWithConversations, search);
   const filteredUsersWithoutConv = filterUsers(usersWithoutConversations, search);
+
+  // Only show users without conversations if there's a search query
+  const showUsersWithoutConv = search.trim().length > 0 && filteredUsersWithoutConv.length > 0;
 
   return (
     <div
@@ -66,9 +72,11 @@ export default function UserList({
         {/* Recent chats */}
         {filteredUsersWithConv.length > 0 && (
           <div className="mb-4">
-            <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
-              Recent Chats
-            </div>
+            {!search.trim() && (
+              <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
+                Recent Chats
+              </div>
+            )}
             <ul className="flex flex-col gap-1">
               {filteredUsersWithConv.map((u) => {
                 const conv = conversations.find((c) => c.otherUserId === u.uid);
@@ -137,12 +145,9 @@ export default function UserList({
           </div>
         )}
         
-        {/* All users */}
-        {filteredUsersWithoutConv.length > 0 && (
+        {/* All users - only shown when searching */}
+        {showUsersWithoutConv && (
           <div>
-            <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
-              All Users
-            </div>
             <ul className="flex flex-col gap-1">
               {filteredUsersWithoutConv.map((u) => {
                 const avatarUrl = getAvatarUrl(u);
@@ -198,12 +203,14 @@ export default function UserList({
           </div>
         )}
         
-        {filteredUsersWithConv.length === 0 &&
-          filteredUsersWithoutConv.length === 0 && (
-            <div className="text-center text-gray-400 py-8 text-sm">
-              {search ? 'No users found' : 'No users available'}
-            </div>
-          )}
+        {/* Empty states */}
+        {filteredUsersWithConv.length === 0 && !showUsersWithoutConv && (
+          <div className="text-center text-gray-400 py-8 text-sm">
+            {search.trim() 
+              ? 'No conversations found' 
+              : 'No conversations yet. Search for users to start chatting!'}
+          </div>
+        )}
       </div>
     </div>
   );
