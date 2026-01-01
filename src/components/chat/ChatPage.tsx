@@ -57,31 +57,50 @@ export default function ChatPage() {
   const autoAnswerCallId = searchParams.get("callId");
   const urlCallType = searchParams.get("callType");
 
-  // Custom hooks
-  const { user } = useCurrentUser();
-  const { allUsers, error: usersError } = useAllUsers() as {
+  // Current user
+  const { user, loading: userLoading } = useCurrentUser() as {
+    user: ChatUser | null;
+    loading: boolean;
+  };
+
+  // All users
+  const {
+    allUsers,
+    error: usersError,
+    loading: isLoadingUsers,
+  } = useAllUsers() as {
     allUsers: ChatUser[];
     error: string | null;
+    loading: boolean;
   };
+
+  // Active users
   const activeUsers = useActiveUsers() as ChatUser[];
-  const { conversations, unreadCounts, setUnreadCounts } = useConversations(
-    user?.uid
-  );
+
+  // Conversations
+  const {
+    conversations,
+    unreadCounts,
+    setUnreadCounts,
+    loading: isLoadingConversations,
+  } = useConversations(user?.uid);
+
+  // Incoming calls
   const { incomingCall, ringtoneRef, handleDeclineIncomingCall } =
     useIncomingCalls(user?.uid, pathname, allUsers);
 
+  // Presence tracking
   useTrackUserActivity(60000);
+
   useEffect(() => {
     const prevTitle = document.title;
     document.title = "SkillSwap | Chat";
-
     return () => {
       document.title = prevTitle;
     };
   }, []);
 
-
-  // Local state
+  // Local UI state
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState<string>("");
@@ -99,7 +118,7 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Click outside attach menu
+  // Close attach menu on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -115,23 +134,21 @@ export default function ChatPage() {
 
   // Auto-select user from URL + auto-answer
   useEffect(() => {
-    if (autoAnswerCallId && initialUserId && allUsers.length > 0 && user) {
-      const targetUser = allUsers.find((u) => u.uid === initialUserId);
-      if (targetUser) {
-        void selectUser(targetUser);
-        const typeFromUrl =
-          urlCallType === "audio" || urlCallType === "video"
-            ? urlCallType
-            : "video";
-        setActiveCall({ type: typeFromUrl, autoAnswer: true });
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, "", newUrl);
-      }
-    } else if (initialUserId && allUsers.length > 0 && user) {
-      const targetUser = allUsers.find((u) => u.uid === initialUserId);
-      if (targetUser) {
-        void selectUser(targetUser);
-      }
+    if (!initialUserId || !user || allUsers.length === 0) return;
+
+    const targetUser = allUsers.find((u) => u.uid === initialUserId);
+    if (!targetUser) return;
+
+    void selectUser(targetUser);
+
+    if (autoAnswerCallId) {
+      const typeFromUrl =
+        urlCallType === "audio" || urlCallType === "video"
+          ? urlCallType
+          : "video";
+      setActiveCall({ type: typeFromUrl, autoAnswer: true });
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUserId, autoAnswerCallId, urlCallType, allUsers, user]);
@@ -234,7 +251,6 @@ export default function ChatPage() {
       await sendTextMessage(user as ChatUser, selectedUser, text, chatId);
       setInput("");
 
-      // send email notification to receiver
       if (selectedUser.email) {
         fetch("/api/send-chat-email", {
           method: "POST",
@@ -269,7 +285,6 @@ export default function ChatPage() {
         chatId
       );
 
-      // send email notification to receiver
       if (selectedUser.email) {
         fetch("/api/send-chat-email", {
           method: "POST",
@@ -308,6 +323,18 @@ export default function ChatPage() {
       `&callType=${incomingCall.callType}`;
     router.push(url);
   };
+
+  // Combined loading for whole page
+  const actuallyLoading =
+    userLoading || !user || isLoadingUsers || isLoadingConversations;
+
+  if (actuallyLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-50">
+        <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   if (!user) return null;
 
@@ -396,6 +423,7 @@ export default function ChatPage() {
           usersError={usersError}
           isUserOnline={isUserOnlineCheck}
           currentUserId={user.uid}
+          isLoadingUsers={isLoadingUsers}
         />
 
         <div
@@ -505,21 +533,6 @@ export default function ChatPage() {
           )}
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes pulse-slow {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.95;
-          }
-        }
-        .animate-pulse-slow {
-          animation: pulse-slow 2s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
