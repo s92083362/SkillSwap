@@ -415,7 +415,6 @@ export default function ChatPage() {
           conversations={conversations}
           unreadCounts={unreadCounts}
           allUsers={allUsers}
-          activeUsers={activeUsers}
           selectedUser={selectedUser}
           search={search}
           onSearchChange={setSearch}
