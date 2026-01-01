@@ -176,16 +176,6 @@ export default function ProfileMessages() {
     router.push("/chat/messages");
   };
 
-  //  useEffect(() => {
-  //           const prevTitle = document.title;
-  //           document.title = "SkillSwap | Messages";
-        
-  //           return () => {
-  //             document.title = prevTitle;
-  //           };
-  //         }, []);
-  
-
   return (
     <section>
       <div className="flex items-center justify-between mb-3">

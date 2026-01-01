@@ -8,7 +8,6 @@ interface UserListProps {
   conversations: ConversationMeta[];
   unreadCounts: Record<string, number>;
   allUsers: ChatUser[];
-  activeUsers: ChatUser[];
   selectedUser: ChatUser | null;
   search: string;
   onSearchChange: (value: string) => void;
@@ -23,7 +22,6 @@ export default function UserList({
   conversations,
   unreadCounts,
   allUsers,
-  activeUsers,
   selectedUser,
   search,
   onSearchChange,
@@ -110,16 +108,19 @@ export default function UserList({
         <div className="flex-1 overflow-y-auto p-3 sm:p-4">
           {allMatchingUsers.length === 0 ? (
             <div className="text-center text-gray-400 py-8 text-sm">
-              No users found for "{search.trim()}"
+              No users found for '{search.trim()}'
             </div>
           ) : (
             <>
               <div className="text-xs font-semibold text-gray-500 mb-2 uppercase">
-                {allMatchingUsers.length} {allMatchingUsers.length === 1 ? "User" : "Users"} Found
+                {allMatchingUsers.length}{" "}
+                {allMatchingUsers.length === 1 ? "User" : "Users"} Found
               </div>
               <ul className="flex flex-col gap-1">
                 {allMatchingUsers.map((u) => {
-                  const conv = conversations.find((c) => c.otherUserId === u.uid);
+                  const conv = conversations.find(
+                    (c) => c.otherUserId === u.uid
+                  );
                   const unreadCount = unreadCounts[u.uid] || 0;
                   const avatarUrl = getAvatarUrl(u);
                   const hasConversation = usersWithConversations.some(
@@ -226,7 +227,9 @@ export default function UserList({
             </div>
             <ul className="flex flex-col gap-1">
               {usersWithConversations.map((u) => {
-                const conv = conversations.find((c) => c.otherUserId === u.uid);
+                const conv = conversations.find(
+                  (c) => c.otherUserId === u.uid
+                );
                 const unreadCount = unreadCounts[u.uid] || 0;
                 const avatarUrl = getAvatarUrl(u);
 
