@@ -36,29 +36,18 @@ type Particle = {
   hue: number;
 };
 
-/* ============================
-   Fireworks Effect (Jan 1 only)
-   ============================ */
+// Fireworks Effect (Only January 1st)
 const FireworksEffect: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Track current time and update every minute
-  const [today, setToday] = useState(new Date());
-
   useEffect(() => {
-    const interval = setInterval(() => {
-      setToday(new Date());
-    }, 60 * 1000); // check every minute
-    return () => clearInterval(interval);
-  }, []);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentDate = now.getDate();
 
-  const month = today.getMonth();
-  const day = today.getDate();
+    // Show fireworks only on January 1st (month 0, date 1)
+    if (currentMonth !== 0 || currentDate !== 1) return;
 
-  // Fireworks only on Jan 1
-  if (!(month === 0 && day === 1)) return null;
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -111,16 +100,20 @@ const FireworksEffect: React.FC = () => {
     function loop() {
       if (!ctx) return;
 
+      // Clear canvas
       ctx.clearRect(0, 0, windowW, windowH);
 
+      // Random firework launch
       if (Math.random() < 0.03) {
         createFirework();
       }
 
+      // Update and draw fireworks
       for (let i = fireworks.length - 1; i >= 0; i--) {
         const fw = fireworks[i];
 
         if (!fw.exploded) {
+          // Rising rocket
           fw.y -= 8;
 
           ctx.beginPath();
@@ -128,11 +121,13 @@ const FireworksEffect: React.FC = () => {
           ctx.fillStyle = `hsl(${fw.hue}, 100%, 60%)`;
           ctx.fill();
 
+          // Check if reached target
           if (fw.y <= fw.targetY) {
             fw.exploded = true;
             createParticles(fw);
           }
         } else {
+          // Draw explosion particles
           for (let j = fw.particles.length - 1; j >= 0; j--) {
             const p = fw.particles[j];
 
@@ -152,6 +147,7 @@ const FireworksEffect: React.FC = () => {
             ctx.fill();
           }
 
+          // Remove firework when all particles fade
           if (fw.particles.length === 0) {
             fireworks.splice(i, 1);
           }
@@ -177,6 +173,13 @@ const FireworksEffect: React.FC = () => {
     };
   }, []);
 
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  // Show fireworks only on January 1st
+  if (currentMonth !== 0 || currentDate !== 1) return null;
+
   return (
     <canvas
       ref={canvasRef}
@@ -186,28 +189,18 @@ const FireworksEffect: React.FC = () => {
   );
 };
 
-/* ============================
-   Snow Effect (December only)
-   ============================ */
+// Snow Effect
 const SnowEffect: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Track current time and update every minute
-  const [today, setToday] = useState(new Date());
-
   useEffect(() => {
-    const interval = setInterval(() => {
-      setToday(new Date());
-    }, 60 * 1000); // check every minute
-    return () => clearInterval(interval);
-  }, []);
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentDate = now.getDate();
 
-  const month = today.getMonth();
+    // Show snow only in December (month 11, dates 1-31)
+    if (currentMonth !== 11 || currentDate > 31) return;
 
-  // Snow only December
-  if (!(month === 11)) return null;
-
-  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -310,6 +303,13 @@ const SnowEffect: React.FC = () => {
       cancelAnimationFrame(animationId);
     };
   }, []);
+
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  // Show snow only in December (month 11, dates 1-31)
+  if (currentMonth !== 11 || currentDate > 31) return null;
 
   return (
     <canvas

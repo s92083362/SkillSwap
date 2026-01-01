@@ -76,10 +76,6 @@ export default function UserList({
     .map((conv) => getUserById(conv.otherUserId, allUsers))
     .filter((u): u is ChatUser => !!u);
 
-  const usersWithoutConversations: ChatUser[] = otherUsers.filter(
-    (u) => !conversations.some((conv) => conv.otherUserId === u.uid)
-  );
-
   if (hasSearch) {
     // SEARCH MODE: Show all matching users in one list
     const allMatchingUsers = filterUsers(otherUsers, search);
@@ -108,7 +104,7 @@ export default function UserList({
         <div className="flex-1 overflow-y-auto p-3 sm:p-4">
           {allMatchingUsers.length === 0 ? (
             <div className="text-center text-gray-400 py-8 text-sm">
-              No users found for '{search.trim()}'
+              No users found for &quot;{search.trim()}&quot;
             </div>
           ) : (
             <>
