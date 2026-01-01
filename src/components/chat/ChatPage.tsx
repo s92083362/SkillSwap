@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   collection,
@@ -12,6 +12,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
+import dynamic from "next/dynamic";
 
 // Hooks
 import { useCurrentUser } from "@/hooks/users/useCurrentUser";
@@ -21,15 +22,32 @@ import { useActiveUsers } from "@/hooks/users/useActiveUsers";
 import { useConversations } from "@/hooks/chat/useConversations";
 import { useIncomingCalls } from "@/hooks/chat/useIncomingCalls";
 
-// Components
+// Components - Eager load only critical components
 import ChatHeader from "@/components/chat/ChatHeader";
 import UserList from "@/components/chat/UserList";
-import FileUploadPreview from "@/components/chat/messages/FileUploadPreview";
-import IncomingCallOverlay from "@/components/chat/calls/IncomingCallOverlay";
 import MessageInput from "@/components/chat/messages/MessageInput";
 import MessageBubble from "@/components/chat/messages/MessageBubble";
-import VideoCall from "@/components/chat/calls/VideoCall";
-import AudioCall from "@/components/chat/calls/AudioCall";
+
+// Lazy load heavy/conditional components
+const FileUploadPreview = dynamic(() => import("@/components/chat/messages/FileUploadPreview"), {
+  loading: () => <div className="h-24 bg-gray-100 animate-pulse" />,
+  ssr: false,
+});
+
+const IncomingCallOverlay = dynamic(() => import("@/components/chat/calls/IncomingCallOverlay"), {
+  loading: () => null,
+  ssr: false,
+});
+
+const VideoCall = dynamic(() => import("@/components/chat/calls/VideoCall"), {
+  loading: () => <div className="fixed inset-0 bg-black flex items-center justify-center"><div className="text-white">Loading video call...</div></div>,
+  ssr: false,
+});
+
+const AudioCall = dynamic(() => import("@/components/chat/calls/AudioCall"), {
+  loading: () => <div className="fixed inset-0 bg-black flex items-center justify-center"><div className="text-white">Loading audio call...</div></div>,
+  ssr: false,
+});
 
 // Utils
 import {
@@ -117,20 +135,89 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const attachMenuRef = useRef<HTMLDivElement | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Close attach menu on outside click
+  // Close attach menu on outside click - memoized
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         attachMenuRef.current &&
         !attachMenuRef.current.contains(event.target as Node)
       ) {
         setShowAttachMenu(false);
       }
-    }
+    };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Memoized online check
+  const isUserOnlineCheck = useCallback(
+    (userId: string) => checkUserOnline(userId, activeUsers),
+    [activeUsers]
+  );
+
+  // Optimized selectUser with cleanup
+  const selectUser = useCallback(
+    async (targetUser: ChatUser) => {
+      if (!user) return;
+
+      // Cleanup previous subscription
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+
+      setSelectedUser(targetUser);
+      setShowUserList(false);
+      setMessages([]); // Clear messages immediately for better UX
+      
+      const chatId = createChatId(user.uid, targetUser.uid);
+
+      try {
+        // Mark as read and update unread counts
+        await markMessagesAsRead(user.uid, targetUser.uid);
+        setUnreadCounts((prev) => ({ ...prev, [targetUser.uid]: 0 }));
+
+        // Update chat metadata
+        await setDoc(
+          doc(db, "privateChats", chatId),
+          {
+            participants: [user.uid, targetUser.uid],
+            participantNames: {
+              [user.uid]: user.displayName || user.email,
+              [targetUser.uid]: targetUser.displayName || targetUser.email,
+            },
+            lastUpdated: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        // Subscribe to messages
+        const q = query(
+          collection(db, "privateChats", chatId, "messages"),
+          orderBy("timestamp")
+        );
+        
+        const unsub = onSnapshot(q, (snapshot) => {
+          setMessages(
+            snapshot.docs.map(
+              (d) =>
+                ({
+                  id: d.id,
+                  ...(d.data() as Omit<ChatMessage, "id">),
+                } as ChatMessage)
+            )
+          );
+        });
+
+        unsubscribeRef.current = unsub;
+      } catch (error) {
+        console.error("Error selecting user:", error);
+      }
+    },
+    [user, setUnreadCounts]
+  );
 
   // Auto-select user from URL + auto-answer
   useEffect(() => {
@@ -150,63 +237,27 @@ export default function ChatPage() {
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialUserId, autoAnswerCallId, urlCallType, allUsers, user]);
+  }, [initialUserId, autoAnswerCallId, urlCallType, allUsers, user, selectUser]);
 
-  // Auto-scroll messages
+  // Cleanup on unmount
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, []);
 
-  const isUserOnlineCheck = (userId: string) =>
-    checkUserOnline(userId, activeUsers);
+  // Optimized auto-scroll with debouncing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(timeoutId);
+  }, [messages.length]); // Only trigger on message count change
 
-  const selectUser = async (targetUser: ChatUser) => {
-    if (!user) return;
-    setSelectedUser(targetUser);
-    setShowUserList(false);
-    const chatId = createChatId(user.uid, targetUser.uid);
-
-    try {
-      await markMessagesAsRead(user.uid, targetUser.uid);
-      setUnreadCounts((prev) => ({ ...prev, [targetUser.uid]: 0 }));
-    } catch (error) {
-      console.error("Error marking messages as read:", error);
-    }
-
-    await setDoc(
-      doc(db, "privateChats", chatId),
-      {
-        participants: [user.uid, targetUser.uid],
-        participantNames: {
-          [user.uid]: user.displayName || user.email,
-          [targetUser.uid]: targetUser.displayName || targetUser.email,
-        },
-        lastUpdated: serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    const q = query(
-      collection(db, "privateChats", chatId, "messages"),
-      orderBy("timestamp")
-    );
-    const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(
-        snapshot.docs.map(
-          (d) =>
-            ({
-              id: d.id,
-              ...(d.data() as Omit<ChatMessage, "id">),
-            } as ChatMessage)
-        )
-      );
-    });
-
-    return () => unsub();
-  };
-
-  const handleFileSelect = (file: File) => {
+  // Memoized callbacks
+  const handleFileSelect = useCallback((file: File) => {
     setSelectedFile(file);
     setShowAttachMenu(false);
     if (file.type.startsWith("image/")) {
@@ -218,39 +269,42 @@ export default function ChatPage() {
     } else {
       setFilePreview(null);
     }
-  };
+  }, []);
 
-  const cancelFileUpload = () => {
+  const cancelFileUpload = useCallback(() => {
     setSelectedFile(null);
     setFilePreview(null);
     setFileCaption("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  };
+  }, []);
 
-  const startVideoCall = () => {
+  const startVideoCall = useCallback(() => {
     setActiveCall({ type: "video", autoAnswer: false });
-  };
+  }, []);
 
-  const startAudioCall = () => {
+  const startAudioCall = useCallback(() => {
     setActiveCall({ type: "audio", autoAnswer: false });
-  };
+  }, []);
 
-  const closeCall = () => {
+  const closeCall = useCallback(() => {
     setActiveCall(null);
-  };
+  }, []);
 
-  // TEXT MESSAGE + EMAIL
-  async function handleSendMessage() {
+  // Optimized message sending with debouncing
+  const handleSendMessage = useCallback(async () => {
     if (!user || !input.trim() || !selectedUser) return;
     const chatId = createChatId(user.uid, selectedUser.uid);
     const text = input.trim();
 
+    // Clear input immediately for better UX
+    setInput("");
+
     try {
       await sendTextMessage(user as ChatUser, selectedUser, text, chatId);
-      setInput("");
 
+      // Send email notification asynchronously without blocking
       if (selectedUser.email) {
         fetch("/api/send-chat-email", {
           method: "POST",
@@ -266,11 +320,12 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      // Restore input on error
+      setInput(text);
     }
-  }
+  }, [user, input, selectedUser]);
 
-  // FILE MESSAGE + EMAIL
-  async function handleSendFileMessage() {
+  const handleSendFileMessage = useCallback(async () => {
     if (!user || !selectedUser || !selectedFile) return;
     const chatId = createChatId(user.uid, selectedUser.uid);
 
@@ -311,9 +366,9 @@ export default function ChatPage() {
     } finally {
       setUploading(false);
     }
-  }
+  }, [user, selectedUser, selectedFile, fileCaption, cancelFileUpload]);
 
-  const handleAnswerIncomingCall = () => {
+  const handleAnswerIncomingCall = useCallback(() => {
     if (!incomingCall || !user) return;
     const chatId = createChatId(user.uid, incomingCall.callerId);
     const url =
@@ -322,7 +377,23 @@ export default function ChatPage() {
       `&callId=${encodeURIComponent(incomingCall.callId)}` +
       `&callType=${incomingCall.callType}`;
     router.push(url);
-  };
+  }, [incomingCall, user, router]);
+
+  const handleBackToUserList = useCallback(() => {
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    setSelectedUser(null);
+    setShowUserList(true);
+    setMessages([]);
+  }, []);
+
+  // Memoize total unread count
+  const totalUnread = useMemo(
+    () => Object.values(unreadCounts).reduce((sum, count) => sum + count, 0),
+    [unreadCounts]
+  );
 
   // Combined loading for whole page
   const actuallyLoading =
@@ -330,55 +401,56 @@ export default function ChatPage() {
 
   if (actuallyLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <main className="flex items-center justify-center h-screen bg-gray-50">
         <div className="h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      </main>
     );
   }
 
   if (!user) return null;
 
-  const totalUnread = Object.values(unreadCounts).reduce(
-    (sum, count) => sum + count,
-    0
-  );
-
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-      <audio ref={ringtoneRef} src="/sounds/incoming-call.mp3" />
+    <main className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+      <audio ref={ringtoneRef} src="/sounds/incoming-call.mp3" preload="none" />
 
       {incomingCall && (
-        <IncomingCallOverlay
-          incomingCall={incomingCall}
-          onAnswer={handleAnswerIncomingCall}
-          onDecline={handleDeclineIncomingCall}
-        />
+        <Suspense fallback={null}>
+          <IncomingCallOverlay
+            incomingCall={incomingCall}
+            onAnswer={handleAnswerIncomingCall}
+            onDecline={handleDeclineIncomingCall}
+          />
+        </Suspense>
       )}
 
       {activeCall?.type === "video" && selectedUser && (
-        <VideoCall
-          currentUserId={user.uid}
-          currentUserName={user.displayName || user.email || "Anonymous"}
-          otherUserId={selectedUser.uid}
-          otherUserName={
-            selectedUser.displayName || selectedUser.email || "Unknown"
-          }
-          onClose={closeCall}
-          autoAnswer={activeCall.autoAnswer}
-        />
+        <Suspense fallback={<div className="fixed inset-0 bg-black flex items-center justify-center"><div className="text-white">Loading video call...</div></div>}>
+          <VideoCall
+            currentUserId={user.uid}
+            currentUserName={user.displayName || user.email || "Anonymous"}
+            otherUserId={selectedUser.uid}
+            otherUserName={
+              selectedUser.displayName || selectedUser.email || "Unknown"
+            }
+            onClose={closeCall}
+            autoAnswer={activeCall.autoAnswer}
+          />
+        </Suspense>
       )}
 
       {activeCall?.type === "audio" && selectedUser && (
-        <AudioCall
-          currentUserId={user.uid}
-          currentUserName={user.displayName || user.email || "Anonymous"}
-          otherUserId={selectedUser.uid}
-          otherUserName={
-            selectedUser.displayName || selectedUser.email || "Unknown"
-          }
-          onClose={closeCall}
-          autoAnswer={activeCall.autoAnswer}
-        />
+        <Suspense fallback={<div className="fixed inset-0 bg-black flex items-center justify-center"><div className="text-white">Loading audio call...</div></div>}>
+          <AudioCall
+            currentUserId={user.uid}
+            currentUserName={user.displayName || user.email || "Anonymous"}
+            otherUserId={selectedUser.uid}
+            otherUserName={
+              selectedUser.displayName || selectedUser.email || "Unknown"
+            }
+            onClose={closeCall}
+            autoAnswer={activeCall.autoAnswer}
+          />
+        </Suspense>
       )}
 
       <ChatHeader
@@ -387,11 +459,7 @@ export default function ChatPage() {
         isUserOnline={
           selectedUser ? isUserOnlineCheck(selectedUser.uid) : false
         }
-        onBack={() => {
-          setSelectedUser(null);
-          setShowUserList(true);
-          setMessages([]);
-        }}
+        onBack={handleBackToUserList}
         onStartAudioCall={startAudioCall}
         onStartVideoCall={startVideoCall}
       />
@@ -468,15 +536,17 @@ export default function ChatPage() {
               </div>
 
               {selectedFile && (
-                <FileUploadPreview
-                  selectedFile={selectedFile}
-                  filePreview={filePreview}
-                  fileCaption={fileCaption}
-                  uploading={uploading}
-                  onCaptionChange={setFileCaption}
-                  onSend={handleSendFileMessage}
-                  onCancel={cancelFileUpload}
-                />
+                <Suspense fallback={<div className="h-24 bg-gray-100 animate-pulse" />}>
+                  <FileUploadPreview
+                    selectedFile={selectedFile}
+                    filePreview={filePreview}
+                    fileCaption={fileCaption}
+                    uploading={uploading}
+                    onCaptionChange={setFileCaption}
+                    onSend={handleSendFileMessage}
+                    onCancel={cancelFileUpload}
+                  />
+                </Suspense>
               )}
 
               <MessageInput
@@ -510,6 +580,7 @@ export default function ChatPage() {
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -532,6 +603,6 @@ export default function ChatPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
