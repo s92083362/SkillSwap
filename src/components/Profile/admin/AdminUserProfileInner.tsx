@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState, useEffect} from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../lib/firebase/firebaseConfig";
 import AdminHeader from "@/components/shared/header/AdminHeader";
 import AdminSidebar from "./AdminProfileSidebar";
 import AdminEditProfile from "./AdminEditProfile";
+import AnalyticsReport from "./analytics/AnalyticsReport";
+import { useSessionTracking } from "@/hooks/useSessionTracking";
 
 // Keep SectionKey in sync with AdminSidebar
-type SectionKey = "overview" | "settings" | "security" | "activity";
+type SectionKey = "overview" | "settings" | "security" | "activity" | "analytics";
 
 export default function AdminProfilePageInner() {
   const router = useRouter();
@@ -17,9 +19,12 @@ export default function AdminProfilePageInner() {
   const [user] = useAuthState(auth as any);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Add session tracking
+  useSessionTracking();
+
   // Read section from URL and safely narrow to SectionKey
   const sectionParam = (searchParams.get("section") || "overview") as string;
-  const validSections: SectionKey[] = ["overview", "settings", "security", "activity"];
+  const validSections: SectionKey[] = ["overview", "settings", "security", "activity", "analytics"];
 
   const section: SectionKey = validSections.includes(
     sectionParam as SectionKey
@@ -32,14 +37,15 @@ export default function AdminProfilePageInner() {
     router.push(`/profile?section=${sectionName}`);
     setMobileMenuOpen(false);
   };
-   useEffect(() => {
-      const prevTitle = document.title;
-      document.title = "SkillSwap | Profile";
-  
-      return () => {
-        document.title = prevTitle;
-      };
-    }, []);
+
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Profile";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
 
   const renderContent = () => {
     switch (section) {
@@ -78,6 +84,9 @@ export default function AdminProfilePageInner() {
           </div>
         );
 
+      case "analytics":
+        return <AnalyticsReport />;
+
       default:
         return <AdminEditProfile />;
     }
@@ -115,7 +124,7 @@ export default function AdminProfilePageInner() {
       <AdminHeader
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
-        showMobileMenu={true} // Enable hamburger menu on profile page
+        showMobileMenu={true}
       />
 
       <div className="flex">

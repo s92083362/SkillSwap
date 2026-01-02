@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useRef, type RefObject, useEffect} from "react";
+import React, { useState, useRef, type RefObject, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
 import type { User } from "firebase/auth";
@@ -33,7 +33,8 @@ function initialSection(): Section {
 
 export default function CreateLessonPage() {
   const router = useRouter();
-  const [user] = useAuthState(auth as any as Parameters<typeof useAuthState>[0]);
+  const [user] =
+    useAuthState(auth as any as Parameters<typeof useAuthState>[0]);
 
   // meta
   const [lessonTitle, setLessonTitle] = useState("");
@@ -43,7 +44,8 @@ export default function CreateLessonPage() {
   const [lessonImage, setLessonImage] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageProgress, setImageProgress] = useState(0);
-  const imageInputRef: RefObject<HTMLInputElement> = useRef<HTMLInputElement>(null) as RefObject<HTMLInputElement>;
+  const imageInputRef: RefObject<HTMLInputElement> =
+    useRef<HTMLInputElement>(null) as RefObject<HTMLInputElement>;
 
   // content
   const [sections, setSections] = useState<Section[]>([initialSection()]);
@@ -262,7 +264,9 @@ export default function CreateLessonPage() {
         })),
         creatorId: (user as User).uid,
         visibility: isPublic ? "public" : "swap-only",
-        createdAt: new Date().toISOString(),
+        // ✅ TIMESTAMP for analytics
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
       await addDoc(collection(db, "lessons"), payload);
@@ -276,14 +280,15 @@ export default function CreateLessonPage() {
     }
   };
 
-   useEffect(() => {
-        const prevTitle = document.title;
-        document.title = "SkillSwap | CreateLesson";
-    
-        return () => {
-          document.title = prevTitle;
-        };
-      }, []);
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | CreateLesson";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full max-w-4xl mx-auto p-4 sm:p-6 md:p-8">

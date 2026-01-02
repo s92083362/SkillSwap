@@ -2,9 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { logout } from "../../../lib/firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db, auth } from "../../../lib/firebase/firebaseConfig";
 import {
   LogOut,
   User,
@@ -12,10 +9,19 @@ import {
   Shield,
   Activity,
   X,
+  BarChart3,
 } from "lucide-react";
+import { auth } from "../../../lib/firebase/firebaseConfig";
+import { logout } from "../../../lib/firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { useActivityTracker } from "@/hooks/useSessionTracking";
 
-type SectionKey = "overview" | "settings" | "security" | "activity";
+export type SectionKey =
+  | "overview"
+  | "settings"
+  | "security"
+  | "activity"
+  | "analytics";
 
 interface AdminSidebarProps {
   mobileMenuOpen: boolean;
@@ -34,23 +40,29 @@ export default function AdminSidebar({
   const [success, setSuccess] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [user, loading] = useAuthState(auth as any);
-  
+  const { trackAction } = useActivityTracker();
+
   // Close mobile menu on escape key
   React.useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && mobileMenuOpen) {
+      if (e.key === "Escape" && mobileMenuOpen) {
         setMobileMenuOpen(false);
       }
     };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [mobileMenuOpen, setMobileMenuOpen]);
 
-  const navItems: { key: SectionKey; icon: React.ReactNode; label: string }[] = [
+  const navItems: {
+    key: SectionKey;
+    icon: React.ReactNode;
+    label: string;
+  }[] = [
     { key: "overview", icon: <User className="w-5 h-5" />, label: "Profile Overview" },
     { key: "settings", icon: <Settings className="w-5 h-5" />, label: "Settings" },
     { key: "security", icon: <Shield className="w-5 h-5" />, label: "Security" },
     { key: "activity", icon: <Activity className="w-5 h-5" />, label: "Activity Log" },
+    { key: "analytics", icon: <BarChart3 className="w-5 h-5" />, label: "Analytics Report" },
   ];
 
   const handleLogoutClick = () => {
@@ -59,19 +71,7 @@ export default function AdminSidebar({
 
   const handleLogoutConfirm = async () => {
     try {
-      if (user?.uid) {
-        await setDoc(
-          doc(db, "users", user.uid),
-          {
-            lastActive: serverTimestamp(),
-            isOnline: false,
-          },
-          { merge: true }
-        );
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-
-      await logout();
+      await logout(); // logout handles activity logging
       setSuccess("You have successfully logged out");
       setShowLogoutConfirm(false);
       setTimeout(() => {
@@ -94,7 +94,7 @@ export default function AdminSidebar({
   };
 
   const getButtonClasses = (sectionKey: SectionKey) =>
-    `flex items-center gap-3 py-2 px-4 rounded-lg w-full text-left transition ${
+    `flex items-center gap-3 py-2 px-4 rounded-lg w-full text-left text-sm sm:text-base transition ${
       activeSection === sectionKey
         ? "bg-blue-100 text-blue-700 font-semibold"
         : "text-gray-600 hover:bg-blue-50"
@@ -110,74 +110,108 @@ export default function AdminSidebar({
 
   const goToSection = (section: SectionKey) => {
     setActiveSection(section);
+
+    // Track navigation action for analytics
+    trackAction("page_view", {
+      section,
+      page: "profile",
+      timestamp: new Date().toISOString(),
+    });
+
     if (mobileMenuOpen) {
       setMobileMenuOpen(false);
     }
   };
 
   const sidebarContent = (
-    <>
+    <div className="relative flex flex-col items-center w-full h-full">
       {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-2 text-center font-semibold absolute top-5 left-5 right-5 z-50">
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-2 text-center font-semibold absolute top-5 left-4 right-4 z-10 text-xs sm:text-sm">
           {success}
         </div>
       )}
 
-      <img
-        src={avatarUrl}
-        alt="Admin Profile"
-        className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover mb-3 lg:mb-4 ring-4 ring-blue-100"
-      />
+      {/* Avatar + role */}
+      <div className="flex flex-col items-center mt-6 sm:mt-4 mb-4 sm:mb-6">
+        <img
+          src={avatarUrl}
+          alt="Admin Profile"
+          className="w-16 h-16 lg:w-20 lg:h-20 rounded-full object-cover mb-3 lg:mb-4 ring-4 ring-blue-100"
+        />
+        <p className="font-bold text-base lg:text-lg mb-1 text-gray-900">
+          {displayName}
+        </p>
+        <p className="text-blue-600 text-xs lg:text-sm font-medium mb-4 lg:mb-6 bg-blue-100 px-3 py-1 rounded-full flex items-center gap-1">
+          <Shield className="w-3 h-3" />
+          System Administrator
+        </p>
+      </div>
 
-      <p className="font-bold text-base lg:text-lg mb-1 text-gray-900">
-        {displayName}
-      </p>
-      <p className="text-blue-600 text-xs lg:text-sm font-medium mb-5 lg:mb-7 bg-blue-100 px-3 py-1 rounded-full flex items-center gap-1">
-        <Shield className="w-3 h-3" />
-        System Administrator
-      </p>
+      {/* Main nav area grows, pushing logout down */}
+      <div className="w-full flex-1 flex flex-col gap-2 overflow-y-auto">
+        <ul className="w-full space-y-1">
+          {navItems.map((item) => (
+            <li key={item.key}>
+              <button
+                type="button"
+                className={getButtonClasses(item.key)}
+                onClick={() => goToSection(item.key)}
+              >
+                {item.icon}
+                <span className="truncate">{item.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      <ul className="w-full flex-1 space-y-1 mb-0">
-        {navItems.map((item) => (
-          <li key={item.key}>
-            <button
-              type="button"
-              className={getButtonClasses(item.key)}
-              onClick={() => goToSection(item.key)}
-            >
-              {item.icon} {item.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-
+      {/* Logout pinned to bottom and centered */}
       <button
         onClick={handleLogoutClick}
-        className="w-full flex items-center gap-2 text-gray-500 hover:text-red-500 py-2 mt-7 lg:mt-9 transition-colors"
+        className="mt-4 w-full flex items-center justify-center gap-2 py-2 px-4
+                   rounded-lg text-sm sm:text-base text-gray-500
+                   hover:text-red-500 hover:bg-red-50 transition-colors"
       >
-        <LogOut className="w-5 h-5" /> Logout
+        <LogOut className="w-5 h-5" />
+        <span className="truncate">Logout</span>
       </button>
-    </>
+    </div>
   );
 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-20 w-64 lg:w-72 h-[calc(100vh-5rem)] bg-white border-r px-4 lg:px-6 py-8 flex-col items-center overflow-y-auto z-40">
+      <aside
+        className="
+          hidden md:flex
+          fixed left-0 top-[4.5rem]
+          w-60 lg:w-72
+          h-[calc(100vh-4.5rem)]
+          bg-white border-r border-gray-200
+          px-3 sm:px-4 lg:px-6 py-6
+          flex-col items-center
+          overflow-y-auto
+          z-40
+        "
+      >
         {sidebarContent}
       </aside>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Overlay */}
           <div
-            className="flex-1 bg-black/40"
+            className="flex-1 bg-black/40 backdrop-blur-[1px]"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <aside className="w-72 h-full bg-white border-r px-6 py-8 flex flex-col items-center relative overflow-y-auto shadow-lg">
+
+          {/* Drawer panel */}
+          <aside className="w-[80%] max-w-xs h-full bg-white border-l border-gray-200 px-4 sm:px-6 py-6 flex flex-col items-center relative overflow-y-auto shadow-xl">
             <button
-              className="absolute top-4 right-4"
+              className="absolute top-4 right-4 rounded-full p-1 hover:bg-gray-100"
               onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close menu"
             >
               <X className="w-6 h-6 text-gray-700" />
             </button>
