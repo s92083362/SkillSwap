@@ -93,22 +93,10 @@ export default function AnalyticsReport() {
         setActivityData(mockData);
         const mockStatsData = generateMockStatsData(mockData);
         setStats([
-          {
-            ...mockStatsData.totalLogins,
-            icon: <Activity className="w-5 h-5" />,
-          },
-          {
-            ...mockStatsData.totalActions,
-            icon: <TrendingUp className="w-5 h-5" />,
-          },
-          {
-            ...mockStatsData.avgSession,
-            icon: <Clock className="w-5 h-5" />,
-          },
-          {
-            ...mockStatsData.totalTime,
-            icon: <Calendar className="w-5 h-5" />,
-          },
+          { ...mockStatsData.totalLogins, icon: <Activity className="w-5 h-5" /> },
+          { ...mockStatsData.totalActions, icon: <TrendingUp className="w-5 h-5" /> },
+          { ...mockStatsData.avgSession, icon: <Clock className="w-5 h-5" /> },
+          { ...mockStatsData.totalTime, icon: <Calendar className="w-5 h-5" /> },
         ]);
         setLoading(false);
       }
@@ -127,11 +115,11 @@ export default function AnalyticsReport() {
         );
         setTotalUsers(usersSnap.size);
 
-        // Active exchanges
+        // Active exchanges = accepted swap requests
         const exchangesSnap = await getDocs(
           query(
             collection(db, "swapRequests"),
-            where("status", "==", "active"),
+            where("status", "==", "accepted"),
             limit(5000)
           )
         );
@@ -202,22 +190,10 @@ export default function AnalyticsReport() {
         setActivityData(mockData);
         const mockStatsData = generateMockStatsData(mockData);
         setStats([
-          {
-            ...mockStatsData.totalLogins,
-            icon: <Activity className="w-5 h-5" />,
-          },
-          {
-            ...mockStatsData.totalActions,
-            icon: <TrendingUp className="w-5 h-5" />,
-          },
-          {
-            ...mockStatsData.avgSession,
-            icon: <Clock className="w-5 h-5" />,
-          },
-          {
-            ...mockStatsData.totalTime,
-            icon: <Calendar className="w-5 h-5" />,
-          },
+          { ...mockStatsData.totalLogins, icon: <Activity className="w-5 h-5" /> },
+          { ...mockStatsData.totalActions, icon: <TrendingUp className="w-5 h-5" /> },
+          { ...mockStatsData.avgSession, icon: <Clock className="w-5 h-5" /> },
+          { ...mockStatsData.totalTime, icon: <Calendar className="w-5 h-5" /> },
         ]);
         setError(
           adminFlag
@@ -239,22 +215,10 @@ export default function AnalyticsReport() {
 
       const statsData = calculateStatsData(logs, processedData);
       setStats([
-        {
-          ...statsData.totalLogins,
-          icon: <Activity className="w-5 h-5" />,
-        },
-        {
-          ...statsData.totalActions,
-          icon: <TrendingUp className="w-5 h-5" />,
-        },
-        {
-          ...statsData.avgSession,
-          icon: <Clock className="w-5 h-5" />,
-        },
-        {
-          ...statsData.totalTime,
-          icon: <Calendar className="w-5 h-5" />,
-        },
+        { ...statsData.totalLogins, icon: <Activity className="w-5 h-5" /> },
+        { ...statsData.totalActions, icon: <TrendingUp className="w-5 h-5" /> },
+        { ...statsData.avgSession, icon: <Clock className="w-5 h-5" /> },
+        { ...statsData.totalTime, icon: <Calendar className="w-5 h-5" /> },
       ]);
 
       // Recent Activity timeline (sorted newest first)
@@ -275,22 +239,10 @@ export default function AnalyticsReport() {
       setActivityData(mockData);
       const mockStatsData = generateMockStatsData(mockData);
       setStats([
-        {
-          ...mockStatsData.totalLogins,
-          icon: <Activity className="w-5 h-5" />,
-        },
-        {
-          ...mockStatsData.totalActions,
-          icon: <TrendingUp className="w-5 h-5" />,
-        },
-        {
-          ...mockStatsData.avgSession,
-          icon: <Clock className="w-5 h-5" />,
-        },
-        {
-          ...mockStatsData.totalTime,
-          icon: <Calendar className="w-5 h-5" />,
-        },
+        { ...mockStatsData.totalLogins, icon: <Activity className="w-5 h-5" /> },
+        { ...mockStatsData.totalActions, icon: <TrendingUp className="w-5 h-5" /> },
+        { ...mockStatsData.avgSession, icon: <Clock className="w-5 h-5" /> },
+        { ...mockStatsData.totalTime, icon: <Calendar className="w-5 h-5" /> },
       ]);
       setUseMockData(true);
       setLoading(false);
@@ -305,10 +257,7 @@ export default function AnalyticsReport() {
     },
     {
       name: "Other Actions",
-      value: activityData.reduce(
-        (sum, d) => sum + d.actions - d.logins,
-        0
-      ),
+      value: activityData.reduce((sum, d) => sum + d.actions - d.logins, 0),
       color: "#10B981",
     },
   ];
@@ -460,7 +409,9 @@ export default function AnalyticsReport() {
                     {stat.change}
                   </span>
                 </div>
-                <h3 className="text-gray-600 text-sm mb-1">{stat.title}</h3>
+                <h3 className="text-gray-600 text-sm mb-1">
+                  {stat.title}
+                </h3>
                 <p className="text-2xl font-bold text-gray-900">
                   {stat.value}
                 </p>
