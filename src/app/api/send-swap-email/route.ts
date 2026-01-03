@@ -30,8 +30,8 @@ export async function POST(request: Request) {
     const statusText = type === "accepted" ? "accepted" : "rejected";
 
     // 1) Link goes to login page WITH redirect back to swap-requests
-    const swapRequestsUrl = encodeURIComponent("/swap-requests");
-    const loginUrl = `https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup?tab=login&redirect=${swapRequestsUrl}`;
+    const myRequestsUrl = encodeURIComponent("/my-requests");
+    const loginUrl = `https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup?tab=login&redirect=${myRequestsUrl}`;
 
     await transporter.sendMail({
       from: `"SkillSwap" <${process.env.SMTP_USER}>`,
