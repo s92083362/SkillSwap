@@ -11,7 +11,7 @@ type LessonItem = {
   description: string;
   instructor: string;
   image: string;
-  enrolledDate: string; // Store the formatted date string
+  enrolledDate: string; // formatted date string
   status: "active" | "inactive";
   enrolledAtDate: Date | null;
 };
@@ -26,8 +26,6 @@ export default function ProfileLessons() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 4; // 4 lessons per page
 
-  
-
   useEffect(() => {
     if (!user) {
       setLessons([]);
@@ -38,12 +36,7 @@ export default function ProfileLessons() {
     const fetchLessons = async () => {
       setLoading(true);
       try {
-        const enrolledRef = collection(
-          db,
-          "users",
-          user.uid,
-          "enrolledSkills"
-        );
+        const enrolledRef = collection(db, "users", user.uid, "enrolledSkills");
         const enrolledSnap = await getDocs(enrolledRef);
 
         const lessonPromises = enrolledSnap.docs.map(async (enrollDoc) => {
@@ -80,6 +73,7 @@ export default function ProfileLessons() {
             };
           }
 
+          // Missing lesson doc -> mark as inactive; will be filtered out
           return {
             id: lessonId,
             title: lessonId.replace(/-/g, " "),
@@ -94,14 +88,19 @@ export default function ProfileLessons() {
 
         const resolved = await Promise.all(lessonPromises);
 
+        // keep only active lessons (hide inactive/missing)
+        const activeLessons = resolved.filter(
+          (lesson) => lesson.status === "active"
+        );
+
         // sort by enrolledAtDate desc (latest first)
-        resolved.sort((a, b) => {
+        activeLessons.sort((a, b) => {
           const aTime = a.enrolledAtDate ? a.enrolledAtDate.getTime() : 0;
           const bTime = b.enrolledAtDate ? b.enrolledAtDate.getTime() : 0;
           return bTime - aTime;
         });
 
-        setLessons(resolved);
+        setLessons(activeLessons);
         setCurrentPage(1); // always show first page (latest)
       } catch (error) {
         console.error("Error fetching enrolled lessons:", error);
@@ -113,7 +112,7 @@ export default function ProfileLessons() {
     void fetchLessons();
   }, [user]);
 
-  // pagination calculations
+  // pagination calculations (only active lessons)
   const totalPages = Math.ceil(lessons.length / pageSize) || 1;
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
@@ -137,7 +136,7 @@ export default function ProfileLessons() {
 
       {loading ? (
         <div className="flex justify-center items-center py-12">
-          {/* spinner ... unchanged */}
+          {/* spinner ... */}
         </div>
       ) : lessons.length === 0 ? (
         <div className="text-gray-500 text-center py-8 text-sm">
@@ -149,16 +148,8 @@ export default function ProfileLessons() {
             {paginatedLessons.map((lesson) => (
               <li
                 key={lesson.id}
-                className={`border-2 rounded-lg p-2 flex flex-row items-center justify-between transition-colors cursor-pointer
-                  ${
-                    lesson.status === "inactive"
-                      ? "border-gray-300 bg-gray-100 opacity-60 cursor-default pointer-events-none"
-                      : "border-purple-500 bg-purple-50 hover:bg-purple-100"
-                  }`}
-                onClick={() =>
-                  lesson.status === "active" &&
-                  router.push(`/skills/${lesson.id}`)
-                }
+                className="border-2 rounded-lg p-2 flex flex-row items-center justify-between transition-colors cursor-pointer border-purple-500 bg-purple-50 hover:bg-purple-100"
+                onClick={() => router.push(`/skills/${lesson.id}`)}
                 style={{ minHeight: "56px" }}
               >
                 <div className="flex-shrink-0 mr-3">
@@ -178,11 +169,7 @@ export default function ProfileLessons() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p
-                    className={`font-semibold text-gray-800 text-sm truncate ${
-                      lesson.status === "inactive" && "line-through"
-                    }`}
-                  >
+                  <p className="font-semibold text-gray-800 text-sm truncate">
                     {lesson.title}
                   </p>
                   <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
@@ -194,29 +181,18 @@ export default function ProfileLessons() {
                       Enrolled on {lesson.enrolledDate}
                     </span>
                   </div>
-                  {lesson.status === "inactive" && (
-                    <span className="block text-xs text-red-500">
-                      Lesson not found
-                    </span>
-                  )}
                 </div>
 
                 <div>
-                  {lesson.status === "active" ? (
-                    <button
-                      className="text-blue-600 hover:text-blue-700 font-medium text-xs sm:ml-4"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/skills/${lesson.id}`);
-                      }}
-                    >
-                      Continue →
-                    </button>
-                  ) : (
-                    <span className="text-xs text-gray-400 sm:ml-4">
-                      Unavailable
-                    </span>
-                  )}
+                  <button
+                    className="text-blue-600 hover:text-blue-700 font-medium text-xs sm:ml-4"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/skills/${lesson.id}`);
+                    }}
+                  >
+                    Continue →
+                  </button>
                 </div>
               </li>
             ))}
