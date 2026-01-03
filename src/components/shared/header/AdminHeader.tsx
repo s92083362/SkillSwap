@@ -5,8 +5,13 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Bell, Menu, X, BarChart3, Mail, Home } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useTrackUserActivity } from "@/hooks/users/useTrackUserActivity";
+import {
+  useNotifications,
+  Notification,
+} from "../../../hooks/useNotifications";
+import NotificationList from "../NotificationList";
 
 interface AdminHeaderProps {
   hasNotifications?: boolean;
@@ -16,7 +21,6 @@ interface AdminHeaderProps {
 }
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({
-  hasNotifications,
   mobileMenuOpen = false,
   setMobileMenuOpen,
 }) => {
@@ -24,6 +28,10 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [user] = useAuthState(auth);
+  const userId = user?.uid;
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useNotifications(userId);
 
   useTrackUserActivity(60000);
 
@@ -95,13 +103,106 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   };
 
   const handleNotificationsClick = () => {
-    console.log("Notifications clicked");
-    if (setMobileMenuOpen) setMobileMenuOpen(false);
+    setNotificationsOpen((v) => !v);
+    if (setMobileMenuOpen && mobileMenuOpen) setMobileMenuOpen(false);
   };
 
   const toggleMobileMenu = () => {
     if (setMobileMenuOpen) {
       setMobileMenuOpen(!mobileMenuOpen);
+    }
+  };
+
+  const dismissNotification = async (notifId: string | number) => {
+    try {
+      const notifRef = doc(db, "notifications", String(notifId));
+      const snap = await getDoc(notifRef);
+      if (snap.exists()) {
+        await updateDoc(notifRef, {
+          read: true,
+          readAt: new Date(),
+        });
+        setNotifications((prev) => prev.filter((n) => n.id !== notifId));
+      }
+    } catch (error) {
+      console.error("Error dismissing notification:", error);
+    }
+  };
+
+  const handleNotificationAction = async (
+    notifId: string | number,
+    action: string,
+    notif: Notification
+  ) => {
+    await dismissNotification(notifId);
+
+    if (notif.type === "swap_request" && action === "View") {
+      router.push("/swap-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (notif.type === "ping" && action === "View") {
+      router.push("/swap-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (
+      (notif.type === "requestAccepted" || notif.type === "requestRejected") &&
+      action === "View"
+    ) {
+      router.push("/my-requests");
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (notif.type === "video_call" && action === "Answer") {
+      if (!user) {
+        alert("You must be logged in to answer the call.");
+        return;
+      }
+      if (!notif.senderId) {
+        alert("Missing caller information for this call.");
+        return;
+      }
+
+      const chatId = [user.uid, notif.senderId].sort().join("_");
+      const url =
+        `/chat/${chatId}` +
+        `?user=${notif.senderId}` +
+        `&callId=${encodeURIComponent(notif.callId || "")}` +
+        `&callType=video`;
+
+      router.push(url);
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (
+      (notif.type === "chat" || notif.type === "message") &&
+      action === "View"
+    ) {
+      if (notif.chatId) {
+        router.push(`/chat/${notif.chatId}`);
+      } else if (notif.senderId && notif.senderName) {
+        const userInfo = encodeURIComponent(
+          JSON.stringify({
+            uid: notif.senderId,
+            displayName: notif.senderName,
+            email: notif.senderEmail || "",
+          })
+        );
+        router.push(`/chat?selectUser=${userInfo}`);
+      } else {
+        alert("Unable to open chat. Missing chat information.");
+      }
+      setNotificationsOpen(false);
+      return;
+    }
+
+    if (action === "Open" || action === "View") {
+      setNotificationsOpen(false);
     }
   };
 
@@ -126,64 +227,76 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
 
           {/* Center: Navigation buttons (desktop / tablet only) */}
-          <div className="hidden md:flex items-center gap-2 md:gap-3 flex-1 justify-center">
+          <div className="hidden md:flex items-center gap-6 md:gap-8 flex-1 justify-center">
             <button
               type="button"
               onClick={goDashboard}
-              className={`px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors ${
-                activeSection === "home"
-                  ? "text-white bg-blue-600 border border-blue-600"
-                  : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
-              }`}
+              className="relative pb-2 text-sm sm:text-base font-medium text-gray-700 hover:text-gray-900 transition-colors"
             >
               Home
+              {activeSection === "home" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
+              )}
             </button>
 
             <button
               type="button"
               onClick={handleAnalyticsClick}
-              className={`px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-                activeSection === "analytics"
-                  ? "text-white bg-blue-600 border border-blue-600"
-                  : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
-              }`}
+              className="relative pb-2 text-sm sm:text-base font-medium text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-1.5"
               aria-label="Analytics"
             >
-              <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <BarChart3 className="w-4 h-4" />
               <span>Analytics</span>
+              {activeSection === "analytics" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
+              )}
             </button>
 
             <button
               type="button"
               onClick={handleMessagesClick}
-              className={`px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-                activeSection === "messages"
-                  ? "text-white bg-blue-600 border border-blue-600"
-                  : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
-              }`}
+              className="relative pb-2 text-sm sm:text-base font-medium text-gray-700 hover:text-gray-900 transition-colors flex items-center gap-1.5"
               aria-label="Messages"
             >
-              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Mail className="w-4 h-4" />
               <span>Messages</span>
+              {activeSection === "messages" && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-500" />
+              )}
             </button>
           </div>
 
           {/* Right: actions */}
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
             {/* Notifications */}
-            <button
-              type="button"
-              onClick={handleNotificationsClick}
-              className="relative p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label="Notifications"
-            >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-              {hasNotifications && (
-                <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[10px] sm:text-xs font-bold">
-                  1
-                </span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleNotificationsClick}
+                className="relative p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                aria-label="Notifications"
+              >
+                <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-[10px] sm:text-xs font-bold">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+              {notificationsOpen && (
+                <NotificationList
+                  notifications={notifications}
+                  onClose={() => setNotificationsOpen(false)}
+                  onActionClick={handleNotificationAction}
+                  onDismiss={dismissNotification}
+                  onClearAll={async () => {
+                    await Promise.all(
+                      notifications.map((n) => dismissNotification(n.id))
+                    );
+                  }}
+                />
               )}
-            </button>
+            </div>
 
             {/* Profile avatar */}
             <button
@@ -230,40 +343,37 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={goDashboard}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
-                activeSection === "home"
-                  ? "text-white bg-blue-600"
-                  : "text-gray-700 bg-white hover:bg-gray-100"
-              }`}
+              className="relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <Home className="w-5 h-5" />
               <span>Home</span>
+              {activeSection === "home" && (
+                <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-cyan-500" />
+              )}
             </button>
 
             <button
               type="button"
               onClick={handleAnalyticsClick}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
-                activeSection === "analytics"
-                  ? "text-white bg-blue-600"
-                  : "text-gray-700 bg-white hover:bg-gray-100"
-              }`}
+              className="relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <BarChart3 className="w-5 h-5" />
               <span>Analytics</span>
+              {activeSection === "analytics" && (
+                <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-cyan-500" />
+              )}
             </button>
 
             <button
               type="button"
               onClick={handleMessagesClick}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
-                activeSection === "messages"
-                  ? "text-white bg-blue-600"
-                  : "text-gray-700 bg-white hover:bg-gray-100"
-              }`}
+              className="relative w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <Mail className="w-5 h-5" />
               <span>Messages</span>
+              {activeSection === "messages" && (
+                <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-cyan-500" />
+              )}
             </button>
           </nav>
         </div>
