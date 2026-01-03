@@ -39,9 +39,9 @@ export async function POST(request: Request) {
         "You can review the latest content from your SkillSwap profile.";
     } else if (type === "deleted") {
       subject = "Your lesson was deleted from SkillSwap";
-      statusLine = "was deleted from your lessons.";
+      statusLine = "was deleted successfully.";
       extraText =
-        "If this was not intentional, please contact support. This action cannot be undone.";
+        "This lesson is no longer available in your SkillSwap lessons list.";
     } else {
       subject = "Update about your lesson on SkillSwap";
       statusLine = "had a status change.";
@@ -60,6 +60,13 @@ export async function POST(request: Request) {
       "https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup" +
       `?tab=login&redirect=${encodeURIComponent(lessonPath)}`;
 
+    const buttonLabel =
+      type === "deleted" ? "Login & View SkillSwap" : "Login & View Lesson";
+    const buttonIntro =
+      type === "deleted"
+        ? "Login and view your SkillSwap lessons:"
+        : "Login and go directly to your lesson:";
+
     await transporter.sendMail({
       from: `"SkillSwap" <${process.env.SMTP_USER}>`,
       to,
@@ -71,7 +78,7 @@ export async function POST(request: Request) {
           <p>${extraText}</p>
 
           <p style="margin-top: 24px; margin-bottom: 8px;">
-            Login and go directly to your lesson:
+            ${buttonIntro}
           </p>
 
           <a
@@ -87,7 +94,7 @@ export async function POST(request: Request) {
               font-weight: 600;
             "
           >
-            Login & View Lesson
+            ${buttonLabel}
           </a>
 
           <p style="margin-top: 16px; font-size: 12px; color: #6b7280;">
