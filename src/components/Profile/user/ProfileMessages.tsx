@@ -120,42 +120,56 @@ export default function ProfileMessages() {
       limit(5)
     );
 
-    const unsub = onSnapshot(q, async (snapshot) => {
-      const msgs: Message[] = [];
+    const unsub = onSnapshot(
+      q,
+      async (snapshot) => {
+        const msgs: Message[] = [];
 
-      for (const docSnap of snapshot.docs as QueryDocumentSnapshot<DocumentData>[]) {
-        const raw = docSnap.data() as DocumentData;
-        const msgData: Message = {
-          id: docSnap.id,
-          ...raw,
-        };
+        for (const docSnap of snapshot.docs as QueryDocumentSnapshot<DocumentData>[]) {
+          const raw = docSnap.data() as DocumentData;
+          
+          // Double-check that the message is still unread
+          // This handles real-time updates if message becomes read elsewhere
+          if (raw.read === true) {
+            continue; // Skip this message as it's now read
+          }
 
-        if (msgData.senderId) {
-          try {
-            const senderRef = doc(db, "users", msgData.senderId);
-            const senderSnap = await getDoc(senderRef);
+          const msgData: Message = {
+            id: docSnap.id,
+            ...raw,
+          };
 
-            if (senderSnap.exists()) {
-              const senderData = senderSnap.data() as UserDoc;
-              msgData.senderAvatar = getAvatarUrl(senderData);
-              msgData.senderName = getDisplayName(senderData);
-              msgData.senderEmail = senderData.email || "";
+          if (msgData.senderId) {
+            try {
+              const senderRef = doc(db, "users", msgData.senderId);
+              const senderSnap = await getDoc(senderRef);
+
+              if (senderSnap.exists()) {
+                const senderData = senderSnap.data() as UserDoc;
+                msgData.senderAvatar = getAvatarUrl(senderData);
+                msgData.senderName = getDisplayName(senderData);
+                msgData.senderEmail = senderData.email || "";
+              }
+            } catch (error) {
+              console.error("Error fetching sender profile:", error);
+              if (!msgData.senderName) msgData.senderName = "Unknown User";
             }
-          } catch (error) {
-            console.error("Error fetching sender profile:", error);
+          } else {
             if (!msgData.senderName) msgData.senderName = "Unknown User";
           }
-        } else {
-          if (!msgData.senderName) msgData.senderName = "Unknown User";
+
+          msgs.push(msgData);
         }
 
-        msgs.push(msgData);
+        setMessages(msgs);
+        setTotalUnreadCount(msgs.length); // All messages are unread now
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error listening to messages:", error);
+        setLoading(false);
       }
-
-      setMessages(msgs);
-      setTotalUnreadCount(msgs.length); // All messages are unread now
-      setLoading(false);
-    });
+    );
 
     return unsub;
   }, [user]);
