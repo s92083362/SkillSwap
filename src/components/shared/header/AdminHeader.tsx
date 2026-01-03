@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Bell, Menu, X, BarChart3, Mail, Home } from "lucide-react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, db } from "../../../lib/firebase/firebaseConfig";
@@ -21,9 +21,30 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
   setMobileMenuOpen,
 }) => {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [user] = useAuthState(auth);
 
   useTrackUserActivity(60000);
+
+  // Determine active section based on current route
+  const getActiveSection = () => {
+    if (pathname === "/dash-board") {
+      return "home";
+    }
+    if (pathname === "/profile") {
+      const section = searchParams.get("section");
+      if (section === "analytics") return "analytics";
+      if (section === "messages") return "messages";
+    }
+    return "home";
+  };
+
+  const [activeSection, setActiveSection] = useState(getActiveSection());
+
+  useEffect(() => {
+    setActiveSection(getActiveSection());
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     async function ensureUserDocument() {
@@ -109,7 +130,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={goDashboard}
-              className="px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors"
+              className={`px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors ${
+                activeSection === "home"
+                  ? "text-white bg-blue-600 border border-blue-600"
+                  : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
+              }`}
             >
               Home
             </button>
@@ -117,7 +142,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={handleAnalyticsClick}
-              className="px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+              className={`px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                activeSection === "analytics"
+                  ? "text-white bg-blue-600 border border-blue-600"
+                  : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
+              }`}
               aria-label="Analytics"
             >
               <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -127,7 +156,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={handleMessagesClick}
-              className="px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+              className={`px-3 md:px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                activeSection === "messages"
+                  ? "text-white bg-blue-600 border border-blue-600"
+                  : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
+              }`}
               aria-label="Messages"
             >
               <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -197,7 +230,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={goDashboard}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
+                activeSection === "home"
+                  ? "text-white bg-blue-600"
+                  : "text-gray-700 bg-white hover:bg-gray-100"
+              }`}
             >
               <Home className="w-5 h-5" />
               <span>Home</span>
@@ -206,7 +243,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={handleAnalyticsClick}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
+                activeSection === "analytics"
+                  ? "text-white bg-blue-600"
+                  : "text-gray-700 bg-white hover:bg-gray-100"
+              }`}
             >
               <BarChart3 className="w-5 h-5" />
               <span>Analytics</span>
@@ -215,7 +256,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
             <button
               type="button"
               onClick={handleMessagesClick}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
+                activeSection === "messages"
+                  ? "text-white bg-blue-600"
+                  : "text-gray-700 bg-white hover:bg-gray-100"
+              }`}
             >
               <Mail className="w-5 h-5" />
               <span>Messages</span>
@@ -223,8 +268,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
           </nav>
         </div>
       )}
-
-
     </>
   );
 };
