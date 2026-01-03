@@ -84,16 +84,19 @@ export default function CreateLessonPage() {
     try {
       const xhr = new XMLHttpRequest();
 
-      xhr.upload.addEventListener("progress", (e: ProgressEvent<EventTarget>) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          setSections((secs) =>
-            secs.map((s, i) =>
-              i === idx ? { ...s, progress: percent } : s
-            )
-          );
+      xhr.upload.addEventListener(
+        "progress",
+        (e: ProgressEvent<EventTarget>) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            setSections((secs) =>
+              secs.map((s, i) =>
+                i === idx ? { ...s, progress: percent } : s
+              )
+            );
+          }
         }
-      });
+      );
 
       xhr.addEventListener("load", () => {
         if (xhr.status === 200) {
@@ -177,12 +180,15 @@ export default function CreateLessonPage() {
     try {
       const xhr = new XMLHttpRequest();
 
-      xhr.upload.addEventListener("progress", (e: ProgressEvent<EventTarget>) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100);
-          setImageProgress(percent);
+      xhr.upload.addEventListener(
+        "progress",
+        (e: ProgressEvent<EventTarget>) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            setImageProgress(percent);
+          }
         }
-      });
+      );
 
       xhr.addEventListener("load", () => {
         if (xhr.status === 200) {
@@ -264,17 +270,54 @@ export default function CreateLessonPage() {
         })),
         creatorId: (user as User).uid,
         visibility: isPublic ? "public" : "swap-only",
-        // ✅ TIMESTAMP for analytics
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
 
+      // Save lesson in Firestore
       await addDoc(collection(db, "lessons"), payload);
+
+      // 🔔 Send success email with login-aware link to skills section
+      if (user.email) {
+        try {
+          await fetch("/api/send-lesson-status-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: user.email,
+              type: "created",
+              lessonTitle,
+              ownerName: user.displayName || instructor || "SkillSwap user",
+            }),
+          });
+        } catch (e) {
+          console.error("Error sending lesson created email:", e);
+        }
+      }
+
       alert("Lesson published successfully!");
       router.push("/profile?section=skills");
     } catch (error) {
       console.error("Error saving lesson:", error);
       alert("Failed to publish lesson. Please try again.");
+
+      // 🔔 Optional: send failure email
+      if (user?.email) {
+        try {
+          await fetch("/api/send-lesson-status-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: user.email,
+              type: "failed",
+              lessonTitle,
+              ownerName: user.displayName || instructor || "SkillSwap user",
+            }),
+          });
+        } catch (e) {
+          console.error("Error sending lesson failed email:", e);
+        }
+      }
     } finally {
       setIsPublishing(false);
     }
@@ -283,7 +326,6 @@ export default function CreateLessonPage() {
   useEffect(() => {
     const prevTitle = document.title;
     document.title = "SkillSwap | CreateLesson";
-
     return () => {
       document.title = prevTitle;
     };

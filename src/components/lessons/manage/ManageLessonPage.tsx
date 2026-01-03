@@ -1,9 +1,12 @@
-'use client';
+"use client";
 
-import { ArrowLeft, Trash2, Plus, X, Eye, Edit } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, X, Eye, Edit } from "lucide-react";
 import React, { useEffect } from "react";
-import { useRouter } from 'next/navigation';
-import { useLessonManager } from '@/hooks/lessons/useLessonManager';
+import { useRouter } from "next/navigation";
+import { useLessonManager } from "@/hooks/lessons/useLessonManager";
+import { useAuthState } from "react-firebase-hooks/auth";
+import { auth } from "@/lib/firebase/firebaseConfig";
+import type { User } from "firebase/auth";
 
 type Props = {
   lessonId?: string;
@@ -11,6 +14,9 @@ type Props = {
 
 export default function ManageLessonPage({ lessonId }: Props) {
   const router = useRouter();
+
+  const [authUser] =
+    useAuthState(auth as any as Parameters<typeof useAuthState>[0]);
 
   const {
     mode,
@@ -53,7 +59,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
     return () => {
       document.title = prevTitle;
     };
-  }, []); // runs once when page is mounted[web:23][web:26][web:29][web:40]
+  }, []);
 
   if (isLoading) {
     return (
@@ -63,14 +69,52 @@ export default function ManageLessonPage({ lessonId }: Props) {
     );
   }
 
+  // helper to call manage-lesson email API with lessonId
+  const sendManageLessonEmail = async (type: "updated" | "deleted") => {
+    if (!authUser?.email) {
+      console.warn("No authUser email, skipping manage lesson email");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/send-manage-lesson-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: authUser.email,
+          type,
+          lessonTitle,
+          ownerName:
+            authUser.displayName || instructor || "SkillSwap user",
+          lessonId, // used in route.ts to build /skills/<lessonId> redirect
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      console.log("manage email response:", res.status, data);
+
+      if (!res.ok) {
+        console.error("manage email API error:", data);
+      }
+    } catch (e) {
+      console.error("Error sending manage lesson email:", e);
+    }
+  };
+
   const onDeleteClick = async () => {
     const ok = await handleDeleteLesson();
-    if (ok) router.push('/profile');
+    if (ok) {
+      await sendManageLessonEmail("deleted");
+      router.push("/profile?section=skills");
+    }
   };
 
   const onSaveClick = async () => {
     const ok = await handleSaveChanges();
-    if (ok) router.push('/profile');
+    if (ok) {
+      await sendManageLessonEmail("updated");
+      router.push("/profile?section=skills");
+    }
   };
 
   return (
@@ -79,7 +123,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
         {/* Header */}
         <div className="mb-8 relative">
           <button
-            onClick={() => router.push('/profile')}
+            onClick={() => router.push("/profile?section=skills")}
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft size={20} />
@@ -89,22 +133,22 @@ export default function ManageLessonPage({ lessonId }: Props) {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                {mode === 'preview' ? 'Lesson Preview' : 'Edit Lesson'}
+                {mode === "preview" ? "Lesson Preview" : "Edit Lesson"}
               </h1>
               <p className="text-gray-500 text-sm sm:text-base">
-                {mode === 'preview'
-                  ? 'Review your lesson details'
-                  : 'Make changes to your lesson'}
+                {mode === "preview"
+                  ? "Review your lesson details"
+                  : "Make changes to your lesson"}
               </p>
             </div>
 
             <button
               onClick={() =>
-                setMode((prev) => (prev === 'preview' ? 'edit' : 'preview'))
+                setMode((prev) => (prev === "preview" ? "edit" : "preview"))
               }
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
             >
-              {mode === 'preview' ? (
+              {mode === "preview" ? (
                 <>
                   <Edit size={18} />
                   Edit Lesson
@@ -126,13 +170,13 @@ export default function ManageLessonPage({ lessonId }: Props) {
               className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               <Trash2 size={18} />
-              {isDeleting ? 'Deleting...' : 'Delete Lesson'}
+              {isDeleting ? "Deleting..." : "Delete Lesson"}
             </button>
           </div>
         </div>
 
         {/* Preview Mode */}
-        {mode === 'preview' && (
+        {mode === "preview" && (
           <>
             {/* Lesson Details Card */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 md:p-8 mb-6">
@@ -232,7 +276,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
         )}
 
         {/* Edit Mode */}
-        {mode === 'edit' && (
+        {mode === "edit" && (
           <>
             {/* Lesson Details Card */}
             <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 md:p-8 mb-6">
@@ -283,10 +327,18 @@ export default function ManageLessonPage({ lessonId }: Props) {
                     <option value="AI">Artificial Intelligence</option>
                     <option value="CyberSecurity">Cybersecurity</option>
                     <option value="CloudComputing">Cloud Computing</option>
-                    <option value="MobileDevelopment">Mobile Development</option>
-                    <option value="SoftwareEngineering">Software Engineering</option>
-                    <option value="ComputerNetworks">Computer Networks</option>
-                    <option value="DatabaseManagement">Database Management</option>
+                    <option value="MobileDevelopment">
+                      Mobile Development
+                    </option>
+                    <option value="SoftwareEngineering">
+                      Software Engineering
+                    </option>
+                    <option value="ComputerNetworks">
+                      Computer Networks
+                    </option>
+                    <option value="DatabaseManagement">
+                      Database Management
+                    </option>
                     <option value="UIUXDesign">UI/UX Design</option>
                   </select>
                 </div>
@@ -326,7 +378,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
                     disabled={isUploadingImage}
                     className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700 disabled:opacity-50 text-sm md:text-base"
                   >
-                    {isUploadingImage ? 'Uploading...' : 'Upload Thumbnail'}
+                    {isUploadingImage ? "Uploading..." : "Upload Thumbnail"}
                   </button>
 
                   {isUploadingImage && (
@@ -478,7 +530,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
                         disabled={section.isUploading}
                         className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700 disabled:opacity-50 text-sm md:text-base"
                       >
-                        {section.isUploading ? 'Uploading...' : 'Upload Video'}
+                        {section.isUploading ? "Uploading..." : "Upload Video"}
                       </button>
                     </div>
                     {section.videoFileName && section.isUploading && (
@@ -509,7 +561,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
                     {section.videoUrl &&
                       !section.isUploading &&
                       !section.error &&
-                      section.videoUrl.startsWith('http') && (
+                      section.videoUrl.startsWith("http") && (
                         <div className="mt-3">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-sm text-green-600">
@@ -569,7 +621,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
               <button
                 type="button"
                 className="w-full sm:w-auto px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
-                onClick={() => setMode('preview')}
+                onClick={() => setMode("preview")}
                 disabled={isSaving}
               >
                 Cancel
@@ -580,7 +632,7 @@ export default function ManageLessonPage({ lessonId }: Props) {
                 onClick={onSaveClick}
                 disabled={isSaving}
               >
-                {isSaving ? 'Saving...' : 'Save Changes'}
+                {isSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </>
