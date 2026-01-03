@@ -58,7 +58,7 @@ export async function POST(request: Request) {
             style="
               display: inline-block;
               padding: 10px 18px;
-              background-color: #2563eb;
+              background-color: #1F426E;
               color: #ffffff;
               text-decoration: none;
               border-radius: 6px;
