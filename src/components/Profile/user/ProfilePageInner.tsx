@@ -5,7 +5,7 @@ import { Home, BookOpen, Users, Layers } from "lucide-react";
 import Header from "../../shared/header/UserHeader";
 import ProfileSidebar from "./ProfileSidebar";
 import ProfileLessons from "./ProfileLessons";
-import ProfileMessages from "./ProfileMessages";
+import ProfileMessages from "../ProfileMessages";
 import EditProfile from "./EditProfile";
 import MySkills from "./MySkills";
 import AcceptedSwapRequests from "./AcceptedSwapRequests";
