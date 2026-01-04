@@ -41,18 +41,19 @@ export default function SwapRequestsPage() {
   const [showChatDialog, setShowChatDialog] = useState(false);
   const [acceptedRequestData, setAcceptedRequestData] = useState<SwapRequest | null>(null);
 
+  // NEW: control which requester popover is open
+  const [hoveredRequesterId, setHoveredRequesterId] = useState<string | null>(null);
+
   const getAvatarUrl = (u: any) =>
     u?.photoURL || u?.photoUrl || "/default-avatar.png";
 
-  // set tab title
   useEffect(() => {
     const prevTitle = document.title;
     document.title = "SkillSwap | Swap Requests";
-
     return () => {
       document.title = prevTitle;
     };
-  }, []); 
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -243,7 +244,7 @@ export default function SwapRequestsPage() {
         setMobileMenuOpen={setMobileMenuOpen}
       />
 
-      {/* Chat Dialog Popup */}
+      {/* Chat Dialog Popup (unchanged) */}
       {showChatDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 sm:p-8 mx-4">
@@ -282,7 +283,7 @@ export default function SwapRequestsPage() {
           </p>
         </div>
 
-        {/* Filter Tabs */}
+        {/* Filter Tabs (unchanged) */}
         <div className="flex gap-1 sm:gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
           {["all", "pending", "accepted", "rejected"].map((status) => (
             <button
@@ -350,7 +351,18 @@ export default function SwapRequestsPage() {
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                     {/* Left: requester avatar + basic info */}
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+                      {/* AVATAR + HOVER POPOVER + CLICK TO PROFILE */}
+                      <div
+                        className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-200 overflow-hidden flex items-center justify-center flex-shrink-0 cursor-pointer"
+                        onClick={() =>
+                          request.requesterId &&
+                          router.push(`/user/${request.requesterId}`)
+                        }
+                        onMouseEnter={() =>
+                          setHoveredRequesterId(request.requesterId)
+                        }
+                        onMouseLeave={() => setHoveredRequesterId(null)}
+                      >
                         {request.requesterAvatar ? (
                           <img
                             src={request.requesterAvatar}
@@ -358,7 +370,31 @@ export default function SwapRequestsPage() {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <span className="text-sm text-gray-500">U</span>
+                          <span className="text-sm text-gray-500">
+                            {request.requesterName?.charAt(0).toUpperCase() ||
+                              "U"}
+                          </span>
+                        )}
+
+                        {/* small hover popover */}
+                        {hoveredRequesterId === request.requesterId && (
+                          <div className="absolute left-0 top-12 z-20 w-56 bg-white rounded-xl shadow-lg border border-gray-200 p-3 text-sm">
+                            <p className="font-semibold text-gray-900 mb-1">
+                              {request.requesterName}
+                            </p>
+                            <p className="text-xs text-gray-500 mb-3">
+                              {request.requesterEmail}
+                            </p>
+                            <button
+                              className="w-full text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-full"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/user/${request.requesterId}`);
+                              }}
+                            >
+                              View profile
+                            </button>
+                          </div>
                         )}
                       </div>
 
@@ -397,7 +433,18 @@ export default function SwapRequestsPage() {
                   <div className="space-y-2 mb-4">
                     <p className="text-sm sm:text-base text-gray-700 break-words">
                       <span className="font-semibold">From:</span>{" "}
-                      {request.requesterName} ({request.requesterEmail})
+                      {/* NAME CLICK → PROFILE */}
+                      <button
+                        type="button"
+                        className="underline-offset-2 hover:underline text-left"
+                        onClick={() =>
+                          request.requesterId &&
+                          router.push(`/user/${request.requesterId}`)
+                        }
+                      >
+                        {request.requesterName}
+                      </button>{" "}
+                      ({request.requesterEmail})
                     </p>
                     <p className="text-sm sm:text-base text-gray-700 break-words">
                       <span className="font-semibold">Offering:</span>{" "}
@@ -429,7 +476,7 @@ export default function SwapRequestsPage() {
                     )}
                   </div>
 
-                  {/* Buttons / status blocks */}
+                  {/* Buttons / status blocks (unchanged) */}
                   {statusNormalized === "pending" && (
                     <div className="flex flex-col sm:flex-row gap-3 mt-4">
                       <button
