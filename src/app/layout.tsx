@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://skill-swaps-mydeployments.vercel.app'),
+  metadataBase: new URL('https://skill-swaps.vercel.app'),
   title: {
     default: 'SkillSwap - Exchange Skills, Grow Together',
     template: '%s | SkillSwap'
@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://skill-swaps-mydeployments.vercel.app',
+    url: 'https://skill-swaps.vercel.app',
     siteName: 'SkillSwap',
     title: 'SkillSwap - Exchange Skills, Grow Together',
     description: 'Join SkillSwap to exchange skills with others. Learn new skills by teaching what you know.',
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
     images: ['/og-image.png'],
   },
   verification: {
-    google: 'UUH6H-m0Ln5mbXGVHExiLn9HInS278-eYv3zCsh853s', // Add after Google Search Console setup
+    google: 'UUH6H-m0Ln5mbXGVHExiLn9HInS278-eYv3zCsh853s',
   },
   alternates: {
     canonical: 'https://skill-swaps.vercel.app',
@@ -111,10 +111,10 @@ export default function RootLayout({
               "@type": "WebSite",
               "name": "SkillSwap",
               "description": "Exchange skills with others and grow together",
-              "url": "https://skill-swaps-mydeployments.vercel.app",
+              "url": "https://skill-swaps.vercel.app",
               "potentialAction": {
                 "@type": "SearchAction",
-                "target": "https://skill-swaps-mydeployments.vercel.app/search?q={search_term_string}",
+                "target": "https://skill-swaps.vercel.app/search?q={search_term_string}",
                 "query-input": "required name=search_term_string"
               }
             })
@@ -127,8 +127,8 @@ export default function RootLayout({
               "@context": "https://schema.org",
               "@type": "Organization",
               "name": "SkillSwap",
-              "url": "https://skill-swaps-mydeployments.vercel.app",
-              "logo": "https://skill-swaps-mydeployments.vercel.app/assets/images/logo.png",
+              "url": "https://skill-swaps.vercel.app",
+              "logo": "https://skill-swaps.vercel.app/assets/images/logo.png",
               "description": "A platform for exchanging skills and knowledge"
             })
           }}
