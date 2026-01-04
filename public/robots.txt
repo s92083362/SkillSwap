@@ -24,4 +24,4 @@ Allow: /*.js
 # Crawl-delay: 10
 
 # Sitemap location
-Sitemap: https://skill-swaps-mydeployments.vercel.app/sitemap.xml
+Sitemap: https://skill-swaps.vercel.app/sitemap.xml
