@@ -5,7 +5,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://skill-swaps-mydeployments.vercel.app';
+  const baseUrl = 'https://skill-swaps.vercel.app';
   const currentDate = new Date();
   
   return [
