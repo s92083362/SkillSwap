@@ -71,7 +71,7 @@ export const metadata: Metadata = {
     google: 'UUH6H-m0Ln5mbXGVHExiLn9HInS278-eYv3zCsh853s', // Add after Google Search Console setup
   },
   alternates: {
-    canonical: 'https://skill-swaps-mydeployments.vercel.app',
+    canonical: 'https://skill-swaps.vercel.app',
   },
   icons: {
     icon: [
