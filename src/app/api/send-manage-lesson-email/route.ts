@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         : "/profile?section=skills";
 
     const loginUrl =
-      "https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup" +
+      "https://skill-swaps.vercel.app/auth/login-and-signup" +
       `?tab=login&redirect=${encodeURIComponent(lessonPath)}`;
 
     const buttonLabel =

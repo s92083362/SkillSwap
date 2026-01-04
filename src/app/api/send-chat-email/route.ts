@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const chatUrl = `/chat/messages?user=${encodeURIComponent(otherUserId)}`;
     
     // Testing URL
-    const baseUrl = "https://skill-swaps-mydeployments.vercel.app";
+    const baseUrl = "https://skill-swaps.vercel.app";
     const loginUrl = `${baseUrl}/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(chatUrl)}`;
 
     await transporter.sendMail({

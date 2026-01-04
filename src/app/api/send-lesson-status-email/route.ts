@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     // 🔗 Login-aware URL: user logs in first, then is redirected to skills section
     const loginUrl =
-      "https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup" +
+      "https://skill-swaps.vercel.app/auth/login-and-signup" +
   "?tab=login&redirect=/profile?section=skills";
 
     await transporter.sendMail({

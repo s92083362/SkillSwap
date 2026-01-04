@@ -45,10 +45,10 @@ export async function POST(request: Request) {
 
     // Target page after login (production domain)
     const profileUrl =
-      "https://skill-swaps-mydeployments.vercel.app/profile";
+      "https://skill-swaps.vercel.app/profile";
 
     // Login URL with redirect back to /profile
-    const loginUrl = `https://skill-swaps-mydeployments.vercel.app/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(
+    const loginUrl = `https://skill-swaps.vercel.app/auth/login-and-signup?tab=login&redirect=${encodeURIComponent(
       profileUrl
     )}`;
 
