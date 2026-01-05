@@ -35,7 +35,12 @@ export default function ProfilePage() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
 
-  // Detect URL section and update activeSection
+  // NEW: which pending-request avatar is hovered
+  const [hoveredRequesterId, setHoveredRequesterId] = useState<string | null>(
+    null
+  );
+
+  // Detect URL section
   useEffect(() => {
     const section = searchParams.get("section");
     if (section === "skills") {
@@ -51,7 +56,7 @@ export default function ProfilePage() {
     }
   }, [searchParams]);
 
-  // Update document title based on activeSection
+  // Document title
   useEffect(() => {
     const sectionTitles = {
       dashboard: "SkillSwap | Profile",
@@ -60,11 +65,11 @@ export default function ProfilePage() {
       swap: "SkillSwap | Accepted Swaps",
       profile: "SkillSwap | Edit Profile",
     };
-    
+
     document.title = sectionTitles[activeSection] || "SkillSwap | Profile";
   }, [activeSection]);
 
-  // Handle Accept (with notifications + email)
+  // Accept
   const handleAccept = async (requestId: string) => {
     try {
       const requestRef = doc(db, "swapRequests", requestId);
@@ -95,7 +100,6 @@ export default function ProfilePage() {
         read: false,
       });
 
-      // send email to requester (fire-and-forget)
       if (requestData.requesterEmail) {
         fetch("/api/send-swap-email", {
           method: "POST",
@@ -118,7 +122,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Handle Decline (with notifications + email)
+  // Decline
   const handleDecline = async (requestId: string) => {
     try {
       const requestRef = doc(db, "swapRequests", requestId);
@@ -149,7 +153,6 @@ export default function ProfilePage() {
         read: false,
       });
 
-      // send email to requester (fire-and-forget)
       if (requestData.requesterEmail) {
         fetch("/api/send-swap-email", {
           method: "POST",
@@ -172,7 +175,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Real-time Pending Requests Fetch
+  // Real-time Pending Requests
   useEffect(() => {
     if (!user) {
       setPendingRequests([]);
@@ -245,7 +248,7 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, [user]);
 
-  // Pending Requests Cards
+  // Pending Requests Cards (UPDATED)
   const PendingRequestsSection = () => (
     <div className="mt-4 sm:mt-6 md:mt-8 mb-3">
       <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
@@ -266,15 +269,57 @@ export default function ProfilePage() {
             key={req.id}
             className="border rounded-xl p-3 sm:p-4 shadow-sm bg-white flex flex-col items-center text-center hover:shadow-md transition-shadow"
           >
-            <img
-              src={req.requesterPhoto}
-              alt={req.requesterName}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mb-2"
-            />
+            {/* Avatar: click → profile, hover → popover */}
+            <div
+              className="relative"
+              onMouseEnter={() => setHoveredRequesterId(req.requesterId)}
+              onMouseLeave={() => setHoveredRequesterId(null)}
+            >
+              <img
+                src={req.requesterPhoto}
+                alt={req.requesterName}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover mb-2 cursor-pointer"
+                onClick={() =>
+                  req.requesterId &&
+                  window.location.assign(`/user/${req.requesterId}`)
+                }
+              />
 
-            <p className="font-semibold text-xs sm:text-sm text-purple-700 truncate w-full px-1">
+              {hoveredRequesterId === req.requesterId && (
+                <div className="absolute left-1/2 -translate-x-1/2 top-12 z-20 w-56 bg-white rounded-xl shadow-lg border border-gray-200 p-3 text-sm">
+                  <p className="font-semibold text-gray-900 mb-1">
+                    {req.requesterName}
+                  </p>
+                  {req.requesterEmail && (
+                    <p className="text-xs text-gray-500 mb-3">
+                      {req.requesterEmail}
+                    </p>
+                  )}
+                  <button
+                    className="w-full text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      req.requesterId &&
+                        window.location.assign(`/user/${req.requesterId}`);
+                    }}
+                  >
+                    View profile
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Name (clickable to profile) */}
+            <button
+              type="button"
+              className="font-semibold text-xs sm:text-sm text-purple-700 truncate w-full px-1 mt-1 underline-offset-2 hover:underline"
+              onClick={() =>
+                req.requesterId &&
+                window.location.assign(`/user/${req.requesterId}`)
+              }
+            >
               {req.requesterName}
-            </p>
+            </button>
 
             <div className="mt-1 text-xs w-full px-1">
               <p className="text-gray-600 truncate">
@@ -313,7 +358,7 @@ export default function ProfilePage() {
     </div>
   );
 
-  // Bottom Navigation with global links (old hamburger items)
+  // Bottom Navigation (unchanged)
   const BottomNavigation = () => {
     const menuItems = [
       {
