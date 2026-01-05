@@ -1,3 +1,4 @@
+// e.g. src/app/profile/page.tsx
 "use client";
 
 import React, { useState, useEffect, useRef, ChangeEvent } from "react";
@@ -6,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase/firebaseConfig";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { updateProfile, User } from "firebase/auth";
+import { getSkillIcon } from "@/utils/skillicons/skillIcons";
 
 type UserProfile = {
   name?: string | null;
@@ -18,17 +20,14 @@ type UserProfile = {
 };
 
 export default function ProfilePage() {
-  // react-firebase-hooks auth state
   const [user, authLoading] = useAuthState(auth as any);
   const router = useRouter();
 
-  // Firestore profile state
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
   const [editMode, setEditMode] = useState(false);
 
-  // Form fields
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
@@ -44,132 +43,12 @@ export default function ProfilePage() {
     | string
     | undefined;
 
-  // DEBUG: log auth + profile states
   useEffect(() => {
     console.log("auth user:", user?.uid, "displayName:", user?.displayName);
     console.log("profile state:", profile);
   }, [user, profile]);
 
-  const getSkillLogo = (skill: string) => {
-    const skillLower = skill.toLowerCase().trim();
-    const logos: { [key: string]: string } = {
-      java: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg",
-      python:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg",
-      javascript:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg",
-      js: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg",
-      typescript:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg",
-      ts: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg",
-      react:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
-      "react js":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
-      reactjs:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
-      node: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",
-      nodejs:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",
-      "node.js":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",
-      angular:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/angularjs/angularjs-original.svg",
-      vue: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg",
-      "vue.js":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg",
-      html: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg",
-      html5:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg",
-      css: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg",
-      css3:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg",
-      php: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg",
-      "c++":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cplusplus/cplusplus-original.svg",
-      cpp: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cplusplus/cplusplus-original.svg",
-      "c#": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/csharp/csharp-original.svg",
-      csharp:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/csharp/csharp-original.svg",
-      c: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/c/c-original.svg",
-      go: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg",
-      golang:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg",
-      rust: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-plain.svg",
-      ruby: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ruby/ruby-original.svg",
-      swift:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/swift/swift-original.svg",
-      kotlin:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kotlin/kotlin-original.svg",
-      dart: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/dart/dart-original.svg",
-      flutter:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/flutter/flutter-original.svg",
-      spring:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg",
-      "spring boot":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg",
-      django:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/django/django-plain.svg",
-      flask:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/flask/flask-original.svg",
-      express:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg",
-      "express.js":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg",
-      mongodb:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg",
-      mysql:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg",
-      postgresql:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
-      postgres:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
-      redis:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg",
-      docker:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg",
-      kubernetes:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg",
-      aws: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original.svg",
-      git: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg",
-      github:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg",
-      gitlab:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/gitlab/gitlab-original.svg",
-      linux:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg",
-      ubuntu:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ubuntu/ubuntu-plain.svg",
-      tailwind:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg",
-      tailwindcss:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg",
-      bootstrap:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/bootstrap/bootstrap-original.svg",
-      sass: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sass/sass-original.svg",
-      firebase:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/firebase/firebase-plain.svg",
-      graphql:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/graphql/graphql-plain.svg",
-      nextjs:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg",
-      "next.js":
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg",
-      svelte:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/svelte/svelte-original.svg",
-      figma:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/figma/figma-original.svg",
-      photoshop:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/photoshop/photoshop-plain.svg",
-      illustrator:
-        "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/illustrator/illustrator-plain.svg",
-      xd: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/xd/xd-plain.svg",
-      sql: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg",
-    };
-    return logos[skillLower] || null;
-  };
-
-  // Load Firestore profile when auth user is ready
+  // Load Firestore profile
   useEffect(() => {
     if (!user) {
       setProfile(null);
@@ -297,17 +176,16 @@ export default function ProfilePage() {
       setAvailability(profile.availability || "Available for new swaps");
     }
   };
-   useEffect(() => {
-            const prevTitle = document.title;
-            document.title = "SkillSwap | Edit Profile";
-        
-            return () => {
-              document.title = prevTitle;
-            };
-          }, []);
-  
 
-  // Global loading state
+  // Page title
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | Edit Profile";
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
+
   if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen  flex items-center justify-center p-4">
@@ -319,7 +197,6 @@ export default function ProfilePage() {
     );
   }
 
-  // If no user after loading, ask to log in
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-purple-600 flex items-center justify-center p-4">
@@ -388,8 +265,7 @@ export default function ProfilePage() {
                     </svg>
                   </div>
                   <p className="text-gray-600 mb-4">
-                    {profile?.username &&
-                    profile.username.trim().length > 0
+                    {profile?.username && profile.username.trim().length > 0
                       ? profile.username
                       : "No username"}
                   </p>
@@ -453,6 +329,7 @@ export default function ProfilePage() {
 
             {/* Skills Section */}
             <div className="grid md:grid-cols-2 gap-6">
+              {/* Skills I Teach */}
               <div className="bg-white rounded-3xl shadow-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -479,20 +356,20 @@ export default function ProfilePage() {
                     .split(",")
                     .filter((skill) => skill.trim().length > 0)
                     .map((skill, idx) => {
-                      const logo = getSkillLogo(skill);
+                      const icon = getSkillIcon(skill);
                       return (
                         <div
                           key={idx}
                           className="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-xl border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all"
                         >
-                          {logo ? (
+                          {icon.type === "url" ? (
                             <img
-                              src={logo}
+                              src={icon.value}
                               alt={skill.trim()}
                               className="w-5 h-5 object-contain"
                             />
                           ) : (
-                            <div className="w-2 h-2 bg-gray-800 rounded-sm"></div>
+                            <span className="text-base">{icon.value}</span>
                           )}
                           <span className="text-sm font-medium text-gray-800">
                             {skill.trim()}
@@ -506,6 +383,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
+              {/* Skills I Want to Learn */}
               <div className="bg-white rounded-3xl shadow-2xl p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
@@ -532,20 +410,20 @@ export default function ProfilePage() {
                     .split(",")
                     .filter((skill) => skill.trim().length > 0)
                     .map((skill, idx) => {
-                      const logo = getSkillLogo(skill);
+                      const icon = getSkillIcon(skill);
                       return (
                         <div
                           key={idx}
                           className="flex items-center gap-2 px-4 py-2 bg-purple-50 rounded-xl border border-purple-200 hover:border-purple-300 hover:bg-purple-100 transition-all"
                         >
-                          {logo ? (
+                          {icon.type === "url" ? (
                             <img
-                              src={logo}
+                              src={icon.value}
                               alt={skill.trim()}
                               className="w-5 h-5 object-contain"
                             />
                           ) : (
-                            <div className="w-2 h-2 bg-purple-600 rounded-sm"></div>
+                            <span className="text-base">{icon.value}</span>
                           )}
                           <span className="text-sm font-medium text-purple-800">
                             {skill.trim()}
@@ -563,6 +441,7 @@ export default function ProfilePage() {
             </div>
           </>
         ) : (
+          // Edit mode (same UI as before)
           <div className="bg-white rounded-3xl shadow-2xl p-8">
             <div className="mb-8">
               <h2 className="text-3xl font-bold text-gray-900 mb-2">
@@ -717,7 +596,6 @@ export default function ProfilePage() {
                 </select>
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-4 pt-6 border-t border-gray-200">
                 <button
                   type="button"

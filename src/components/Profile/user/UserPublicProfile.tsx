@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   doc,
   onSnapshot,
@@ -12,6 +12,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/firebaseConfig";
+import { getSkillIcon } from "@/utils/skillicons/skillIcons";
 
 type UserDoc = {
   displayName?: string;
@@ -26,7 +27,7 @@ type UserDoc = {
   status?: string;
   availability?: string;
   verified?: boolean;
-  skills?: string;        // comma-separated
+  skills?: string; // comma-separated
   skillsToLearn?: string; // comma-separated
 };
 
@@ -36,147 +37,6 @@ type Lesson = {
   description?: string;
   skillCategory?: string;
   category?: string;
-};
-
-// Map skills → devicon CDN URL or emoji
-const getSkillIcon = (
-  skill: string
-): { type: "emoji" | "url"; value: string } => {
-  const skillLower = skill.toLowerCase().trim();
-
-  const logoMap: { [key: string]: string } = {
-    java: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg",
-    python:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg",
-    javascript:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg",
-    js: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg",
-    typescript:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg",
-    ts: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg",
-    "c++":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cplusplus/cplusplus-original.svg",
-    cpp: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/cplusplus/cplusplus-original.svg",
-    "c#":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/csharp/csharp-original.svg",
-    csharp:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/csharp/csharp-original.svg",
-    c: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/c/c-original.svg",
-    ruby: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ruby/ruby-original.svg",
-    go: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg",
-    golang:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg",
-    rust: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-plain.svg",
-    php: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg",
-    swift:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/swift/swift-original.svg",
-    kotlin:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kotlin/kotlin-original.svg",
-    dart: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/dart/dart-original.svg",
-
-    // React – correct logo
-    react:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
-    reactjs:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
-    "react js":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
-
-    vue: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg",
-    "vue.js":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg",
-    angular:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/angularjs/angularjs-original.svg",
-    html: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg",
-    html5:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/html5/html5-original.svg",
-    css: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg",
-    css3:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/css3/css3-original.svg",
-    node:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",
-    nodejs:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",
-    "node.js":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg",
-    nextjs:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg",
-    "next.js":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nextjs/nextjs-original.svg",
-    svelte:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/svelte/svelte-original.svg",
-    spring:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg",
-    "spring boot":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg",
-    django:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/django/django-plain.svg",
-    flask:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/flask/flask-original.svg",
-    express:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg",
-    "express.js":
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg",
-    flutter:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/flutter/flutter-original.svg",
-    mongodb:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg",
-    mysql:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg",
-    postgresql:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
-    postgres:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
-    redis:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg",
-    firebase:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/firebase/firebase-plain.svg",
-    sql: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg",
-    docker:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg",
-    kubernetes:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg",
-    git: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg",
-    github:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/github/github-original.svg",
-    gitlab:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/gitlab/gitlab-original.svg",
-    linux:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg",
-    ubuntu:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ubuntu/ubuntu-plain.svg",
-    aws: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/amazonwebservices/amazonwebservices-original.svg",
-    tailwind:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg",
-    tailwindcss:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/tailwindcss/tailwindcss-plain.svg",
-    bootstrap:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/bootstrap/bootstrap-original.svg",
-    sass: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sass/sass-original.svg",
-    figma:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/figma/figma-original.svg",
-    photoshop:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/photoshop/photoshop-plain.svg",
-    illustrator:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/illustrator/illustrator-plain.svg",
-    xd: "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/xd/xd-plain.svg",
-    graphql:
-      "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/graphql/graphql-plain.svg",
-  };
-
-  for (const [key, logo] of Object.entries(logoMap)) {
-    if (skillLower.includes(key)) {
-      return { type: "url", value: logo };
-    }
-  }
-
-  if (skillLower.includes("design")) return { type: "emoji", value: "🎨" };
-  if (skillLower.includes("data")) return { type: "emoji", value: "📊" };
-  if (skillLower.includes("web")) return { type: "emoji", value: "🌐" };
-  if (skillLower.includes("mobile")) return { type: "emoji", value: "📱" };
-  if (skillLower.includes("backend")) return { type: "emoji", value: "⚙️" };
-
-  return { type: "emoji", value: "💡" };
 };
 
 const getAvatarUrl = (userData?: UserDoc | null): string => {
@@ -202,11 +62,23 @@ const getDisplayName = (userData?: UserDoc | null): string => {
 
 const UserPublicProfile = () => {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [user, setUser] = useState<UserDoc | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // realtime user
+  // Update browser tab title when user changes
+  useEffect(() => {
+    if (!user) return;
+    const name = getDisplayName(user);
+    const prevTitle = document.title;
+    document.title = `SkillSwap | ${name}`;
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [user]);
+
+  // Realtime user profile
   useEffect(() => {
     if (!params?.id) return;
 
@@ -232,7 +104,7 @@ const UserPublicProfile = () => {
     return () => unsubscribe();
   }, [params?.id]);
 
-  // lessons
+  // Lessons uploaded by this user
   useEffect(() => {
     const loadLessons = async () => {
       if (!params?.id) return;
@@ -482,6 +354,12 @@ const UserPublicProfile = () => {
                         {lesson.skillCategory || lesson.category}
                       </span>
                     ) : null}
+                    <button
+                      onClick={() => router.push(`/skills/${lesson.id}`)}
+                      className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-semibold hover:bg-blue-600 transition-colors"
+                    >
+                      View Skill
+                    </button>
                   </div>
                 </div>
               ))}
