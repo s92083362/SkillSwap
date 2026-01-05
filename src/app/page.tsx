@@ -1,4 +1,4 @@
-import SkillSwapLanding from './components/SkillSwapLanding';
+import SkillSwapLanding from '@/components/landing/SkillSwapLanding';
 
 export default function Home() {
   
