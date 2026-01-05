@@ -1,17 +1,25 @@
+
 "use client";
 import React, { useEffect, useState } from "react";
 import { PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { collection, getDocs, query, where, DocumentData } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  DocumentData,
+} from "firebase/firestore";
 import { db, auth } from "@/lib/firebase/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { getSkillIcon } from "@/utils/skillicons/skillIcons";
 
 type Lesson = {
   id: string;
   title: string;
   image?: string;
   creatorId: string;
-  // add other fields if you use them
+  
 };
 
 export default function MyLessonsPage() {
@@ -59,14 +67,14 @@ export default function MyLessonsPage() {
     router.push(`/lessons/manage/${lessonId}`);
   };
 
-   useEffect(() => {
-          const prevTitle = document.title;
-          document.title = "SkillSwap | MySkills";
-      
-          return () => {
-            document.title = prevTitle;
-          };
-        }, []);
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = "SkillSwap | MySkills";
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
@@ -87,35 +95,47 @@ export default function MyLessonsPage() {
           <div className="text-gray-500 text-center">Loading...</div>
         ) : lessons.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm flex items-center gap-6"
-              >
-                <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-4xl overflow-hidden">
-                  {lesson.image && lesson.image.startsWith("http") ? (
-                    <img
-                      src={lesson.image}
-                      alt={lesson.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>🎬</span>
-                  )}
-                </div>
-                <div className="flex-grow">
-                  <div className="font-bold text-gray-900 text-[20px] mb-2">
-                    {lesson.title}
+            {lessons.map((lesson) => {
+              // derive icon from lesson title, e.g. "Java Basics" -> "Java"
+              const mainSkill = lesson.title.split(" ")[0];
+              const icon = getSkillIcon(mainSkill);
+
+              return (
+                <div
+                  key={lesson.id}
+                  className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm flex items-center gap-6"
+                >
+                  <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center text-4xl overflow-hidden">
+                    {lesson.image && lesson.image.startsWith("http") ? (
+                      <img
+                        src={lesson.image}
+                        alt={lesson.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : icon.type === "url" ? (
+                      <img
+                        src={icon.value}
+                        alt={mainSkill}
+                        className="w-12 h-12 object-contain"
+                      />
+                    ) : (
+                      <span className="text-3xl">{icon.value}</span>
+                    )}
                   </div>
-                  <button
-                    onClick={() => handleManage(lesson.id)}
-                    className="text-blue-600 hover:text-blue-700 font-medium text-base"
-                  >
-                    Manage
-                  </button>
+                  <div className="flex-grow">
+                    <div className="font-bold text-gray-900 text-[20px] mb-2">
+                      {lesson.title}
+                    </div>
+                    <button
+                      onClick={() => handleManage(lesson.id)}
+                      className="text-blue-600 hover:text-blue-700 font-medium text-base"
+                    >
+                      Manage
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="text-gray-500 text-center py-10">
