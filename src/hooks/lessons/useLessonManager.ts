@@ -243,7 +243,7 @@ export function useLessonManager(lessonId: string | undefined) {
         setIsUploadingImage(false);
       });
 
-      xhr.open('POST', '/api/upload-image');
+      xhr.open('POST', '/api/upload/image');
       xhr.send(formData);
     } catch {
       alert('Failed to upload image');
