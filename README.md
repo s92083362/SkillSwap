@@ -1,11 +1,18 @@
 # SkillSwap
 
+<p align="center">
+  <img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&duration=2500&pause=400&color=38BDF8&center=true&vCenter=true&width=550&lines=Welcome+to+SkillSwap;Peer-to-Peer+Skill+Sharing;Learn+Skills,+Teach+Skills" />
+</p>
+
+
 > A peer-to-peer skill exchange platform that breaks down monetary barriers to learning
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Node.js](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![Firebase](https://img.shields.io/badge/Firebase-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
+
+
 
 
 ## 📖 About The Project
