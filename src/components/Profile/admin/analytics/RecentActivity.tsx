@@ -40,23 +40,34 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ logs }) => (
     </div>
 
     <div className="space-y-4">
-      {logs.slice(0, 5).map((log) => {
+      {logs.slice(0, 5).map((log, index) => {
         const date = log.timestamp?.toDate?.() || new Date(log.timestamp);
+        const description = log.description || '';
+        
+        // Parse description to separate "New user Liam" from "completed verification."
+        const parts = description.match(/^(.*?\s+\w+)\s+(.+)$/);
+        const boldPart = parts ? parts[1] : description.split(' ').slice(0, 2).join(' ');
+        const normalPart = parts ? parts[2] : description.split(' ').slice(2).join(' ');
+        
         return (
-          <div key={log.id} className="flex gap-3">
-            <div className="flex flex-col items-center">
+          <div key={log.id} className="flex gap-3 items-start">
+            <div className="flex flex-col items-center pt-1">
               <span
                 className={`h-3 w-3 rounded-full ${dotColor(
                   log.type
-                )} border-2 border-white shadow`}
+                )} border-2 border-white shadow flex-shrink-0`}
               />
-              <span className="flex-1 w-px bg-gray-200 mt-1" />
+              {index < logs.slice(0, 5).length - 1 && (
+                <span className="w-px bg-gray-200 mt-1 h-8" />
+              )}
             </div>
-            <div className="flex-1">
-              <p className="text-xs text-gray-500 mb-0.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-500 mb-1">
                 {timeAgo(date)}
               </p>
-              <p className="text-sm text-gray-800">{log.description}</p>
+              <p className="text-sm text-gray-800">
+                <span className="font-semibold">{boldPart}</span> {normalPart}
+              </p>
             </div>
           </div>
         );
