@@ -10,6 +10,8 @@ import {
   limit,
   doc,
   getDoc,
+  onSnapshot,
+  Timestamp,
 } from "firebase/firestore";
 import { db, auth } from "../../../../lib/firebase/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -37,7 +39,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import RecentActivity, { RecentActivityProps } from "./RecentActivity";
+import RecentActivity from "./RecentActivity";
 import {
   processActivityData,
   calculateStatsData,
@@ -49,7 +51,14 @@ import {
   StatsCard,
 } from "@/utils/analytics/analyticsUtils";
 
-type ActivityLogItem = RecentActivityProps["logs"][number];
+type ActivityLogItem = {
+  id: string;
+  description: string;
+  timestamp: Timestamp | Date;
+  type?: string;
+  userId?: string;
+  action?: string;
+};
 
 export default function AnalyticsReport() {
   const [user] = useAuthState(auth as any);
@@ -104,6 +113,65 @@ export default function AnalyticsReport() {
 
     init();
   }, [user, timeRange]);
+
+  // Real-time listener for recent activity logs
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    let unsubscribe: (() => void) | undefined;
+
+    const setupRealtimeListener = async () => {
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        const adminFlag = userSnap.exists() && userSnap.data().isAdmin === true;
+
+        // Build query based on admin status
+        let logsQuery;
+        if (adminFlag) {
+          // Admin: get all recent logs
+          logsQuery = query(
+            collection(db, "activityLogs"),
+            orderBy("timestamp", "desc"),
+            limit(10)
+          );
+        } else {
+          // Regular user: only their logs
+          logsQuery = query(
+            collection(db, "activityLogs"),
+            where("userId", "==", user.uid),
+            orderBy("timestamp", "desc"),
+            limit(10)
+          );
+        }
+
+        // Set up real-time listener
+        unsubscribe = onSnapshot(logsQuery, (snapshot) => {
+          const logs = snapshot.docs.map(doc => ({
+            id: doc.id,
+            description: doc.data().description || '',
+            timestamp: doc.data().timestamp,
+            type: doc.data().type,
+            userId: doc.data().userId,
+            action: doc.data().action,
+          })) as ActivityLogItem[];
+
+          setRecentLogs(logs);
+        }, (error) => {
+          console.error("❌ Error in real-time listener:", error);
+        });
+      } catch (err) {
+        console.error("❌ Error setting up real-time listener:", err);
+      }
+    };
+
+    setupRealtimeListener();
+
+    // Cleanup listener on unmount
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [user]);
 
   // Load KPI summary cards
   useEffect(() => {
@@ -220,14 +288,6 @@ export default function AnalyticsReport() {
         { ...statsData.avgSession, icon: <Clock className="w-5 h-5" /> },
         { ...statsData.totalTime, icon: <Calendar className="w-5 h-5" /> },
       ]);
-
-      // Recent Activity timeline (sorted newest first)
-      const sorted = [...logs].sort(
-        (a: any, b: any) =>
-          (b.timestamp?.toMillis?.() || 0) -
-          (a.timestamp?.toMillis?.() || 0)
-      );
-      setRecentLogs(sorted);
 
       setUseMockData(false);
       setError(null);

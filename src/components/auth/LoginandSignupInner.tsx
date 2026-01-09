@@ -11,6 +11,61 @@ import {
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase/firebaseConfig";
 
+const getFirebaseErrorMessage = (error: unknown): string => {
+  if (!(error instanceof Error)) {
+    return "An unexpected error occurred. Please try again.";
+  }
+
+  const errorMessage = error.message.toLowerCase();
+  const errorCode = errorMessage.match(/auth\/([a-z-]+)/)?.[1];
+
+  const errorMessages: Record<string, string> = {
+    "email-already-in-use": "This email is already registered. Please login instead.",
+    "invalid-email": "Please enter a valid email address.",
+    "user-not-found": "No account found with this email. Please sign up first.",
+    "wrong-password": "Incorrect password. Please try again or reset your password.",
+    "invalid-credential": "Invalid email or password. Please check your credentials.",
+    "invalid-login-credentials": "Invalid email or password. Please try again.",
+    "weak-password": "Password is too weak. Please use at least 6 characters.",
+    "password-does-not-meet-requirements": "Password must be at least 6 characters long.",
+    "user-disabled": "This account has been disabled. Please contact support.",
+    "account-exists-with-different-credential": "An account already exists with this email using a different sign-in method.",
+    "network-request-failed": "Network error. Please check your internet connection.",
+    "too-many-requests": "Too many failed attempts. Please wait a moment and try again.",
+    "popup-closed-by-user": "Sign-in cancelled. Please try again.",
+    "popup-blocked": "Pop-up blocked. Please allow pop-ups for this site.",
+    "cancelled-popup-request": "Sign-in cancelled. Please try again.",
+    "operation-not-allowed": "This sign-in method is not enabled. Please contact support.",
+    "requires-recent-login": "Please log in again to complete this action.",
+  };
+
+  if (errorCode && errorMessages[errorCode]) {
+    return errorMessages[errorCode];
+  }
+
+  if (errorMessage.includes("email")) {
+    return "Please enter a valid email address.";
+  }
+  if (errorMessage.includes("password")) {
+    return "Password must be at least 6 characters long.";
+  }
+  if (errorMessage.includes("network")) {
+    return "Network error. Please check your internet connection.";
+  }
+
+  return "Something went wrong. Please try again.";
+};
+
+const getSuccessMessage = (action: "login" | "signup" | "social"): string => {
+  const messages = {
+    login: "Login successful!",
+    signup: "Account created successfully!",
+    social: "Login successful!",
+  };
+  return messages[action];
+};
+
+
 export default function LoginAndSignupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -29,15 +84,12 @@ export default function LoginAndSignupInner() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // loading states
   const [loadingLogin, setLoadingLogin] = useState(false);
   const [loadingSignup, setLoadingSignup] = useState(false);
   const [loadingSocial, setLoadingSocial] = useState(false);
 
-  // Get redirect URL from query params (e.g. /profile from email link)
   const redirectUrl = searchParams.get("redirect");
 
-  // Initialize tab from URL (?tab=login or ?tab=signup)
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab === "login" || tab === "signup") {
@@ -45,7 +97,6 @@ export default function LoginAndSignupInner() {
     }
   }, [searchParams]);
 
-  // Set browser tab title based on activeTab
   useEffect(() => {
     const base = "SkillSwap |  ";
     if (activeTab === "login") {
@@ -65,12 +116,11 @@ export default function LoginAndSignupInner() {
     }
   };
 
-  // Google Login - save user data with createdAt
   const handleGoogleLogin = async () => {
     setError("");
     setLoadingSocial(true);
     try {
-      const user = await googleLogin(); // Returns User
+      const user = await googleLogin();
 
       await setDoc(
         doc(db, "users", user.uid),
@@ -86,24 +136,23 @@ export default function LoginAndSignupInner() {
         { merge: true }
       );
 
-      setSuccess("You are logged in successfully");
+      setSuccess(getSuccessMessage("social"));
       setTimeout(() => {
         setSuccess("");
         handlePostLoginRedirect();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoadingSocial(false);
     }
   };
 
-  // Facebook Login - save user data with createdAt
   const handleFacebookLogin = async () => {
     setError("");
     setLoadingSocial(true);
     try {
-      const user = await facebookLogin(); // Returns User
+      const user = await facebookLogin();
 
       await setDoc(
         doc(db, "users", user.uid),
@@ -119,38 +168,46 @@ export default function LoginAndSignupInner() {
         { merge: true }
       );
 
-      setSuccess("You are logged in successfully");
+      setSuccess(getSuccessMessage("social"));
       setTimeout(() => {
         setSuccess("");
         handlePostLoginRedirect();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoadingSocial(false);
     }
   };
 
-  // Sign Up - save user data + send welcome email
   const handleSignUp = async () => {
+    // Clear previous messages
+    setError("");
+    setSuccess("");
+
+    // Validation with user-friendly messages
     if (
       !signupData.username ||
       !signupData.email ||
       !signupData.password ||
       !signupData.confirmPassword
     ) {
-      setError("Please fill all the fields");
+      setError("Please fill in all the fields to continue.");
       return;
     }
     if (!agreed) {
-      setError("Please agree to the terms and conditions");
+      setError("Please agree to the Terms of Use and Privacy Policy to continue.");
       return;
     }
     if (signupData.password !== signupData.confirmPassword) {
-      setError("Passwords do not match");
+      setError("Passwords don't match. Please make sure both passwords are the same.");
       return;
     }
-    setError("");
+    if (signupData.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+
     setLoadingSignup(true);
 
     try {
@@ -169,7 +226,7 @@ export default function LoginAndSignupInner() {
         photoURL: "",
       });
 
-      setSuccess("You are registered successfully");
+      setSuccess(getSuccessMessage("signup"));
 
       fetch("/api/send-welcome-email", {
         method: "POST",
@@ -191,19 +248,22 @@ export default function LoginAndSignupInner() {
         }
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoadingSignup(false);
     }
   };
 
-  // Login - update lastLogin timestamp
   const handleLogin = async () => {
+    // Clear previous messages
+    setError("");
+    setSuccess("");
+
     if (!loginData.email || !loginData.password) {
-      setError("Please fill all the fields");
+      setError("Please enter both email and password.");
       return;
     }
-    setError("");
+
     setLoadingLogin(true);
     try {
       const user = await login(loginData.email, loginData.password);
@@ -216,19 +276,18 @@ export default function LoginAndSignupInner() {
         { merge: true }
       );
 
-      setSuccess("You are logged in successfully");
+      setSuccess(getSuccessMessage("login"));
       setTimeout(() => {
         setSuccess("");
         handlePostLoginRedirect();
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(getFirebaseErrorMessage(err));
     } finally {
       setLoadingLogin(false);
     }
   };
 
-  // Forgot Password
   const handleForgotPassword = () => {
     router.push("/auth/forgot-password");
   };
@@ -268,7 +327,6 @@ export default function LoginAndSignupInner() {
     </svg>
   );
 
-  // circular grey/white spinner
   const Spinner = (
     <span className="inline-block w-6 h-6 rounded-full border-[3px] border-gray-300 border-t-white animate-spin" />
   );
@@ -278,7 +336,6 @@ export default function LoginAndSignupInner() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-5xl flex flex-col lg:flex-row overflow-hidden">
-        {/* Left Side - Image Section */}
         <div className="w-full lg:w-1/2 bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center p-6">
           <img
             src="https://i.ibb.co/prv9CVH7/Welcome-to-Skill-Swap-1-1.png"
@@ -287,7 +344,6 @@ export default function LoginAndSignupInner() {
           />
         </div>
 
-        {/* Right Side - Form Section */}
         <div className="w-full lg:w-1/2 p-6 lg:p-10">
           {redirectUrl && (
             <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-2 rounded mb-4 text-sm text-center">
@@ -295,7 +351,6 @@ export default function LoginAndSignupInner() {
             </div>
           )}
 
-          {/* Tabs */}
           <div className="flex mb-6">
             <button
               onClick={() => {
@@ -327,18 +382,26 @@ export default function LoginAndSignupInner() {
             </button>
           </div>
 
+          {/* Enhanced Success Message */}
           {success && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-2 rounded mb-2 text-center font-semibold">
-              {success}
+            <div className="bg-green-50 border-l-4 border-green-500 text-green-800 px-4 py-3 rounded mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span className="font-medium">{success}</span>
             </div>
           )}
+
+          {/* Enhanced Error Message */}
           {error && (
-            <p className="text-red-500 text-sm mb-2">
-              {error}
-            </p>
+            <div className="bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded mb-4 flex items-start gap-2">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span className="font-medium">{error}</span>
+            </div>
           )}
 
-          {/* SignUp Form */}
           {activeTab === "signup" && (
             <div className="space-y-4">
               <input
@@ -480,7 +543,6 @@ export default function LoginAndSignupInner() {
             </div>
           )}
 
-          {/* Login Form */}
           {activeTab === "login" && (
             <div className="space-y-4">
               <input
