@@ -37,15 +37,20 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({
 
   // Determine active section based on current route
   const getActiveSection = () => {
+    // Only set home as active if we're actually on the dashboard page
     if (pathname === "/dash-board") {
       return "home";
     }
+   
+    // Check for profile page sections
     if (pathname === "/profile") {
       const section = searchParams.get("section");
       if (section === "analytics") return "analytics";
       if (section === "messages") return "messages";
     }
-    return "home";
+   
+    // For any other page, return null (no active section)
+    return null;
   };
 
   const [activeSection, setActiveSection] = useState(getActiveSection());
