@@ -71,11 +71,31 @@ export default function AdminSidebar({
     icon: React.ReactNode;
     label: string;
   }[] = [
-    { key: "overview", icon: <User className="w-4 h-4 sm:w-5 sm:h-5" />, label: "Profile Overview" },
-    { key: "settings", icon: <Settings className="w-4 h-4 sm:w-5 sm:h-5" />, label: "Settings" },
-    { key: "security", icon: <Shield className="w-4 h-4 sm:w-5 sm:h-5" />, label: "Security" },
-    { key: "messages", icon: <Mail className="w-4 h-4 sm:w-5 sm:h-5" />, label: "Messages" },
-    { key: "analytics", icon: <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />, label: "Analytics Report" },
+    {
+      key: "overview",
+      icon: <User className="w-4 h-4 sm:w-5 sm:h-5" />,
+      label: "Profile Overview",
+    },
+    {
+      key: "settings",
+      icon: <Settings className="w-4 h-4 sm:w-5 sm:h-5" />,
+      label: "Settings",
+    },
+    {
+      key: "security",
+      icon: <Shield className="w-4 h-4 sm:w-5 sm:h-5" />,
+      label: "Security",
+    },
+    {
+      key: "messages",
+      icon: <Mail className="w-4 h-4 sm:w-5 sm:h-5" />,
+      label: "Messages",
+    },
+    {
+      key: "analytics",
+      icon: <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />,
+      label: "Analytics Report",
+    },
   ];
 
   const handleLogoutClick = () => {
@@ -122,18 +142,10 @@ export default function AdminSidebar({
   const displayName = loading ? "Loading..." : user?.displayName || "Admin";
 
   const goToSection = (section: SectionKey) => {
-    console.log("🔄 Navigating to section:", section);
-    console.log("📍 Current activeSection before update:", activeSection);
-    
-    // Call the parent's setter
+    // inform parent
     setActiveSection(section);
-    
-    // Force a check after state update
-    setTimeout(() => {
-      console.log("✅ activeSection after update:", activeSection);
-    }, 100);
 
-    // Track navigation action for analytics
+    // optional analytics
     trackAction("page_view", {
       section,
       page: "profile",
@@ -144,11 +156,6 @@ export default function AdminSidebar({
       setMobileMenuOpen(false);
     }
   };
-
-  // Debug: Log activeSection changes
-  useEffect(() => {
-    console.log("🎯 Active section changed to:", activeSection);
-  }, [activeSection]);
 
   const sidebarContent = (
     <div className="relative flex flex-col items-center w-full h-full">
@@ -174,7 +181,7 @@ export default function AdminSidebar({
         </p>
       </div>
 
-      {/* Main nav area grows, pushing logout down */}
+      {/* Nav */}
       <div className="w-full flex-1 flex flex-col gap-1 sm:gap-2 overflow-y-auto px-2 sm:px-0">
         <ul className="w-full space-y-0.5 sm:space-y-1">
           {navItems.map((item) => (
@@ -192,7 +199,7 @@ export default function AdminSidebar({
         </ul>
       </div>
 
-      {/* Logout pinned to bottom and left-aligned */}
+      {/* Logout */}
       <div className="w-full px-2 sm:px-0">
         <button
           onClick={handleLogoutClick}

@@ -75,43 +75,23 @@ export default function AdminOverview() {
   const [user] = useAuthState(auth as any);
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-<<<<<<< HEAD
-
-=======
- 
->>>>>>> origin/dev
   // Analytics Stats
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [activeExchanges, setActiveExchanges] = useState<number>(0);
   const [totalLessons, setTotalLessons] = useState<number>(0);
   const [todayActivity, setTodayActivity] = useState<number>(0);
-<<<<<<< HEAD
 
   // Growth percentages
-=======
- 
-  // Growth percentages (calculated from real data)
->>>>>>> origin/dev
   const [userGrowth, setUserGrowth] = useState(0);
   const [exchangeGrowth, setExchangeGrowth] = useState(0);
   const [lessonGrowth, setLessonGrowth] = useState(0);
   const [activityGrowth, setActivityGrowth] = useState(0);
-<<<<<<< HEAD
-
-=======
- 
->>>>>>> origin/dev
   // Unread Messages
   const [unreadMessages, setUnreadMessages] = useState<Message[]>([]);
   const [totalUnreadCount, setTotalUnreadCount] = useState(0);
   const [messagesLoading, setMessagesLoading] = useState(true);
-<<<<<<< HEAD
 
   // Important Updates (now real-time from Firestore)
-=======
- 
-  // Important Updates
->>>>>>> origin/dev
   const [updates, setUpdates] = useState<Update[]>([]);
 
   useEffect(() => {
@@ -124,18 +104,8 @@ export default function AdminOverview() {
     try {
       setLoading(true);
 
-<<<<<<< HEAD
       await loadAnalyticsStats();
       loadUnreadMessages();
-=======
-      // Load Analytics Stats
-      await loadAnalyticsStats();
-
-      // Load Unread Messages
-      loadUnreadMessages();
-
-      // Load Important Updates
->>>>>>> origin/dev
       loadImportantUpdates();
 
       setLoading(false);
@@ -159,11 +129,7 @@ export default function AdminOverview() {
       const currentUsers = usersSnap.size;
       setTotalUsers(currentUsers);
 
-<<<<<<< HEAD
       // Users from last week
-=======
-      // Users from last week (for growth calculation)
->>>>>>> origin/dev
       try {
         const usersLastWeekSnap = await getDocs(
           query(
@@ -173,16 +139,10 @@ export default function AdminOverview() {
           )
         );
         const usersLastWeek = usersLastWeekSnap.size;
-<<<<<<< HEAD
         const userGrowthCalc =
           usersLastWeek > 0
             ? ((currentUsers - usersLastWeek) / usersLastWeek) * 100
             : 0;
-=======
-        const userGrowthCalc = usersLastWeek > 0
-          ? ((currentUsers - usersLastWeek) / usersLastWeek) * 100
-          : 0;
->>>>>>> origin/dev
         setUserGrowth(parseFloat(userGrowthCalc.toFixed(1)));
       } catch (error) {
         console.error("Error calculating user growth:", error);
@@ -211,17 +171,11 @@ export default function AdminOverview() {
           )
         );
         const exchangesLastWeek = exchangesLastWeekSnap.size;
-<<<<<<< HEAD
         const exchangeGrowthCalc =
           exchangesLastWeek > 0
             ? ((currentExchanges - exchangesLastWeek) / exchangesLastWeek) *
               100
             : 0;
-=======
-        const exchangeGrowthCalc = exchangesLastWeek > 0
-          ? ((currentExchanges - exchangesLastWeek) / exchangesLastWeek) * 100
-          : 0;
->>>>>>> origin/dev
         setExchangeGrowth(parseFloat(exchangeGrowthCalc.toFixed(1)));
       } catch (error) {
         console.error("Error calculating exchange growth:", error);
@@ -245,16 +199,10 @@ export default function AdminOverview() {
           )
         );
         const lessonsLastWeek = lessonsLastWeekSnap.size;
-<<<<<<< HEAD
         const lessonGrowthCalc =
           lessonsLastWeek > 0
             ? ((currentLessons - lessonsLastWeek) / lessonsLastWeek) * 100
             : 0;
-=======
-        const lessonGrowthCalc = lessonsLastWeek > 0
-          ? ((currentLessons - lessonsLastWeek) / lessonsLastWeek) * 100
-          : 0;
->>>>>>> origin/dev
         setLessonGrowth(parseFloat(lessonGrowthCalc.toFixed(1)));
       } catch (error) {
         console.error("Error calculating lesson growth:", error);
@@ -272,11 +220,7 @@ export default function AdminOverview() {
       const activityToday = activityTodaySnap.size;
       setTodayActivity(activityToday);
 
-<<<<<<< HEAD
       // Activity from previous period
-=======
-      // Activity from previous 24 hours (for comparison)
->>>>>>> origin/dev
       try {
         const activityYesterdaySnap = await getDocs(
           query(
@@ -287,25 +231,15 @@ export default function AdminOverview() {
           )
         );
         const activityYesterday = activityYesterdaySnap.size;
-<<<<<<< HEAD
         const activityGrowthCalc =
           activityYesterday > 0
             ? ((activityToday - activityYesterday) / activityYesterday) * 100
             : 0;
-=======
-        const activityGrowthCalc = activityYesterday > 0
-          ? ((activityToday - activityYesterday) / activityYesterday) * 100
-          : 0;
->>>>>>> origin/dev
         setActivityGrowth(parseFloat(activityGrowthCalc.toFixed(1)));
       } catch (error) {
         console.error("Error calculating activity growth:", error);
         setActivityGrowth(0);
       }
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/dev
     } catch (error) {
       console.error("Error loading analytics stats:", error);
     }
@@ -321,10 +255,6 @@ export default function AdminOverview() {
 
       setMessagesLoading(true);
 
-<<<<<<< HEAD
-=======
-      // Query for UNREAD messages only with real-time listener
->>>>>>> origin/dev
       const messagesQuery = query(
         collection(db, "messages"),
         where("receiverId", "==", user.uid),
@@ -333,10 +263,6 @@ export default function AdminOverview() {
         limit(5)
       );
 
-<<<<<<< HEAD
-=======
-      // Set up real-time listener
->>>>>>> origin/dev
       const unsubscribe = onSnapshot(
         messagesQuery,
         async (snapshot) => {
@@ -344,26 +270,14 @@ export default function AdminOverview() {
 
           for (const docSnap of snapshot.docs as QueryDocumentSnapshot<DocumentData>[]) {
             const raw = docSnap.data() as DocumentData;
-<<<<<<< HEAD
 
             if (raw.read === true) continue;
-=======
-           
-            // Double-check that the message is still unread
-            if (raw.read === true) {
-              continue;
-            }
->>>>>>> origin/dev
 
             const msgData: Message = {
               id: docSnap.id,
               ...raw,
             };
 
-<<<<<<< HEAD
-=======
-            // Fetch sender information
->>>>>>> origin/dev
             if (msgData.senderId) {
               try {
                 const senderRef = doc(db, "users", msgData.senderId);
@@ -397,10 +311,6 @@ export default function AdminOverview() {
         }
       );
 
-<<<<<<< HEAD
-=======
-      // Cleanup function will be called when component unmounts
->>>>>>> origin/dev
       return () => {
         unsubscribe();
       };
@@ -411,11 +321,7 @@ export default function AdminOverview() {
     }
   };
 
-<<<<<<< HEAD
   // Avatar helper
-=======
-  // Helper to get avatar URL
->>>>>>> origin/dev
   const getAvatarUrl = (userData?: UserDoc | null): string | null => {
     if (!userData) return null;
     return (
@@ -427,11 +333,7 @@ export default function AdminOverview() {
     );
   };
 
-<<<<<<< HEAD
   // Display name helper
-=======
-  // Helper to get display name
->>>>>>> origin/dev
   const getDisplayName = (userData?: UserDoc | null): string => {
     if (!userData) return "Unknown User";
     return (
@@ -442,7 +344,6 @@ export default function AdminOverview() {
     );
   };
 
-<<<<<<< HEAD
   // Load Important Updates from Firestore (realtime)
   const loadImportantUpdates = () => {
     try {
@@ -496,55 +397,17 @@ export default function AdminOverview() {
       console.error("Error setting up updates listener:", error);
       setUpdates([]);
     }
-=======
-  const loadImportantUpdates = () => {
-    // Mock updates - replace with actual data from your database
-    const mockUpdates: Update[] = [
-      {
-        id: "1",
-        title: "System Maintenance Scheduled",
-        description: "Planned maintenance on Jan 15, 2026 from 2-4 AM EST",
-        type: "info",
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      },
-      {
-        id: "2",
-        title: "New Users Spike Detected",
-        description: "50+ new user registrations in the last 24 hours",
-        type: "success",
-        timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        title: "Action Required: Pending Reports",
-        description: "5 user reports awaiting admin review",
-        type: "warning",
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      },
-    ];
-
-    setUpdates(mockUpdates);
->>>>>>> origin/dev
   };
 
   const formatTimestamp = (timestamp: Message["timestamp"]) => {
     if (!timestamp) return "";
-<<<<<<< HEAD
-
-=======
-   
->>>>>>> origin/dev
     let date: Date;
     try {
       if (timestamp instanceof Timestamp) {
         date = timestamp.toDate();
-<<<<<<< HEAD
       } else if (
         typeof (timestamp as FirestoreTimestamp).toDate === "function"
       ) {
-=======
-      } else if (typeof (timestamp as FirestoreTimestamp).toDate === "function") {
->>>>>>> origin/dev
         date = (timestamp as FirestoreTimestamp).toDate();
       } else {
         date = new Date(timestamp as any);
@@ -582,7 +445,6 @@ export default function AdminOverview() {
     router.push("/chat/messages");
   };
 
-<<<<<<< HEAD
   const handleManageLessons = () => {
     router.push("/dash-board");
   };
@@ -591,8 +453,6 @@ export default function AdminOverview() {
     router.push("/profile?section=analytics");
   };
 
-=======
->>>>>>> origin/dev
   const getUpdateIcon = (type: Update["type"]) => {
     switch (type) {
       case "warning":
@@ -645,7 +505,6 @@ export default function AdminOverview() {
             <div className="p-3 bg-blue-100 rounded-lg">
               <Users className="w-6 h-6 text-blue-600" />
             </div>
-<<<<<<< HEAD
             <div
               className={`flex items-center gap-1 text-sm font-medium ${
                 userGrowth >= 0 ? "text-green-600" : "text-red-600"
@@ -656,21 +515,13 @@ export default function AdminOverview() {
               ) : (
                 <ArrowDownRight className="w-4 h-4" />
               )}
-=======
-            <div className={`flex items-center gap-1 text-sm font-medium ${userGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {userGrowth >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
->>>>>>> origin/dev
               {Math.abs(userGrowth)}%
             </div>
           </div>
           <h3 className="text-gray-600 text-sm mb-1">Total Users</h3>
-<<<<<<< HEAD
           <p className="text-2xl font-bold text-gray-900">
             {totalUsers.toLocaleString()}
           </p>
-=======
-          <p className="text-2xl font-bold text-gray-900">{totalUsers.toLocaleString()}</p>
->>>>>>> origin/dev
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -678,7 +529,6 @@ export default function AdminOverview() {
             <div className="p-3 bg-green-100 rounded-lg">
               <Activity className="w-6 h-6 text-green-600" />
             </div>
-<<<<<<< HEAD
             <div
               className={`flex items-center gap-1 text-sm font-medium ${
                 exchangeGrowth >= 0 ? "text-green-600" : "text-red-600"
@@ -689,21 +539,13 @@ export default function AdminOverview() {
               ) : (
                 <ArrowDownRight className="w-4 h-4" />
               )}
-=======
-            <div className={`flex items-center gap-1 text-sm font-medium ${exchangeGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {exchangeGrowth >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
->>>>>>> origin/dev
               {Math.abs(exchangeGrowth)}%
             </div>
           </div>
           <h3 className="text-gray-600 text-sm mb-1">Active Exchanges</h3>
-<<<<<<< HEAD
           <p className="text-2xl font-bold text-gray-900">
             {activeExchanges.toLocaleString()}
           </p>
-=======
-          <p className="text-2xl font-bold text-gray-900">{activeExchanges.toLocaleString()}</p>
->>>>>>> origin/dev
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -711,7 +553,6 @@ export default function AdminOverview() {
             <div className="p-3 bg-purple-100 rounded-lg">
               <BookOpen className="w-6 h-6 text-purple-600" />
             </div>
-<<<<<<< HEAD
             <div
               className={`flex items-center gap-1 text-sm font-medium ${
                 lessonGrowth >= 0 ? "text-green-600" : "text-red-600"
@@ -722,21 +563,13 @@ export default function AdminOverview() {
               ) : (
                 <ArrowDownRight className="w-4 h-4" />
               )}
-=======
-            <div className={`flex items-center gap-1 text-sm font-medium ${lessonGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {lessonGrowth >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
->>>>>>> origin/dev
               {Math.abs(lessonGrowth)}%
             </div>
           </div>
           <h3 className="text-gray-600 text-sm mb-1">Total Lessons</h3>
-<<<<<<< HEAD
           <p className="text-2xl font-bold text-gray-900">
             {totalLessons.toLocaleString()}
           </p>
-=======
-          <p className="text-2xl font-bold text-gray-900">{totalLessons.toLocaleString()}</p>
->>>>>>> origin/dev
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
@@ -744,7 +577,6 @@ export default function AdminOverview() {
             <div className="p-3 bg-amber-100 rounded-lg">
               <Clock className="w-6 h-6 text-amber-600" />
             </div>
-<<<<<<< HEAD
             <div
               className={`flex items-center gap-1 text-sm font-medium ${
                 activityGrowth >= 0 ? "text-green-600" : "text-red-600"
@@ -755,21 +587,13 @@ export default function AdminOverview() {
               ) : (
                 <ArrowDownRight className="w-4 h-4" />
               )}
-=======
-            <div className={`flex items-center gap-1 text-sm font-medium ${activityGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {activityGrowth >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
->>>>>>> origin/dev
               {Math.abs(activityGrowth)}%
             </div>
           </div>
           <h3 className="text-gray-600 text-sm mb-1">Today&apos;s Activity</h3>
-<<<<<<< HEAD
           <p className="text-2xl font-bold text-gray-900">
             {todayActivity.toLocaleString()}
           </p>
-=======
-          <p className="text-2xl font-bold text-gray-900">{todayActivity.toLocaleString()}</p>
->>>>>>> origin/dev
         </div>
       </div>
 
@@ -786,25 +610,17 @@ export default function AdminOverview() {
         </div>
 
         {updates.length === 0 ? (
-<<<<<<< HEAD
           <p className="text-gray-500 text-center py-8">
             No updates at the moment
           </p>
-=======
-          <p className="text-gray-500 text-center py-8">No updates at the moment</p>
->>>>>>> origin/dev
         ) : (
           <div className="space-y-3">
             {updates.map((update) => (
               <div
                 key={update.id}
-<<<<<<< HEAD
                 className={`border rounded-lg p-4 ${getUpdateBgColor(
                   update.type
                 )}`}
-=======
-                className={`border rounded-lg p-4 ${getUpdateBgColor(update.type)}`}
->>>>>>> origin/dev
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
@@ -965,11 +781,7 @@ export default function AdminOverview() {
                 <div
                   key={message.id}
                   onClick={() => handleMessageClick(message)}
-<<<<<<< HEAD
                   className="bg-white p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 cursor-pointer hover:bg-blue-50 hover:shadow-md transition-all duration-200 border-l-4 border-blue-500 border"
-=======
-                  className="bg-white p-3 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 cursor-pointer hover:bg-blue-50 hover:shadow-md transition-all duration-200 border-l-4 border-blue-500 border border-gray-200"
->>>>>>> origin/dev
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-blue-100 overflow-hidden flex items-center justify-center flex-shrink-0">
                     {message.senderAvatar ? (
@@ -991,13 +803,9 @@ export default function AdminOverview() {
                       />
                     ) : (
                       <span className="text-sm font-semibold text-blue-700">
-<<<<<<< HEAD
                         {(message.senderName || "?")
                           .charAt(0)
                           .toUpperCase()}
-=======
-                        {(message.senderName || "?").charAt(0).toUpperCase()}
->>>>>>> origin/dev
                       </span>
                     )}
                   </div>
@@ -1006,14 +814,10 @@ export default function AdminOverview() {
                       {message.senderName || "Unknown User"}
                     </p>
                     <p className="font-semibold text-gray-700 text-sm sm:text-base truncate">
-<<<<<<< HEAD
                       {message.content ||
                         message.text ||
                         message.message ||
                         ""}
-=======
-                      {message.content || message.text || message.message || ""}
->>>>>>> origin/dev
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-1">
@@ -1043,7 +847,6 @@ export default function AdminOverview() {
         )}
       </div>
 
-<<<<<<< HEAD
       {/* Quick Actions - Only 2 Buttons */}
       <div className="grid grid-cols-2 gap-4">
         <button
@@ -1060,26 +863,6 @@ export default function AdminOverview() {
           <BookOpen className="w-8 h-8 text-purple-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
           <p className="text-sm font-medium text-gray-900">Manage Lessons</p>
         </button>
-=======
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md transition-all text-center group">
-          <Users className="w-8 h-8 text-blue-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-          <p className="text-sm font-medium text-gray-900">Manage Users</p>
-        </button>
-        <button className="bg-white border border-gray-200 rounded-xl p-4 hover:border-green-300 hover:shadow-md transition-all text-center group">
-          <Activity className="w-8 h-8 text-green-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-          <p className="text-sm font-medium text-gray-900">View Analytics</p>
-        </button>
-        <button className="bg-white border border-gray-200 rounded-xl p-4 hover:border-purple-300 hover:shadow-md transition-all text-center group">
-          <BookOpen className="w-8 h-8 text-purple-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-          <p className="text-sm font-medium text-gray-900">Manage Lessons</p>
-        </button>
-        <button className="bg-white border border-gray-200 rounded-xl p-4 hover:border-amber-300 hover:shadow-md transition-all text-center group">
-          <Mail className="w-8 h-8 text-amber-600 mx-auto mb-2 group-hover:scale-110 transition-transform" />
-          <p className="text-sm font-medium text-gray-900">Send Message</p>
-        </button>
->>>>>>> origin/dev
       </div>
     </div>
   );
