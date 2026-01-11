@@ -18,6 +18,7 @@ import { useActivityTracker } from "@/hooks/useSessionTracking";
 
 export type SectionKey =
   | "overview"
+  | "editprofile"
   | "settings"
   | "security"
   | "messages"
@@ -121,7 +122,16 @@ export default function AdminSidebar({
   const displayName = loading ? "Loading..." : user?.displayName || "Admin";
 
   const goToSection = (section: SectionKey) => {
+    console.log("🔄 Navigating to section:", section);
+    console.log("📍 Current activeSection before update:", activeSection);
+    
+    // Call the parent's setter
     setActiveSection(section);
+    
+    // Force a check after state update
+    setTimeout(() => {
+      console.log("✅ activeSection after update:", activeSection);
+    }, 100);
 
     // Track navigation action for analytics
     trackAction("page_view", {
@@ -134,6 +144,11 @@ export default function AdminSidebar({
       setMobileMenuOpen(false);
     }
   };
+
+  // Debug: Log activeSection changes
+  useEffect(() => {
+    console.log("🎯 Active section changed to:", activeSection);
+  }, [activeSection]);
 
   const sidebarContent = (
     <div className="relative flex flex-col items-center w-full h-full">

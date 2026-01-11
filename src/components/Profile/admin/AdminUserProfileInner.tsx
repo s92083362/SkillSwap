@@ -6,24 +6,33 @@ import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "../../../lib/firebase/firebaseConfig";
 import AdminHeader from "@/components/shared/header/AdminHeader";
 import AdminSidebar from "./AdminProfileSidebar";
+import AdminOverview from "./AdminOverview";
 import AdminEditProfile from "./AdminEditProfile";
 import AnalyticsReport from "./analytics/AnalyticsReport";
 import ProfileMessages from "../ProfileMessages";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
-import { Home, BarChart3, Mail } from "lucide-react";
+import { Home, BarChart3, Mail, User } from "lucide-react";
 
-type SectionKey = "overview" | "settings" | "security" | "messages" | "analytics";
+type SectionKey = "overview" | "editprofile" | "settings" | "security" | "messages" | "analytics";
+
+const validSections: SectionKey[] = [
+  "overview",
+  "editprofile",
+  "settings",
+  "security",
+  "messages",
+  "analytics",
+];
 
 export default function AdminProfilePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [user] = useAuthState(auth as any);
+  const [user] = useAuthState(auth);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useSessionTracking();
 
-  const sectionParam = (searchParams.get("section") || "overview") as string;
-  const validSections: SectionKey[] = ["overview", "settings", "security", "messages", "analytics"];
+  const sectionParam = (searchParams?.get("section") || "overview") as string;
 
   const section: SectionKey = validSections.includes(sectionParam as SectionKey)
     ? (sectionParam as SectionKey)
@@ -34,9 +43,12 @@ export default function AdminProfilePageInner() {
     setMobileMenuOpen(false);
   };
 
-  // Navigation handlers for bottom nav
   const goDashboard = () => {
     router.push("/dash-board");
+  };
+
+  const handleProfileClick = () => {
+    router.push("/profile?section=editprofile");
   };
 
   const handleAnalyticsClick = () => {
@@ -49,13 +61,22 @@ export default function AdminProfilePageInner() {
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768 && mobileMenuOpen) {
-        setMobileMenuOpen(false);
+      if (typeof window !== "undefined") {
+        if (window.innerWidth >= 768 && mobileMenuOpen) {
+          setMobileMenuOpen(false);
+        }
       }
     };
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", handleResize);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("resize", handleResize);
+      }
+    };
   }, [mobileMenuOpen]);
 
   useEffect(() => {
@@ -68,20 +89,25 @@ export default function AdminProfilePageInner() {
   }, []);
 
   useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    if (typeof document !== "undefined") {
+      if (mobileMenuOpen) {
+        document.body.style.overflow = "hidden";
+      } else {
+        document.body.style.overflow = "unset";
+      }
 
-    return () => {
-      document.body.style.overflow = "unset";
-    };
+      return () => {
+        document.body.style.overflow = "unset";
+      };
+    }
   }, [mobileMenuOpen]);
 
   const renderContent = () => {
     switch (section) {
       case "overview":
+        return <AdminOverview />;
+
+      case "editprofile":
         return <AdminEditProfile />;
 
       case "settings":
@@ -115,7 +141,7 @@ export default function AdminProfilePageInner() {
         return <AnalyticsReport />;
 
       default:
-        return <AdminEditProfile />;
+        return <AdminOverview />;
     }
   };
 
@@ -146,8 +172,8 @@ export default function AdminProfilePageInner() {
     );
   }
 
-  // Check if current page matches for bottom nav active state
-  const isHome = !section || section === "overview";
+  const isOverview = section === "overview";
+  const isProfile = section === "editprofile";
   const isAnalytics = section === "analytics";
   const isMessages = section === "messages";
 
@@ -160,63 +186,60 @@ export default function AdminProfilePageInner() {
       />
 
       <div className="flex flex-1">
-        {/* Sidebar (hamburger menu for profile sections) */}
         <AdminSidebar
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
-          activeSection={section}
           setActiveSection={handleNavigation}
+          activeSection={section}  
         />
 
-        {/* Main Content */}
         <main className="flex-1 w-full pt-20 sm:pt-24 md:pl-60 lg:pl-72 pb-16 md:pb-0 overflow-y-auto">
           <div className="w-full h-full px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">
-            <div className="max-w-6xl mx-auto w-full">
-              {renderContent()}
-            </div>
+            <div className="max-w-6xl mx-auto w-full">{renderContent()}</div>
           </div>
         </main>
       </div>
 
-      {/* Bottom Tab Navigation (Mobile only) */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg md:hidden z-40">
         <div className="flex items-center justify-around px-2 py-2">
-          {/* Home Tab */}
           <button
             type="button"
             onClick={goDashboard}
-            className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors flex-1 ${
-              isHome
-                ? "text-blue-600 bg-blue-50"
-                : "text-gray-600 hover:bg-gray-50"
+            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors flex-1 ${
+              isOverview ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-50"
             }`}
           >
             <Home className="w-5 h-5" />
             <span className="text-xs font-medium">Home</span>
           </button>
 
-          {/* Analytics Tab */}
+          <button
+            type="button"
+            onClick={handleProfileClick}
+            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors flex-1 ${
+              isProfile ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <User className="w-5 h-5" />
+            <span className="text-xs font-medium">Profile</span>
+          </button>
+
           <button
             type="button"
             onClick={handleAnalyticsClick}
-            className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors flex-1 ${
-              isAnalytics
-                ? "text-blue-600 bg-blue-50"
-                : "text-gray-600 hover:bg-gray-50"
+            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors flex-1 ${
+              isAnalytics ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-50"
             }`}
           >
             <BarChart3 className="w-5 h-5" />
             <span className="text-xs font-medium">Analytics</span>
           </button>
 
-          {/* Messages Tab */}
           <button
             type="button"
             onClick={handleMessagesClick}
-            className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors flex-1 ${
-              isMessages
-                ? "text-blue-600 bg-blue-50"
-                : "text-gray-600 hover:bg-gray-50"
+            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors flex-1 ${
+              isMessages ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-50"
             }`}
           >
             <Mail className="w-5 h-5" />
