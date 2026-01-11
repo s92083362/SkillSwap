@@ -189,9 +189,13 @@ export default function AdminProfilePageInner() {
         <AdminSidebar
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
+<<<<<<< HEAD
           setActiveSection={handleNavigation}
           activeSection={section}  
         />
+=======
+          setActiveSection={handleNavigation} activeSection={"overview"}        />
+>>>>>>> origin/dev
 
         <main className="flex-1 w-full pt-20 sm:pt-24 md:pl-60 lg:pl-72 pb-16 md:pb-0 overflow-y-auto">
           <div className="w-full h-full px-3 py-4 sm:px-4 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8">

@@ -138,7 +138,7 @@ export default function MyLessonsPage() {
             })}
           </div>
         ) : (
-          <div className="text-gray-500 text-center py-10">
+          <div className="text-gray-450 text-center py-10">
             You have not yet uploaded any lessons.
           </div>
         )}

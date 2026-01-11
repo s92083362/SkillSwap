@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -35,16 +36,23 @@ type UserDoc = {
   photoUrl?: string;
   avatar?: string;
   profilePicture?: string;
+  profilePicUrl?: string;
+  image?: string;
+  photo_url?: string;
   email?: string;
 };
 
 const getAvatarUrl = (userData?: UserDoc | null): string | null => {
   if (!userData) return null;
+
   return (
     userData.photoURL ||
     userData.photoUrl ||
     userData.avatar ||
     userData.profilePicture ||
+    userData.profilePicUrl ||
+    userData.image ||
+    userData.photo_url ||
     null
   );
 };
@@ -113,7 +121,7 @@ export default function AcceptedSwapRequests() {
     fetchAcceptedSwaps(user);
   }, [user]);
 
-  // fetch requester avatars for all unique requesterIds
+  // fetch requester avatars for all unique requesterIds / emails
   useEffect(() => {
     const loadRequesters = async () => {
       const ids = Array.from(
@@ -126,14 +134,39 @@ export default function AcceptedSwapRequests() {
 
       for (const requesterId of ids) {
         try {
+          // Try direct doc by id first
+          let avatarUrl: string | null = null;
+
           const userRef = doc(db, "users", requesterId);
-          const snap = await getDoc(userRef);
-          if (snap.exists()) {
-            const data = snap.data() as UserDoc;
-            updates[requesterId] = getAvatarUrl(data);
-          } else {
-            updates[requesterId] = null;
+          const snapById = await getDoc(userRef);
+
+          if (snapById.exists()) {
+            const data = snapById.data() as UserDoc;
+            avatarUrl = getAvatarUrl(data);
           }
+
+          // If no doc by id or no avatar, fall back to email query
+          if (!avatarUrl) {
+            const matchedRequest = acceptedRequests.find(
+              (r) => r.requesterId === requesterId
+            );
+            const email = matchedRequest?.requesterEmail;
+
+            if (email) {
+              const q = query(
+                collection(db, "users"),
+                where("email", "==", email)
+              );
+              const snapByEmail = await getDocs(q);
+              if (!snapByEmail.empty) {
+                const data = snapByEmail.docs[0].data() as UserDoc;
+                avatarUrl = getAvatarUrl(data);
+              }
+            }
+          }
+
+          console.log("Requester avatar:", requesterId, avatarUrl);
+          updates[requesterId] = avatarUrl ?? null;
         } catch (e) {
           console.error("Error fetching requester profile:", e);
           updates[requesterId] = null;
